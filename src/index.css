@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-[#09090b]: #121212;
+  --color-[#0c0c0e]: #1a1a1c;
+  --color-[#07070a]: #121212;
+  --color-[#070709]: #121212;
+  --color-[#0b0b0d]: #1a1a1c;
+  
+  /* Overwrite zinc shades for comfortable, premium eye-friendly charcoal dark surfaces */
+  --color-zinc-950: #121212;
+  --color-zinc-900: #1a1a1c;
+  --color-zinc-850: #242427;
+  --color-zinc-800: #2d2d31;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-650: #4f4f56;
+  --color-zinc-350: #a8a8af;
+  --color-zinc-250: #d4d4d8;
+  --color-zinc-205: #e4e4e7;
+  --color-zinc-905: #161618;
+  --color-zinc-855: #202023;
+  --color-zinc-805: #2d2d30;
+  
+  /* Overwrite neutral shades for perfect consistency across UI files */
+  --color-neutral-950: #121212;
+  --color-neutral-900: #1a1a1c;
+  --color-neutral-850: #242427;
+  --color-neutral-800: #2d2d31;
+  --color-neutral-700: #3f3f46;
+
+  /* Standardized high-contrast, beautiful borders for eye-friendly light and dark contexts */
+  --color-zinc-200: #dbdbdf;
+  --color-neutral-200: #dbdbdf;
+  --color-border-zinc-850: #242427;
+  --color-border-zinc-808: #2d2d31;
+  --color-border-zinc-805: #2d2d31;
+
+  /* Deep slate scrollbar and guide brand colors to cohesive slate & emerald-mint configurations */
+  --color-brand-primary: #10b981;
+  --color-brand-hover: #34d399;
+  
+  /* Additional custom UI highlight shades */
+  --color-emerald-555: #10b981;
+  --color-red-505: #ef4444;
+  --color-amber-550: #f59e0b;
+  
+  /* Font Families configuration */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom backgrounds and smooth transition behavior */
+html, body {
+  font-family: var(--font-sans);
+  transition: background-color 200ms ease, color 200ms ease;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbars globally for Chrome, Safari and Opera */
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html, body, #root {
+  background-color: #f9f9f9;
+  color: #181c20;
+  color-scheme: light;
+}
+
+html.dark, html.dark body, html.dark #root {
+  background-color: #121212;
+  color: #f6f6f7;
+  color-scheme: dark;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-ring {
+  animation: ripple 2s infinite ease-in-out;
+}
+
+/* Snug, dense compact mode ratios */
+.app-compact-mode .p-6,
+.app-compact-mode .p-6.p-6 {
+  padding: 0.9rem !important;
+}
+.app-compact-mode .p-5 {
+  padding: 0.75rem !important;
+}
+.app-compact-mode .pb-6 {
+  padding-bottom: 0.75rem !important;
+}
+.app-compact-mode .pt-6 {
+  padding-top: 0.75rem !important;
+}
+.app-compact-mode .gap-6 {
+  gap: 0.8rem !important;
+}
+.app-compact-mode .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.8rem !important;
+}
+.app-compact-mode .py-4 {
+  padding-top: 0.6rem !important;
+  padding-bottom: 0.6rem !important;
+}
+.app-compact-mode .my-5 {
+  margin-top: 0.6rem !important;
+  margin-bottom: 0.6rem !important;
+}
+.app-compact-mode .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.6rem !important;
+}
+.app-compact-mode .h-screen {
+  font-size: 0.95rem;
+}
+
+/* Live dynamic brand color overrides mapping back to Settings options */
+.theme-accent-blue {
+  --color-emerald-50: rgba(59, 130, 246, 0.05) !important;
+  --color-emerald-100: #dbeafe !important;
+  --color-emerald-500: #3b82f6 !important;
+  --color-emerald-600: #2563eb !important;
+  --color-emerald-400: #60a5fa !important;
+  --color-brand-primary: #3b82f6 !important;
+  --color-brand-hover: #2563eb !important;
+}
+.theme-accent-orange {
+  --color-emerald-50: rgba(249, 115, 22, 0.05) !important;
+  --color-emerald-100: #ffedd5 !important;
+  --color-emerald-500: #f97316 !important;
+  --color-emerald-600: #ea580c !important;
+  --color-emerald-400: #fb923c !important;
+  --color-brand-primary: #f97316 !important;
+  --color-brand-hover: #ea580c !important;
+}
+.theme-accent-indigo {
+  --color-emerald-50: rgba(99, 102, 241, 0.05) !important;
+  --color-emerald-100: #e0e7ff !important;
+  --color-emerald-500: #6366f1 !important;
+  --color-emerald-600: #4f46e5 !important;
+  --color-emerald-400: #818cf8 !important;
+  --color-brand-primary: #6366f1 !important;
+  --color-brand-hover: #4f46e5 !important;
+}
+
+/* Ensure the HTML5 QR Code scanner container and video render correctly */
+#live-qr-reader {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 300px !important;
+  display: block !important;
+  background-color: #09090b !important;
+}
+
+#live-qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 300px !important;
+  object-fit: cover !important;
+  display: block !important;
+  border-radius: 12px !important;
+}
+
+/* Gentle transitions of major theme attributes without breaking Framer Motion animations or interactive scaling */
+.trans-all-theme,
+.trans-all-theme div,
+.trans-all-theme header,
+.trans-all-theme aside,
+.trans-all-theme nav,
+.trans-all-theme button,
+.trans-all-theme select,
+.trans-all-theme input,
+.trans-all-theme p,
+.trans-all-theme h1,
+.trans-all-theme h2,
+.trans-all-theme h3,
+.trans-all-theme h4,
+.trans-all-theme h5 {
+  transition-property: background-color, border-color, text-decoration-color, fill, stroke, color, box-shadow;
+  transition-duration: 250ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Prevent automatic zooming on iOS/mobile devices by enforcing minimum 16px font-size for interactive fields */
+@media (max-width: 767px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+
+

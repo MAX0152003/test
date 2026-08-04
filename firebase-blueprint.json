@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "ClassSession": {
+      "title": "Class Session",
+      "description": "Represents an academic course or laboratory class section",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "schedule": { "type": "string" },
+        "room": { "type": "string" },
+        "faculty": { "type": "string" },
+        "enrolled": { "type": "number" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "code", "title"]
+    },
+    "AttendanceRecord": {
+      "title": "Attendance Record",
+      "description": "Log of student attendance for class sessions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentId": { "type": "string" },
+        "status": { "type": "string" },
+        "date": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "classId", "studentId", "status"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Real-time communication message across system users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "senderId", "text"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User account information and role assignments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "department": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/classes/{classId}": {
+      "schema": "ClassSession",
+      "description": "Collection of academic class sessions"
+    },
+    "/records/{recordId}": {
+      "schema": "AttendanceRecord",
+      "description": "Collection of attendance logs"
+    },
+    "/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Collection of chat communications"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of registered user profiles"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "ClassPulse 2.0",
+  "description": "An elegant, responsive Class Schedule and Smart Attendance Tracker featuring student, faculty, and admin dashboards with local-first offline syncing, camera-simulated QR check-ins, and high-performance accessibility presets.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
