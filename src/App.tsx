@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { 
   Role, 
   ClassSession, 
@@ -1685,6 +1686,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <SpeedInsights />
     </div>
   );
 }
