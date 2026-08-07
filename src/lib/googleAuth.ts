@@ -4,7 +4,10 @@ import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+
+// FIXED: Hardcoding your exact database ID here forces both mobile and desktop to always look at the same space
+export const db = getFirestore(app, "ai-studio-classpulse20-2d99fc9f-395e-42ed-a65f-49548e77000e");
+
 export const auth = getAuth(app);
 
 let cachedAccessToken: string | null = null;
