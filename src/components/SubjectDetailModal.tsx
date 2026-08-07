@@ -13,6 +13,10 @@ interface SubjectDetailModalProps {
   isDark?: boolean;
   studentId?: string;
   studentName?: string;
+  studentEmail?: string;
+  userRole?: 'student' | 'faculty' | 'admin';
+  onEnrollSubject?: (classId: string) => void;
+  onDropSubject?: (classId: string) => void;
 }
 
 export default function SubjectDetailModal({
@@ -24,11 +28,24 @@ export default function SubjectDetailModal({
   facultyStatuses,
   isDark,
   studentId,
-  studentName
+  studentName,
+  studentEmail,
+  userRole = 'student',
+  onEnrollSubject,
+  onDropSubject
 }: SubjectDetailModalProps) {
   if (!isOpen || !cls) return null;
 
   const [rosterSearch, setRosterSearch] = React.useState('');
+
+  // Check if current student is enrolled
+  const isEnrolled = enrollments.some(
+    e => e.classId === cls.id &&
+         ((studentId && e.studentId === studentId) || 
+          (studentName && e.studentName === studentName) || 
+          (studentEmail && e.studentEmail === studentEmail)) &&
+         !e.deletedByStudent
+  );
 
   // Find enrolled students for this class
   const classEnrollments = enrollments.filter(e => e.classId === cls.id);
@@ -335,22 +352,54 @@ export default function SubjectDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between gap-3">
-          <button
-            onClick={handleExportCSV}
-            type="button"
-            className="px-4 py-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Export roster attendance dataset as CSV spreadsheet"
-          >
-            <Download className="w-3.5 h-3.5 text-black" />
-            <span>Export Roster CSV</span>
-          </button>
+        <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Export Roster CSV - Only shown if enrolled or if user is faculty/admin */}
+            {(isEnrolled || userRole !== 'student') && (
+              <button
+                onClick={handleExportCSV}
+                type="button"
+                className="px-4 py-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                title="Export roster attendance dataset as CSV spreadsheet"
+              >
+                <Download className="w-3.5 h-3.5 text-black" />
+                <span>Export Roster CSV</span>
+              </button>
+            )}
+
+            {/* Enroll / Unenroll Action Buttons */}
+            {onEnrollSubject && !isEnrolled && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEnrollSubject(cls.id);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                <CheckCircle className="w-3.5 h-3.5 text-black" />
+                <span>Enroll Subject</span>
+              </button>
+            )}
+
+            {onDropSubject && isEnrolled && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDropSubject(cls.id);
+                }}
+                className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Unenroll Subject</span>
+              </button>
+            )}
+          </div>
 
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
           >
-            Close Subject Details
+            Close
           </button>
         </div>
 

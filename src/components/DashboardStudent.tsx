@@ -47,13 +47,17 @@ import {
   ArrowRight,
   TrendingUp,
   TrendingDown,
-  Check
+  Check,
+  LayoutGrid,
+  List,
+  HelpCircle
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock, { triggerNativeChime } from './AlarmClock';
 import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
 import HelpCenter from './HelpCenter';
+import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import { 
   BarChart, 
   Bar, 
@@ -152,8 +156,11 @@ export default function DashboardStudent({
   onEnrollSubject
 }: DashboardStudentProps) {
   
-  // State for search query inside My Schedule
+  // State for search query inside My Schedule & Registered Courses
   const [scheduleSearch, setScheduleSearch] = React.useState('');
+  const [registeredCourseSearch, setRegisteredCourseSearch] = React.useState('');
+  const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
+  const [selectedFacultyForChat, setSelectedFacultyForChat] = React.useState<{ id: string; name?: string; ts: number } | undefined>(undefined);
   
   // State for customizing the attendance trends graph
   const [graphPeriod, setGraphPeriod] = React.useState<'days' | 'weeks' | 'months'>('weeks');
@@ -835,7 +842,7 @@ export default function DashboardStudent({
   const attendanceRate = totalChecked > 0 ? Math.round(((presentsCount + latesCount * 0.7) / totalChecked) * 100) : 100;
 
   return (
-    <div className="space-y-6">
+    <div className={activeScreen === 'messages' || activeScreen === 'help-center' ? "h-full flex flex-col min-h-0" : "space-y-6"}>
       
       <AnimatePresence mode="wait">
         {/* 1. STUDENT DASHBOARD CONTAINER */}
@@ -846,26 +853,27 @@ export default function DashboardStudent({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 text-left"
+            className="space-y-3 sm:space-y-4 text-left"
           >
-            {/* Welcome Banner */}
-          <div className="p-6 md:p-8 rounded-3xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-850 text-white shadow-xl shadow-emerald-500/5">
-            <div className="relative z-10 space-y-2.5">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/15 text-white/90">
-                <Sparkles className="w-3.5 h-3.5" />
-                Active Attendance Session
-              </span>
-              <h2 className="text-2xl md:text-3.5xl font-black tracking-tight">
-                Welcome Back, {userProfile.name}!
-              </h2>
-              <p className="text-white/85 text-xs max-w-xl leading-relaxed">
-                Stay updated with the heartbeat of your classes. Review schedules, scan QR codes instantly below to enroll, and track your attendance rates live on the dashboard.
-              </p>
+            {/* Compact Welcome Banner */}
+          <div className="p-3.5 sm:p-4 md:p-5 rounded-2xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-850 text-white shadow-md">
+            <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/15 text-white/90">
+                    <Sparkles className="w-3 h-3" />
+                    Active Session
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight">
+                  Welcome back, {userProfile.name}!
+                </h2>
+              </div>
             </div>
             
             {/* Background Graphic */}
-            <div className="absolute right-0 bottom-0 opacity-10 transform translate-y-6 translate-x-6">
-              <Scan className="w-64 h-64 text-white" />
+            <div className="absolute right-0 bottom-0 opacity-10 transform translate-y-4 translate-x-4">
+              <Scan className="w-36 h-36 text-white" />
             </div>
           </div>
 
@@ -890,7 +898,7 @@ export default function DashboardStudent({
                 </button>
               </div>
             ) : (
-              <div className="p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 text-amber-950 dark:text-amber-300 space-y-3 text-left relative animate-fade-in">
+              <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 text-amber-950 dark:text-amber-300 space-y-3 text-left relative animate-fade-in">
                 <div className="flex items-center justify-between gap-4">
                   <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-550 bg-amber-500 animate-pulse" />
@@ -925,7 +933,7 @@ export default function DashboardStudent({
           )}
 
           {/* Student Quick Action & Excuse Letter Desk */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-4 text-left">
+          <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-3 sm:space-y-4 text-left">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-900">
               <div>
                 <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -936,14 +944,14 @@ export default function DashboardStudent({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setIsLeaveFormOpen(true);
                   speakText("Opening Excuse letter application launcher.", accessibility.readAloud);
                 }}
-                className="p-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between h-24"
+                className="p-3.5 sm:p-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
               >
                 <div className="p-1.5 rounded-lg bg-emerald-500 text-black w-fit">
                   <FileText className="w-4 h-4" />
@@ -964,7 +972,7 @@ export default function DashboardStudent({
                     speakText("Navigating downwards to QR attendance scanner.", accessibility.readAloud);
                   }
                 }}
-                className="p-4 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between h-24"
+                className="p-3.5 sm:p-4 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
               >
                 <div className="p-1.5 rounded-lg bg-indigo-550 bg-indigo-500 text-white w-fit">
                   <Scan className="w-4 h-4" />
@@ -981,7 +989,7 @@ export default function DashboardStudent({
                   setScreen('messages');
                   speakText("Opening professor direct message interface.", accessibility.readAloud);
                 }}
-                className="p-4 rounded-xl bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between h-24"
+                className="p-3.5 sm:p-4 rounded-xl bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
               >
                 <div className="p-1.5 rounded-lg bg-orange-500 text-white w-fit">
                   <MessageSquare className="w-4 h-4" />
@@ -995,8 +1003,8 @@ export default function DashboardStudent({
 
             {/* Leave Requests Drawer Modal */}
             {isLeaveFormOpen && (
-              <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                <div className="w-full max-w-xl p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-5 text-left max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+                <div className="w-full max-w-xl p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-4 sm:space-y-5 text-left max-h-[90vh] overflow-y-auto">
                   <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900">
                     <div className="flex items-center gap-2">
                       <FileText className="w-5 h-5 text-emerald-500" />
@@ -1049,7 +1057,7 @@ export default function DashboardStudent({
                     className="space-y-4"
                   >
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-bold">Select Target Subject Class</label>
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Select Target Subject Class</label>
                       <select
                         value={leaveClassId}
                         onChange={(e) => setLeaveClassId(e.target.value)}
@@ -1061,9 +1069,9 @@ export default function DashboardStudent({
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-bold">Start Date</label>
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Start Date</label>
                         <input
                           type="date"
                           required
@@ -1073,7 +1081,7 @@ export default function DashboardStudent({
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-bold">End Date</label>
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">End Date</label>
                         <input
                           type="date"
                           required
@@ -1085,7 +1093,7 @@ export default function DashboardStudent({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-bold">Formal Justification Reason</label>
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Formal Justification Reason</label>
                       <textarea
                         required
                         value={leaveReason}
@@ -1097,7 +1105,7 @@ export default function DashboardStudent({
 
                     {/* Drag and Drop File Upload for Medical Certificates */}
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block font-bold">Upload Medical Excuse or Supporting Slip</label>
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Upload Medical Excuse or Supporting Slip</label>
                       <input
                         type="file"
                         id="excuse-letter-upload-real"
@@ -1173,7 +1181,7 @@ export default function DashboardStudent({
           </div>
 
           {/* Live Instructors Directory (Campus consultation hours & coordinates) */}
-          <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-4">
+          <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-3 sm:space-y-4">
             <div className="flex justify-between items-center pb-2 border-b border-zinc-100 dark:border-zinc-900">
               <div>
                 <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -1185,34 +1193,49 @@ export default function DashboardStudent({
               <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Synced</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5">
               {facultyStatuses.map(fac => (
-                <div key={fac.id} className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-855 flex items-center justify-between text-left">
-                  <div className="flex items-center gap-3 min-w-0">
+                <div key={fac.id} className="p-3 sm:p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-855 flex items-center justify-between text-left gap-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                     <img 
                       src={fac.avatar} 
                       alt={fac.name} 
-                      className="w-10 h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-800 shrink-0" 
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-800 shrink-0" 
                     />
                     <div className="min-w-0">
                       <h4 className="font-bold text-xs text-zinc-900 dark:text-zinc-100 truncate">{fac.name}</h4>
                       <p className="text-[10px] text-zinc-500 truncate">{fac.room || 'Consulting Room 303'}</p>
                     </div>
                   </div>
-                  <div className="shrink-0 pl-2">
+                  <div className="shrink-0 flex items-center gap-1.5">
                     {fac.status === 'available' ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 uppercase tracking-widest flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 uppercase tracking-widest flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" /> available
                       </span>
                     ) : fac.status === 'in-class' ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 uppercase tracking-widest flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 uppercase tracking-widest flex items-center gap-1">
                         <Clock className="w-3 h-3 animate-[spin_2s_linear_infinite]" /> in class
                       </span>
                     ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 uppercase tracking-widest flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold text-red-500 bg-red-500/10 border border-red-500/20 uppercase tracking-widest flex items-center gap-1">
                         <X className="w-3 h-3" /> unavailable
                       </span>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetFacId = fac.id || 'fac-1';
+                        setSelectedFacultyForChat({ id: targetFacId, name: fac.name, ts: Date.now() });
+                        setScreen('messages');
+                        speakText(`Directing to message ${fac.name}`, accessibility.readAloud);
+                      }}
+                      className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/20 transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-[10px] font-bold active:scale-95 shrink-0"
+                      title={`Message ${fac.name}`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Message</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1220,66 +1243,121 @@ export default function DashboardStudent({
           </div>
 
           {/* Student High-Fidelity Analytics & Tracking Suite */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
             
-            {/* 1. Attendance Progress Circular Ring & Academic standing tracker */}
-            <div className="md:col-span-6 p-5 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-[9px] font-mono font-black uppercase text-zinc-400 tracking-widest block">Attendance Summary</span>
-                <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1">Class Attendance Ring</h4>
-              </div>
-
-              <div className="flex items-center gap-4">
-                {/* SVG Progress Ring */}
-                <div className="relative w-18 h-18 shrink-0 flex items-center justify-center">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle 
-                      cx="36" 
-                      cy="36" 
-                      r="30" 
-                      className="stroke-zinc-100 dark:stroke-zinc-900" 
-                      strokeWidth="5" 
-                      fill="transparent" 
-                    />
-                    <circle 
-                      cx="36" 
-                      cy="36" 
-                      r="30" 
-                      className="stroke-emerald-500" 
-                      strokeWidth="5" 
-                      fill="transparent" 
-                      strokeDasharray={188.4}
-                      strokeDashoffset={188.4 - (188.4 * Math.min(attendanceRate, 100)) / 100}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <span className="absolute font-mono font-black text-sm text-zinc-800 dark:text-zinc-100">
+            {/* 1. Interactive Visual Attendance Analytics & Subject Breakdown Graph */}
+            <div className="md:col-span-6 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] font-mono font-black uppercase text-zinc-400 tracking-widest block">Attendance Summary</span>
+                  <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-0.5">Subject Attendance Graph</h4>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono font-black text-lg text-emerald-500 leading-none block">
                     {attendanceRate}%
                   </span>
-                </div>
-
-                <div className="space-y-1 text-left min-w-0">
-                  <span className={`inline-block px-2 py-0.5 rounded-[4px] text-[8px] font-black uppercase tracking-wide ${
+                  <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wide mt-0.5 ${
                     attendanceRate >= 80 ? 'bg-emerald-500/10 text-emerald-500' :
                     attendanceRate >= 70 ? 'bg-amber-500/10 text-amber-500' :
                     'bg-red-500/10 text-red-500'
                   }`}>
-                    {attendanceRate >= 80 ? 'Good standing' : 'Needs attention'}
+                    {attendanceRate >= 80 ? 'Good Standing' : 'Needs Attention'}
                   </span>
-                  <p className="text-[10px] text-zinc-400 leading-normal">
-                    Minimum standard is 80%. Keep scanning key codes regular.
-                  </p>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-900 grid grid-cols-2 gap-2 text-left">
-                <div>
-                  <span className="text-[8px] uppercase tracking-wider text-zinc-400 block font-bold">Presents count</span>
-                  <span className="font-mono font-bold text-xs text-zinc-805 dark:text-zinc-200">{presentsCount} checkins</span>
+              {/* Status Proportion Multi-Segment Bar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] font-bold text-zinc-500">
+                  <span>Status Distribution</span>
+                  <span className="font-mono text-[9px]">{totalChecked} total sessions</span>
                 </div>
-                <div>
-                  <span className="text-[8px] uppercase tracking-wider text-zinc-400 block font-bold">Lates count</span>
-                  <span className="font-mono font-bold text-xs text-zinc-805 dark:text-zinc-200">{latesCount} scans</span>
+                <div className="w-full h-3.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden flex p-0.5 gap-0.5">
+                  {totalChecked > 0 ? (
+                    <>
+                      {presentsCount > 0 && (
+                        <div 
+                          style={{ width: `${(presentsCount / totalChecked) * 100}%` }} 
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                          title={`Present: ${presentsCount}`}
+                        />
+                      )}
+                      {latesCount > 0 && (
+                        <div 
+                          style={{ width: `${(latesCount / totalChecked) * 100}%` }} 
+                          className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                          title={`Late: ${latesCount}`}
+                        />
+                      )}
+                      {absentsCount > 0 && (
+                        <div 
+                          style={{ width: `${(absentsCount / totalChecked) * 100}%` }} 
+                          className="bg-red-500 h-full rounded-full transition-all duration-500"
+                          title={`Absent: ${absentsCount}`}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <div className="w-full h-full bg-emerald-500/20 rounded-full" />
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-1 pt-1 text-center">
+                  <div className="bg-zinc-50 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-850">
+                    <span className="text-[8px] font-bold uppercase text-emerald-500 block">Present</span>
+                    <span className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100">{presentsCount}</span>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-850">
+                    <span className="text-[8px] font-bold uppercase text-amber-500 block">Late</span>
+                    <span className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100">{latesCount}</span>
+                  </div>
+                  <div className="bg-zinc-50 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-850">
+                    <span className="text-[8px] font-bold uppercase text-red-500 block">Absent</span>
+                    <span className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100">{absentsCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Per-Subject Attendance Performance Progress Bars */}
+              <div className="space-y-2 pt-1 border-t border-zinc-100 dark:border-zinc-900">
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Subject Rate Graph</span>
+                <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                  {(() => {
+                    const enrolledClassesList = classes.filter(cls =>
+                      enrollments.some(
+                        e => e.classId === cls.id && 
+                             (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
+                             !e.deletedByStudent
+                      )
+                    );
+                    if (enrolledClassesList.length === 0) {
+                      return <div className="text-[10px] text-zinc-400 py-2">No subjects currently enrolled.</div>;
+                    }
+                    return enrolledClassesList.map((cls) => {
+                      const clsRecs = attendanceRecords.filter(
+                        r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
+                      );
+                      const p = clsRecs.filter(r => r.status === 'present').length;
+                      const l = clsRecs.filter(r => r.status === 'late').length;
+                      const tot = clsRecs.length;
+                      const rate = tot > 0 ? Math.round(((p + l * 0.7) / tot) * 100) : 100;
+                      return (
+                        <div key={cls.id} className="space-y-0.5">
+                          <div className="flex justify-between items-center text-[10px]">
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-[180px]">{cls.code || cls.name}</span>
+                            <span className={`font-mono font-black ${rate >= 80 ? 'text-emerald-500' : rate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>{rate}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
+                            <div 
+                              style={{ width: `${Math.min(rate, 100)}%` }} 
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                rate >= 80 ? 'bg-emerald-500' : rate >= 70 ? 'bg-amber-500' : 'bg-red-500'
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
@@ -1287,7 +1365,7 @@ export default function DashboardStudent({
                 type="button"
                 id="student-download-report-btn"
                 onClick={handleDownloadReport}
-                className="w-full mt-2 py-2 px-3 bg-zinc-950 hover:bg-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95 border border-zinc-800 dark:border-zinc-800"
+                className="w-full mt-1 py-2 px-3 bg-zinc-950 hover:bg-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95 border border-zinc-800 dark:border-zinc-800"
                 title="Download your printable monthly attendance report as localized CSV"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
@@ -1296,27 +1374,36 @@ export default function DashboardStudent({
             </div>
 
             {/* 3. Upcoming physical lectures timetable */}
-            <div className="md:col-span-6 p-5 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="md:col-span-6 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
               <div>
                 <span className="text-[9px] font-mono font-black uppercase text-zinc-400 tracking-widest block">Term calendar</span>
                 <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1">Upcoming Lectures today</h4>
               </div>
 
               <div className="space-y-2 text-left">
-                {classes.slice(0, 2).map((cls, idx) => (
-                  <div key={idx} className="flex gap-2.5 items-start">
-                    <div className="p-1 px-1.5 rounded-lg bg-emerald-500/10 text-emerald-505 font-mono text-[9px] font-black uppercase shrink-0 mt-0.5">
-                      {cls.startTime.split(' ')[0]}
+                {(() => {
+                  const enrolledList = classes.filter(cls =>
+                    enrollments.some(
+                      e => e.classId === cls.id && 
+                           (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
+                           !e.deletedByStudent
+                    )
+                  );
+                  if (enrolledList.length === 0) {
+                    return <div className="text-[10px] text-zinc-400 text-center py-4">No enrolled classes in schedule.</div>;
+                  }
+                  return enrolledList.slice(0, 2).map((cls, idx) => (
+                    <div key={idx} className="flex gap-2.5 items-start">
+                      <div className="p-1 px-1.5 rounded-lg bg-emerald-500/10 text-emerald-505 font-mono text-[9px] font-black uppercase shrink-0 mt-0.5">
+                        {cls.startTime.split(' ')[0]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h5 className="text-[10.5px] font-black text-zinc-800 dark:text-zinc-200 truncate leading-tight">{cls.name}</h5>
+                        <span className="text-[9px] text-zinc-400 block mt-0.5 truncate">{cls.room} • {cls.code}</span>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h5 className="text-[10.5px] font-black text-zinc-800 dark:text-zinc-200 truncate leading-tight">{cls.name}</h5>
-                      <span className="text-[9px] text-zinc-400 block mt-0.5 truncate">{cls.room} • {cls.code}</span>
-                    </div>
-                  </div>
-                ))}
-                {classes.length === 0 && (
-                  <div className="text-[10px] text-zinc-400 text-center py-4">No remaining classes today in sched.</div>
-                )}
+                  ));
+                })()}
               </div>
 
               <button 
@@ -1329,696 +1416,207 @@ export default function DashboardStudent({
 
           </div>
 
-          {/* 📊 INTERACTIVE ATTENDANCE TRENDS BAR CHART */}
-          {(() => {
-            const chartData = classes.map(cls => {
-              const classRecords = attendanceRecords.filter(
-                r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
-              );
-              return {
-                name: cls.code,
-                fullName: cls.name,
-                Present: classRecords.filter(r => r.status === 'present').length,
-                Late: classRecords.filter(r => r.status === 'late').length,
-                Absent: classRecords.filter(r => r.status === 'absent').length,
-              };
-            });
-
-            const totalPresents = chartData.reduce((acc, d) => acc + d.Present, 0);
-            const totalLates = chartData.reduce((acc, d) => acc + d.Late, 0);
-            const totalAbsents = chartData.reduce((acc, d) => acc + d.Absent, 0);
-
-            return (
-              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-5 text-left">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-900">
-                  <div>
-                    <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-amber-500 animate-pulse" />
-                      Attendance History Trends (Term Progress)
-                    </h3>
-                    <p className="text-xs text-zinc-400">Comparing your Present, Late, and Absent rates per enrolled subject</p>
-                  </div>
-                  <div className="flex gap-2 flex-wrap text-[10px] font-bold">
-                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/15">
-                      {totalPresents} Presents
-                    </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/15">
-                      {totalLates} Lates
-                    </span>
-                    <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/15">
-                      {totalAbsents} Absents
-                    </span>
-                  </div>
-                </div>
-
-                <div className="w-full h-[300px] text-zinc-900 dark:text-zinc-100">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
-                    >
-                      <CartesianGrid 
-                        strokeDasharray="3 3" 
-                        vertical={false} 
-                        stroke="rgba(120, 120, 120, 0.15)" 
-                      />
-                      <XAxis 
-                        dataKey="name" 
-                        stroke="#888888" 
-                        fontSize={11} 
-                        fontWeight="bold"
-                        tickLine={false} 
-                        axisLine={false} 
-                      />
-                      <YAxis 
-                        stroke="#888888" 
-                        fontSize={11} 
-                        fontWeight="bold"
-                        tickLine={false} 
-                        axisLine={false} 
-                        allowDecimals={false} 
-                      />
-                      <Tooltip 
-                        cursor={{ fill: 'rgba(120, 120, 120, 0.08)', radius: 8 }} 
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            const dataObj = chartData.find(d => d.name === label);
-                            return (
-                              <div className="bg-white dark:bg-zinc-900 p-3.5 rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800 text-left space-y-1.5 text-xs">
-                                <p className="font-extrabold text-zinc-900 dark:text-zinc-100">
-                                  {dataObj ? dataObj.fullName : label} ({label})
-                                </p>
-                                <div className="space-y-1">
-                                  {payload.map((entry, index) => (
-                                    <div key={index} className="flex items-center gap-2 font-semibold">
-                                      <span 
-                                        className="w-2 h-2 rounded-full inline-block" 
-                                        style={{ backgroundColor: entry.color }} 
-                                      />
-                                      <span className="text-zinc-500 dark:text-zinc-400">
-                                        {entry.name}:
-                                      </span>
-                                      <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200">
-                                        {entry.value} sessions
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Legend 
-                        verticalAlign="top" 
-                        height={36} 
-                        iconType="circle"
-                        iconSize={8}
-                        wrapperStyle={{ fontSize: 11, fontWeight: 'bold' }} 
-                      />
-                      <Bar 
-                        dataKey="Present" 
-                        name="Present" 
-                        fill="#10B981" 
-                        radius={[4, 4, 0, 0]} 
-                        maxBarSize={32}
-                      />
-                      <Bar 
-                        dataKey="Late" 
-                        name="Late" 
-                        fill="#F59E0B" 
-                        radius={[4, 4, 0, 0]} 
-                        maxBarSize={32}
-                      />
-                      <Bar 
-                        dataKey="Absent" 
-                        name="Absent" 
-                        fill="#EF4444" 
-                        radius={[4, 4, 0, 0]} 
-                        maxBarSize={32}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 📈 MY ATTENDANCE TRENDS GRAPH */}
-          {(() => {
-            const userRecords = attendanceRecords.filter(r => r.studentId === userProfile.studentId || r.studentName === userProfile.name);
-            
-            // Generate custom arrays based on graphStartDate and graphEndDate
-            const startD = new Date(graphStartDate);
-            const endD = new Date(graphEndDate);
-            const daysDiff = Math.ceil(Math.abs(endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
-            
-            // 1. Days calculation (Dynamically generated day array based on picker)
-            const maxDays = Math.min(45, daysDiff + 1);
-            const daysData = Array.from({ length: maxDays }).map((_, i) => {
-              const d = new Date(startD);
-              d.setDate(d.getDate() + i);
-              const dateStr = d.toISOString().split('T')[0];
-              const recsOnDay = userRecords.filter(r => r.date === dateStr);
-              
-              let percentage;
-              if (recsOnDay.length > 0) {
-                const attended = recsOnDay.filter(r => r.status === 'present' || r.status === 'late').length;
-                percentage = Math.round((attended / recsOnDay.length) * 100);
-              } else {
-                const dayNum = d.getDate();
-                const seed = (dayNum * 7 + (d.getMonth() + 1) * 3) % 15;
-                percentage = 83 + seed; // fluctuates between 83% and 97%
-              }
-              
-              return {
-                label: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
-                percentage,
-              };
-            });
-
-            // 2. Weeks calculation (Dynamically generated week intervals based on picker)
-            const numWeeks = Math.min(16, Math.max(2, Math.ceil(daysDiff / 7)));
-            const weeksData = Array.from({ length: numWeeks }).map((_, i) => {
-              const weekNum = i + 1;
-              const startOfWeek = new Date(startD);
-              startOfWeek.setDate(startOfWeek.getDate() + (i * 7));
-              const endOfWeek = new Date(startOfWeek);
-              endOfWeek.setDate(endOfWeek.getDate() + 7);
-              
-              const recsInWeek = userRecords.filter(r => {
-                const rTime = new Date(r.date).getTime();
-                return rTime >= startOfWeek.getTime() && rTime < endOfWeek.getTime();
-              });
-
-              let percentage;
-              if (recsInWeek.length > 0) {
-                const attended = recsInWeek.filter(r => r.status === 'present' || r.status === 'late').length;
-                percentage = Math.round((attended / recsInWeek.length) * 100);
-              } else {
-                const baselines = [88, 92, 85, 90, 89, 94, 91, 88, 93, 87, 91, 94];
-                percentage = baselines[i % baselines.length] || 90;
-              }
-
-              return {
-                label: startOfWeek.toLocaleDateString([], { month: 'short', day: 'numeric' }),
-                percentage,
-              };
-            });
-
-            // 3. Months calculation (Dynamically generated monthly intervals based on picker)
-            const monthsList = [];
-            let currM = new Date(startD.getFullYear(), startD.getMonth(), 1);
-            const limitM = new Date(endD.getFullYear(), endD.getMonth() + 1, 1);
-            let mCount = 0;
-            while (currM < limitM && mCount < 12) {
-              monthsList.push(new Date(currM));
-              currM.setMonth(currM.getMonth() + 1);
-              mCount++;
-            }
-            if (monthsList.length === 0) {
-              monthsList.push(new Date(startD));
-            }
-
-            const monthsData = monthsList.map((d, i) => {
-              const monthLabel = d.toLocaleDateString([], { month: 'short', year: '2-digit' });
-              const mName = d.toLocaleDateString([], { month: 'long', year: 'numeric' });
-              
-              const recsInMonth = userRecords.filter(r => {
-                try {
-                  const rd = new Date(r.date);
-                  return rd.toLocaleDateString([], { month: 'long', year: 'numeric' }) === mName;
-                } catch {
-                  return false;
-                }
-              });
-
-              let percentage;
-              if (recsInMonth.length > 0) {
-                const attended = recsInMonth.filter(r => r.status === 'present' || r.status === 'late').length;
-                percentage = Math.round((attended / recsInMonth.length) * 100);
-              } else {
-                const baselines = [89, 91, 88, 93, 91, 95];
-                percentage = baselines[i % baselines.length] || 90;
-              }
-
-              return {
-                label: monthLabel,
-                percentage,
-              };
-            });
-
-            const chartDataToRender = 
-              graphPeriod === 'days' ? daysData :
-              graphPeriod === 'months' ? monthsData :
-              weeksData;
-
-            const chartMinWidth = Math.max(680, chartDataToRender.length * 65);
-
-            // Calculate overall attendance rate dynamically and accurately
-            const totalRecs = userRecords.length;
-            const attendedRecs = userRecords.filter(r => r.status === 'present' || r.status === 'late').length;
-            const overallRate = totalRecs > 0 ? Math.round((attendedRecs / totalRecs) * 100) : 100;
-
-            return (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-5 text-left">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-900">
-                    <div>
-                      <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-emerald-500 animate-pulse" />
-                        My Attendance Trends ({graphPeriod === 'days' ? 'Daily Timeline' : graphPeriod === 'months' ? 'Monthly Overview' : 'Weekly Activity Monitor'})
-                      </h3>
-                      <p className="text-xs text-zinc-400">Progression of class attendance rate by {graphPeriod}. Click scroll controls or drag to scroll timeline.</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 select-none">
-                      {/* Period Customization buttons */}
-                      <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/50 dark:border-zinc-800 relative overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGraphPeriod('days');
-                            speakText("Switching student trends graph to daily view", accessibility.readAloud);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer relative isolate z-10 ${
-                            graphPeriod === 'days'
-                              ? 'text-emerald-500 font-black'
-                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-                          }`}
-                        >
-                          {graphPeriod === 'days' && (
-                            <motion.div
-                              layoutId="student-graph-period-pill"
-                              className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                            />
-                          )}
-                          Days
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGraphPeriod('weeks');
-                            speakText("Switching student trends graph to weekly view", accessibility.readAloud);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer relative isolate z-10 ${
-                            graphPeriod === 'weeks'
-                              ? 'text-emerald-500 font-black'
-                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-                          }`}
-                        >
-                          {graphPeriod === 'weeks' && (
-                            <motion.div
-                              layoutId="student-graph-period-pill"
-                              className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                            />
-                          )}
-                          Weeks
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setGraphPeriod('months');
-                            speakText("Switching student trends graph to monthly view", accessibility.readAloud);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer relative isolate z-10 ${
-                            graphPeriod === 'months'
-                              ? 'text-emerald-500 font-black'
-                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
-                          }`}
-                        >
-                          {graphPeriod === 'months' && (
-                            <motion.div
-                              layoutId="student-graph-period-pill"
-                              className="absolute inset-0 bg-white dark:bg-zinc-800 rounded-lg shadow-sm -z-10"
-                              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                            />
-                          )}
-                          Months
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Custom Date-Range Picker with Quick Presets */}
-                  <div className="flex flex-col gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/40 rounded-2xl border border-zinc-150 dark:border-zinc-850/60">
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-emerald-500" />
-                          <span className="text-xs font-extrabold text-zinc-500 dark:text-zinc-400">Time Window:</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="date"
-                            value={graphStartDate}
-                            onChange={(e) => {
-                              const newStart = e.target.value;
-                              const dStart = new Date(newStart);
-                              const dEnd = new Date(graphEndDate);
-                              const diffDays = Math.ceil(Math.abs(dEnd.getTime() - dStart.getTime()) / (1000 * 60 * 60 * 24));
-                              if (diffDays > 183) {
-                                setDateRangeError("Time window exceeds 6 months. This action was blocked.");
-                                speakText("Time window cannot exceed 6 months", accessibility.readAloud);
-                                return;
-                              }
-                              setDateRangeError(null);
-                              setGraphStartDate(newStart);
-                              speakText(`Start date changed to ${newStart}`, accessibility.readAloud);
-                            }}
-                            className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                          />
-                          <span className="text-xs text-zinc-400">to</span>
-                          <input
-                            type="date"
-                            value={graphEndDate}
-                            onChange={(e) => {
-                              const newEnd = e.target.value;
-                              const dStart = new Date(graphStartDate);
-                              const dEnd = new Date(newEnd);
-                              const diffDays = Math.ceil(Math.abs(dEnd.getTime() - dStart.getTime()) / (1000 * 60 * 60 * 24));
-                              if (diffDays > 183) {
-                                setDateRangeError("Time window exceeds 6 months. This action was blocked.");
-                                speakText("Time window cannot exceed 6 months", accessibility.readAloud);
-                                return;
-                              }
-                              setDateRangeError(null);
-                              setGraphEndDate(newEnd);
-                              speakText(`End date changed to ${newEnd}`, accessibility.readAloud);
-                            }}
-                            className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                          />
-                        </div>
-                      </div>
-                      
-                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
-                        Limit: 6 Months Maximum
-                      </span>
-                    </div>
-
-                    {dateRangeError && (
-                      <div className="text-[10px] font-bold text-red-500 font-mono flex items-center gap-1.5 animate-pulse mt-0.5">
-                        ⚠️ {dateRangeError}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Scrollable AreaChart wrapper with sticky Y-axis */}
-                  <div 
-                    ref={studentChartScrollRef}
-                    className="w-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] scroll-smooth bg-zinc-50/30 dark:bg-zinc-950/20 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 relative"
-                  >
-                    <div className="flex relative items-stretch" style={{ minWidth: `${chartMinWidth}px`, height: '240px' }}>
-                      {/* Sticky Y-Axis Column (Pinned on left during horizontal scrolling) */}
-                      <div className="sticky left-0 top-0 z-20 shrink-0 w-11 sm:w-12 h-full flex flex-col justify-between pt-[12px] pb-[32px] pr-2 text-right text-[10px] font-black text-zinc-400 dark:text-zinc-500 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-r border-zinc-200/80 dark:border-zinc-800/80 shadow-xs select-none">
-                        <span className="leading-none transform -translate-y-1/2 font-mono">100%</span>
-                        <span className="leading-none transform -translate-y-1/2 font-mono">75%</span>
-                        <span className="leading-none transform -translate-y-1/2 font-mono">50%</span>
-                        <span className="leading-none transform -translate-y-1/2 font-mono">25%</span>
-                        <span className="leading-none transform -translate-y-1/2 font-mono">0%</span>
-                      </div>
-
-                      <div className="flex-1 h-full min-w-0 pr-2">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartDataToRender} margin={{ top: 12, right: 15, left: 10, bottom: 5 }}>
-                            <defs>
-                              <linearGradient id="colorAttendance" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.25}/>
-                                <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(120, 120, 120, 0.12)" />
-                            <XAxis dataKey="label" stroke="#888888" fontSize={11} fontWeight="bold" tickLine={false} axisLine={false} dy={4} />
-                            <YAxis hide={true} domain={[0, 100]} />
-                            <Tooltip
-                              useTranslate3d={true}
-                              cursor={{ stroke: 'rgba(16, 185, 129, 0.4)', strokeWidth: 1.5, strokeDasharray: '3 3' }}
-                              content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                  const value = payload[0].value;
-                                  return (
-                                    <div className="bg-white dark:bg-zinc-900 p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-850 text-xs text-left space-y-1">
-                                      <p className="font-extrabold text-zinc-900 dark:text-zinc-100">{payload[0].payload.label}</p>
-                                      <p className="font-bold text-emerald-550 flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                        Rate: <span className="font-mono text-sm">{value}%</span>
-                                      </p>
-                                      <p className="text-[10px] text-zinc-450">
-                                        {Number(value) >= 90 ? '🔥 Perfect standing' : '✅ Good standing'}
-                                      </p>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Area type="monotone" dataKey="percentage" stroke="#10B981" strokeWidth={3} activeDot={{ r: 5, strokeWidth: 0, fill: '#10B981' }} fillOpacity={1} fill="url(#colorAttendance)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Overall Attendance Summary card */}
-                <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between text-left space-y-4">
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest block">
-                      Overall Attendance Summary
-                    </span>
-                    <h4 className="text-xl font-black text-zinc-900 dark:text-white flex items-center gap-1.5">
-                      {overallRate}% Overall Rate
-                    </h4>
-                    <p className="text-xs text-zinc-455 dark:text-zinc-400 leading-relaxed">
-                      Your attendance record is in perfect standing. Consistent check-ins ensure that all course sessions are verified and logged successfully by faculty.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="p-4 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-850 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-500 font-bold">Attendance Status:</span>
-                        <span className="px-2 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider bg-emerald-500/10 text-emerald-500">
-                          Excellent
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-500 font-bold">Course Standing:</span>
-                        <span className="px-2 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider bg-emerald-500/10 text-emerald-500">
-                          Perfect
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Daily Progress Check-in Activity Logs */}
-                    <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900/60">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest block">
-                          Daily Progress History
-                        </span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 font-mono font-bold">
-                          Latest Logs
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-                        {userRecords.slice(0, 3).map((rec, rIdx) => (
-                          <div key={rec.id || rIdx} className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850/60 flex items-center justify-between gap-2 text-xs">
-                            <div className="min-w-0">
-                              <p className="font-extrabold text-zinc-800 dark:text-zinc-200 truncate">{rec.className || 'Academic Session'}</p>
-                              <p className="text-[9px] font-mono text-zinc-400">{rec.date} • {rec.time || 'On-Time'}</p>
-                            </div>
-                            <span className={`px-2 py-0.5 rounded-full font-black text-[8px] uppercase tracking-wider shrink-0 ${
-                              rec.status === 'present' ? 'bg-emerald-500/15 text-emerald-500' :
-                              rec.status === 'late' ? 'bg-amber-500/15 text-amber-500' :
-                              'bg-red-500/15 text-red-500'
-                            }`}>
-                              {rec.status}
-                            </span>
-                          </div>
-                        ))}
-                        {userRecords.length === 0 && (
-                          <p className="text-[10px] italic text-zinc-400 text-center py-2">No recent check-in logs recorded.</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl flex items-center gap-3 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-500/10">
-                        <Check className="w-4 h-4" />
-                      </div>
-                      <div className="text-[11px] leading-snug">
-                        <strong className="font-extrabold uppercase text-[10px] block tracking-wide">
-                          Status: Active
-                        </strong>
-                        All registered classes are completely cleared.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             
             {/* LEFT ROW: Faculty list & Today's classes */}
-            <div className="lg:col-span-8 space-y-6">
+            <div className="lg:col-span-8 space-y-4 sm:space-y-6">
                       {/* Active Classes Card Lists */}
-              <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-900">
+              <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-3 sm:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-zinc-100 dark:border-zinc-900">
                   <div>
                     <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100">Your Registered Courses</h3>
                     <p className="text-xs text-zinc-400">Click on any subject row to inspect rosters and attendance trend graphs</p>
                   </div>
+
+                  {/* Registered Courses Manual Subject Search Bar */}
+                  <div className="relative w-full sm:w-64 shrink-0">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400 pointer-events-none">
+                      <Search className="w-4 h-4 text-emerald-500" />
+                    </span>
+                    <input
+                      type="text"
+                      value={registeredCourseSearch}
+                      onChange={(e) => setRegisteredCourseSearch(e.target.value)}
+                      placeholder="Find subject to enroll..."
+                      className="w-full pl-9 pr-8 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 rounded-xl text-base md:text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                    />
+                    {registeredCourseSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setRegisteredCourseSearch('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 font-black cursor-pointer text-sm animate-fade-in"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {classes.map(cls => {
-                    const isEnrolled = enrollments.some(
-                      e => e.classId === cls.id && 
-                           (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
-                           !e.deletedByStudent
-                    );
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  {(() => {
+                    const isSearching = registeredCourseSearch.trim().length > 0;
+                    
+                    // If searching, search across all subjects in catalog; otherwise filter to enrolled subjects
+                    let displayClasses = classes;
+                    if (isSearching) {
+                      const query = registeredCourseSearch.toLowerCase();
+                      displayClasses = classes.filter(cls => 
+                        (cls.name || '').toLowerCase().includes(query) ||
+                        (cls.code || '').toLowerCase().includes(query) ||
+                        (cls.room || '').toLowerCase().includes(query)
+                      );
+                    } else {
+                      displayClasses = classes.filter(cls =>
+                        enrollments.some(
+                          e => e.classId === cls.id && 
+                               (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
+                               !e.deletedByStudent
+                        )
+                      );
+                    }
 
-                    // Compute active standing indicators
-                    const studentRecordsForClass = attendanceRecords.filter(
-                      r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
-                    );
-                    const absentsForClass = studentRecordsForClass.filter(r => r.status === 'absent');
-                    const countAbsentsForClass = absentsForClass.length;
+                    if (displayClasses.length === 0) {
+                      return (
+                        <div className="col-span-full p-6 text-center rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800">
+                          <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                            {isSearching 
+                              ? `No subjects found matching "${registeredCourseSearch}".` 
+                              : 'No registered courses found.'
+                            }
+                          </p>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1">
+                            {isSearching 
+                              ? 'Try searching by catalog code (e.g., CS-101) or course name.' 
+                              : 'Use the search bar above or scan a QR code to find and register your courses.'
+                            }
+                          </p>
+                        </div>
+                      );
+                    }
 
-                    let maxConsecutive = 0;
-                    let currConsecutive = 0;
-                    const sortedRecs = [...studentRecordsForClass].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                    for (const r of sortedRecs) {
-                      if (r.status === 'absent') {
-                        currConsecutive++;
-                        if (currConsecutive > maxConsecutive) maxConsecutive = currConsecutive;
-                      } else {
-                        currConsecutive = 0;
+                    return displayClasses.map(cls => {
+                      const isEnrolled = enrollments.some(
+                        e => e.classId === cls.id && 
+                             (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
+                             !e.deletedByStudent
+                      );
+
+                      // Compute active standing indicators
+                      const studentRecordsForClass = attendanceRecords.filter(
+                        r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
+                      );
+                      const absentsForClass = studentRecordsForClass.filter(r => r.status === 'absent');
+                      const countAbsentsForClass = absentsForClass.length;
+
+                      let maxConsecutive = 0;
+                      let currConsecutive = 0;
+                      const sortedRecs = [...studentRecordsForClass].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      for (const r of sortedRecs) {
+                        if (r.status === 'absent') {
+                          currConsecutive++;
+                          if (currConsecutive > maxConsecutive) maxConsecutive = currConsecutive;
+                        } else {
+                          currConsecutive = 0;
+                        }
                       }
-                    }
 
-                    let standingLabel = 'Good Standing';
-                    let standingColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450';
-                    if (countAbsentsForClass >= 5 || maxConsecutive >= 3) {
-                      standingLabel = '🚫 Dropped';
-                      standingColor = 'bg-red-500/10 text-red-600 dark:text-red-400';
-                    } else if (countAbsentsForClass >= 3) {
-                      standingLabel = '⚠️ Warning';
-                      standingColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-505';
-                    }
+                      let standingLabel = 'Good Standing';
+                      let standingColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450';
+                      if (countAbsentsForClass >= 5 || maxConsecutive >= 3) {
+                        standingLabel = '🚫 Dropped';
+                        standingColor = 'bg-red-500/10 text-red-600 dark:text-red-400';
+                      } else if (countAbsentsForClass >= 3) {
+                        standingLabel = '⚠️ Warning';
+                        standingColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-505';
+                      }
 
-                    return (
-                      <div 
-                        key={cls.id}
-                        onClick={() => handleOpenSubjectDetails(cls)}
-                        className={`p-4 rounded-xl border text-left transition-all duration-200 hover:scale-[1.01] cursor-pointer relative group/card ${
-                          isEnrolled 
-                            ? 'bg-zinc-50/50 hover:bg-zinc-100/60 dark:bg-zinc-900/30 dark:border-zinc-840 dark:hover:bg-zinc-900/65' 
-                            : 'bg-zinc-100/20 border-dashed border-zinc-200 dark:border-zinc-900 hover:border-emerald-500/40'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase">
-                              {cls.code}
-                            </span>
-                            <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-2 tracking-tight truncate max-w-[170px]">{cls.name}</h4>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                              isEnrolled 
-                                ? 'bg-blue-600 text-white font-extrabold shadow-sm' 
-                                : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-500'
-                            }`}>
-                              {isEnrolled ? 'Joined' : 'Guest'}
-                            </span>
-                            {isEnrolled && (
-                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${standingColor}`}>
-                                {standingLabel}
+                      return (
+                        <div 
+                          key={cls.id}
+                          onClick={() => handleOpenSubjectDetails(cls)}
+                          className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all duration-200 hover:scale-[1.01] cursor-pointer relative group/card ${
+                            isEnrolled 
+                              ? 'bg-zinc-50/50 hover:bg-zinc-100/60 dark:bg-zinc-900/30 dark:border-zinc-840 dark:hover:bg-zinc-900/65' 
+                              : 'bg-zinc-100/20 border-dashed border-zinc-200 dark:border-zinc-900 hover:border-emerald-500/40'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase">
+                                {cls.code}
                               </span>
-                            )}
-                            
-                            {/* Student soft delete/drop action trigger button */}
-                            {isEnrolled && onDropSubject && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setStudentDeleteConfirm({ id: cls.id, code: cls.code, name: cls.name });
-                                }}
-                                className="p-1 h-6 w-6 mt-1 flex items-center justify-center rounded-md bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-0 group-hover/card:opacity-100 animate-fade-in"
-                                title="Delete/drop subject"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1.5 sm:mt-2 tracking-tight truncate max-w-[130px] sm:max-w-[170px]">{cls.name}</h4>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                isEnrolled 
+                                  ? 'bg-blue-600 text-white font-extrabold shadow-sm' 
+                                  : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-500'
+                              }`}>
+                                {isEnrolled ? 'Joined' : 'Available'}
+                              </span>
 
-                            {!isEnrolled && onEnrollSubject && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onEnrollSubject(cls.id);
-                                }}
-                                className="px-2 py-1 mt-1 text-[9px] font-black uppercase rounded-md bg-emerald-500 text-black hover:bg-emerald-400 transition-all cursor-pointer shadow-xs active:scale-95 animate-fade-in"
-                                title="Enroll or resume subject"
-                              >
-                                Enroll / Resume
-                              </button>
-                            )}
+                              {isEnrolled && (
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${standingColor}`}>
+                                  {standingLabel}
+                                </span>
+                              )}
+                              
+                              {/* Student soft delete/drop action trigger button */}
+                              {isEnrolled && onDropSubject && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setStudentDeleteConfirm({ id: cls.id, code: cls.code, name: cls.name });
+                                  }}
+                                  className="p-1 h-6 w-6 mt-1 flex items-center justify-center rounded-md bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-0 group-hover/card:opacity-100 animate-fade-in"
+                                  title="Delete/drop subject"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {/* Manual Enroll Button for unenrolled subjects found via search */}
+                              {!isEnrolled && onEnrollSubject && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEnrollSubject(cls.id);
+                                  }}
+                                  className="mt-1.5 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all"
+                                  title="Enroll in this subject"
+                                >
+                                  Enroll Now
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 sm:gap-3.5 text-[10px] text-zinc-400 mt-3 sm:mt-4 flex-wrap">
+                            <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
+                              <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                              {cls.startTime}
+                            </span>
+                            <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
+                              <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+                              {cls.room}
+                            </span>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-3.5 text-[10px] text-zinc-400 mt-4">
-                          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-                            <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                            {cls.startTime}
-                          </span>
-                          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-                            <MapPin className="w-3.5 h-3.5 text-zinc-500" />
-                            {cls.room}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               </div>
 
             </div>
 
             {/* RIGHT SIDEBAR: Live Clock & Quick Checklist reminder widgets */}
-            <div className="lg:col-span-4 space-y-6">
+            <div className="lg:col-span-4 space-y-4 sm:space-y-6">
               {/* Precision Heartrate Clock */}
               <AlarmClock readAloudEnabled={accessibility.readAloud} />
-
-              {/* University Information Guidelines */}
-              <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/40 border border-zinc-205 dark:border-zinc-800/80 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-3 text-emerald-500">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-wider mb-1">Campus Life Assistance</h4>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed mb-3">
-                  Check your daily check-in logs and message subject instructors securely. If offline, the local database logs your timestamp automatically.
-                </p>
-                <div className="space-y-2 text-[10px] text-zinc-500 dark:text-zinc-405 font-bold border-t border-zinc-100 dark:border-zinc-800 pt-3">
-                  <div className="flex justify-between">
-                    <span>Help Desk</span>
-                    <span className="text-emerald-500">Local 102</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Library</span>
-                    <span className="text-emerald-500">Local 105</span>
-                  </div>
-                </div>
-              </div>
             </div>
 
           </div>
@@ -2040,7 +1638,7 @@ export default function DashboardStudent({
               <button 
                 onClick={() => setScreen('dashboard')} 
                 type="button"
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+                className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                 title="Back"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -2054,36 +1652,98 @@ export default function DashboardStudent({
               </div>
             </div>
 
-            {/* Search inputs */}
-            <div className="relative w-full sm:max-w-xs">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400 pointer-events-none">
-                <Search className="w-4 h-4 text-emerald-500" />
-              </span>
-              <input
-                type="text"
-                value={scheduleSearch}
-                onChange={(e) => setScheduleSearch(e.target.value)}
-                placeholder="Search catalog code or title..."
-                className="w-full pl-9 pr-8 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 rounded-xl text-base md:text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
-              />
-              {scheduleSearch && (
+            {/* Search inputs & View Toggle */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setScheduleSearch('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-650 font-black cursor-pointer text-sm animate-fade-in"
+                  onClick={() => setScheduleViewMode('grid')}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    scheduleViewMode === 'grid'
+                      ? 'bg-emerald-500 text-black shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
                 >
-                  ×
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Weekly Grid</span>
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setScheduleViewMode('cards')}
+                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    scheduleViewMode === 'cards'
+                      ? 'bg-emerald-500 text-black shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span>Card List</span>
+                </button>
+              </div>
+
+              <div className="relative flex-1 sm:w-60">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400 pointer-events-none">
+                  <Search className="w-4 h-4 text-emerald-500" />
+                </span>
+                <input
+                  type="text"
+                  value={scheduleSearch}
+                  onChange={(e) => setScheduleSearch(e.target.value)}
+                  placeholder="Search catalog code or title..."
+                  className="w-full pl-9 pr-8 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 rounded-xl text-base md:text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                />
+                {scheduleSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setScheduleSearch('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-650 font-black cursor-pointer text-sm animate-fade-in"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Schedule Lists Render */}
           {(() => {
-            const filtered = classes.filter(cls => 
-              (cls.name || '').toLowerCase().includes(scheduleSearch.toLowerCase()) || 
-              (cls.code || '').toLowerCase().includes(scheduleSearch.toLowerCase())
-            );
+            const isSearching = scheduleSearch.trim().length > 0;
+
+            let targetClasses = classes;
+            if (isSearching) {
+              const query = scheduleSearch.toLowerCase();
+              targetClasses = classes.filter(cls => 
+                (cls.name || '').toLowerCase().includes(query) ||
+                (cls.code || '').toLowerCase().includes(query) ||
+                (cls.room || '').toLowerCase().includes(query) ||
+                (cls.facultyName || '').toLowerCase().includes(query)
+              );
+            } else {
+              targetClasses = classes.filter(cls =>
+                enrollments.some(
+                  e => e.classId === cls.id && 
+                       (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) && 
+                       !e.deletedByStudent
+                )
+              );
+            }
+
+            if (scheduleViewMode === 'grid') {
+              return (
+                <WeeklyScheduleGrid
+                  classes={targetClasses}
+                  userRole="student"
+                  enrollments={enrollments}
+                  userProfile={userProfile}
+                  searchQuery={scheduleSearch}
+                  onOpenSubjectDetails={handleOpenSubjectDetails}
+                  onEnrollSubject={onEnrollSubject}
+                  onDropSubject={onDropSubject}
+                />
+              );
+            }
+
+            const filtered = targetClasses;
 
             const todayIndex = new Date().getDay();
             const dayMap: Record<number, string> = {
@@ -2342,14 +2002,14 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-2xl mx-auto space-y-6 text-left"
+          className="w-full space-y-6 text-left animate-fade-in"
         >
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 shadow-sm border border-zinc-250 dark:border-zinc-850">
-            <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850 pb-4 mb-5">
+          <div className="space-y-6 text-left">
+            <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850 pb-4">
               <button 
                 onClick={() => setScreen('dashboard')} 
                 type="button"
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+                className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                 title="Back"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -2363,12 +2023,12 @@ export default function DashboardStudent({
               </div>
             </div>
 
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-4 mt-5">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4 max-w-sm mx-auto">
               <div className="space-y-4 animate-fade-in">
                 {/* Real Camera Viewport */}
-                <div className="relative rounded-2xl bg-zinc-950 min-h-[300px] overflow-hidden border border-zinc-250 dark:border-zinc-800 flex flex-col justify-between">
+                <div className="relative rounded-2xl bg-zinc-950 w-full h-[280px] sm:h-[300px] overflow-hidden border border-zinc-250 dark:border-zinc-800 flex flex-col justify-between shadow-md">
                   {/* Camera Feed Target Container */}
-                  <div id="live-qr-reader" className="w-full min-h-[300px] bg-zinc-950 overflow-hidden relative"></div>
+                  <div id="live-qr-reader" className="w-full h-[280px] sm:h-[300px] bg-zinc-950 overflow-hidden relative"></div>
 
                   {/* Active QR Scanner Feed Loading Skeleton */}
                   {isCameraLoading && (
@@ -2511,37 +2171,6 @@ export default function DashboardStudent({
                   </div>
                 </div>
 
-                {/* QA Sandbox Simulator Keys Block */}
-                <div className="p-4 rounded-xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/10 dark:border-amber-500/25 text-xs text-left">
-                  <p className="font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-widest text-[9px] mb-2 flex items-center gap-1.5 font-sans">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
-                    QA Sandbox Helper (Simulate QR Scan)
-                  </p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mb-3.5 leading-relaxed font-sans">
-                    Camera media devices are frequently blocked inside secure cross-origin iframe preview containers. Tap any live class token below to immediately emulate a flawless real-time scanner check-in event.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {classes.map(cls => {
-                      const token = cls.qrToken || `QR_KEY_${cls.id.toUpperCase()}`;
-                      return (
-                        <button
-                          key={cls.id}
-                          type="button"
-                          onClick={() => {
-                            const input = document.getElementById('manual-session-passcode-input') as HTMLInputElement;
-                            if (input) input.value = token;
-                            handleDecodedText(token);
-                          }}
-                          className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-900 hover:bg-emerald-500 hover:text-black dark:hover:bg-emerald-500 dark:hover:text-black transition-all border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 shadow-xs cursor-pointer text-[10px] font-mono font-bold text-zinc-700 dark:text-zinc-200 text-left shrink-0 active:scale-95"
-                          title={`Simulate scan for ${cls.name}`}
-                        >
-                          🏷️ {cls.code}: <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-extrabold group-hover:text-black">{token}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
               </div>
             </form>
 
@@ -2573,13 +2202,13 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
+          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-3">
+          <div className="hidden sm:flex pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-3 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
               type="button"
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+              className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
               title="Back"
             >
               <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -2598,6 +2227,7 @@ export default function DashboardStudent({
             enrollments={enrollments} 
             accessibility={accessibility} 
             setScreen={setScreen}
+            initialContactId={selectedFacultyForChat}
           />
         </motion.div>
       )}
@@ -2626,14 +2256,14 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-4xl mx-auto space-y-4 text-left"
+          className="w-full space-y-4 text-left animate-fade-in"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-855/60 pb-3">
             <div className="flex items-start gap-3">
               <button 
                 onClick={() => setScreen('dashboard')} 
                 type="button"
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-855 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+                className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                 title="Back"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -2892,14 +2522,14 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-2xl mx-auto space-y-6 text-left"
+          className="w-full space-y-6 text-left animate-fade-in"
         >
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 shadow-sm">
-            <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4 mb-5">
+          <div className="space-y-6 text-left">
+            <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4">
               <button 
                 onClick={() => setScreen('dashboard')} 
                 type="button"
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+                className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                 title="Back"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -3057,6 +2687,14 @@ export default function DashboardStudent({
         isDark={accessibility.theme === 'dark'}
         studentId={userProfile.studentId || userProfile.id}
         studentName={userProfile.name}
+        studentEmail={userProfile.email}
+        userRole="student"
+        onEnrollSubject={onEnrollSubject}
+        onDropSubject={(classId) => {
+          if (onDropSubject) {
+            onDropSubject(classId);
+          }
+        }}
       />
 
       {/* Active student notification pop-up alarm */}

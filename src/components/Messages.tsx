@@ -35,6 +35,7 @@ interface MessagesProps {
   onBack?: () => void;
   mode?: 'private' | 'tickets';
   setScreen?: (screen: string) => void;
+  initialContactId?: string | { id: string; name?: string; ts?: number };
 }
 
 interface EnrichedChatMessage extends ChatMessage {
@@ -163,7 +164,7 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
   return result;
 };
 
-export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen }: MessagesProps) {
+export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen, initialContactId }: MessagesProps) {
   const [messages, setMessages] = useState<EnrichedChatMessage[]>(() => {
     const cached = localStorage.getItem('cp_chat_messages_v2');
     if (cached) {
@@ -470,17 +471,35 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     );
 
     if (userProfile.role === 'student') {
-      const teachers = classes.map(c => {
+      const teachersMap = new Map();
+      classes.forEach(c => {
         const matchedT = dynPeople.find(p => p.id === c.facultyId || p.name === c.facultyName);
-        return {
-          id: c.facultyId || 'fac-1',
-          name: c.facultyName,
-          role: 'faculty',
-          avatar: matchedT?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-          courseCode: c.code
-        };
+        const id = c.facultyId || matchedT?.id || 'fac-1';
+        if (!teachersMap.has(id)) {
+          teachersMap.set(id, {
+            id,
+            name: c.facultyName,
+            role: 'faculty',
+            avatar: matchedT?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
+            courseCode: c.code
+          });
+        }
       });
-      list = [...teachers];
+
+      // Include all faculty members from dynPeople so student can message any faculty member directly from Live Instructors Directory
+      dynPeople.filter(p => p.role === 'faculty').forEach(f => {
+        if (!teachersMap.has(f.id)) {
+          teachersMap.set(f.id, {
+            id: f.id,
+            name: f.name,
+            role: 'faculty',
+            avatar: f.avatar,
+            courseCode: f.dept || 'Faculty Member'
+          });
+        }
+      });
+
+      list = Array.from(teachersMap.values());
     } else if (userProfile.role === 'faculty') {
       // Faculty see students
       const facultyId = userProfile.facultyId || 'fac-1';
@@ -633,7 +652,21 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
   // Set initial contact or channel
   useEffect(() => {
-    if (userProfile.role === 'admin') {
+    const targetId = typeof initialContactId === 'object' ? initialContactId?.id : initialContactId;
+    if (targetId) {
+      const match = contacts.find(c => 
+        c.id === targetId || 
+        (c.name && targetId && c.name.toLowerCase() === targetId.toLowerCase()) ||
+        (c.id && targetId && c.id.replace('-', '') === targetId.replace('-', '')) ||
+        (c.id && targetId && c.id.replace('fac-0', 'fac-') === targetId.replace('fac-0', 'fac-'))
+      );
+      if (match) {
+        setActiveContactId(match.id);
+      } else {
+        setActiveContactId(targetId);
+      }
+      setMobileShowChat(true);
+    } else if (userProfile.role === 'admin') {
       if (mode === 'tickets') {
         if (!activeContactId && adminTickets && adminTickets.length > 0) {
           setActiveContactId(adminTickets[0].id);
@@ -656,7 +689,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         }
       }
     }
-  }, [contacts, channels, adminTickets, userProfile.role, mode]);
+  }, [initialContactId, contacts, channels, adminTickets, userProfile.role, mode]);
 
   // Automatically scroll chat container to original position (bottom) and reset texts/attachments when switching active contacts
   useEffect(() => {
@@ -734,7 +767,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       senderName: userProfile.name,
       senderRole: userProfile.role,
       receiverId: activeContactId,
-      receiverName: destObj?.name || 'Academic Group',
+      receiverName: destObj?.name || activeMeta?.name || 'Academic Group',
       message: inputText.trim() || (pendingImg ? "Shared an image" : pendingFile ? "Shared a file" : "Shared a link"),
       timestamp: nowStr,
       attachmentImg: pendingImg || undefined,
@@ -790,21 +823,13 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     speakText("Syllabus resource file attached.", accessibility.readAloud);
   };
 
-  // Filter messages for current discussion
-  
-  const isActiveChannel = channels.some(ch => ch.id === activeContactId);
-  
-  const currentMessages = messages.filter(m => {
-    if (!isActiveChannel) {
-      return (m.senderId === myId && m.receiverId === activeContactId) ||
-             (m.senderId === activeContactId && m.receiverId === myId);
-    } else {
-      return m.receiverId === activeContactId;
-    }
-  });
-
-  const displayMessages = currentMessages;
-  const isGoogleChatActive = false;
+  const dynPeopleForSearch = getDynamicCampusPeople(
+    userProfile.role,
+    userProfile.id || (userProfile as any).uid || (userProfile.role === 'admin' ? 'admin-cur' : userProfile.role === 'faculty' ? 'fac-1' : '2023-10492'),
+    userProfile.name,
+    userProfile.avatar,
+    userProfile.email
+  );
 
   const getActiveMetadata = () => {
     const ch = channels.find(c => c.id === activeContactId);
@@ -817,7 +842,12 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         courseCode: ch.code 
       };
     }
-    const co = contacts.find(c => c.id === activeContactId);
+    const co = contacts.find(c => 
+      c.id === activeContactId || 
+      (c.name && activeContactId && c.name.toLowerCase() === activeContactId.toLowerCase()) ||
+      (c.id && activeContactId && c.id.replace('-', '') === activeContactId.replace('-', '')) ||
+      (c.id && activeContactId && c.id.replace('fac-0', 'fac-') === activeContactId.replace('fac-0', 'fac-'))
+    );
     if (co) {
       return { 
         id: co.id, 
@@ -828,10 +858,42 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         courseCode: co.courseCode 
       };
     }
+    const person = dynPeopleForSearch.find(p => 
+      p.id === activeContactId || 
+      (p.name && activeContactId && p.name.toLowerCase() === activeContactId.toLowerCase()) ||
+      (p.id && activeContactId && p.id.replace('-', '') === activeContactId.replace('-', '')) ||
+      (p.id && activeContactId && p.id.replace('fac-0', 'fac-') === activeContactId.replace('fac-0', 'fac-'))
+    );
+    if (person) {
+      return {
+        id: person.id,
+        name: person.name,
+        isChannel: false,
+        avatar: person.avatar,
+        role: person.role,
+        courseCode: person.dept || 'Faculty Member'
+      };
+    }
     return null;
   };
 
   const activeMeta = getActiveMetadata();
+
+  // Filter messages for current discussion
+  const isActiveChannel = channels.some(ch => ch.id === activeContactId);
+  
+  const currentMessages = messages.filter(m => {
+    if (!isActiveChannel) {
+      const isTargetSender = m.senderId === activeContactId || (activeMeta?.id && m.senderId === activeMeta.id) || (activeMeta?.name && m.senderName === activeMeta.name);
+      const isTargetReceiver = m.receiverId === activeContactId || (activeMeta?.id && m.receiverId === activeMeta.id) || (activeMeta?.name && m.receiverName === activeMeta.name);
+      return (m.senderId === myId && isTargetReceiver) || (isTargetSender && m.receiverId === myId);
+    } else {
+      return m.receiverId === activeContactId;
+    }
+  });
+
+  const displayMessages = currentMessages;
+  const isGoogleChatActive = false;
 
   // Filter channels & contacts with userSearchText
   const filteredChannels = channels.filter(ch => 
@@ -842,14 +904,6 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   const filteredContacts = contacts.filter(co => 
     (co.name || '').toLowerCase().includes(userSearchText.toLowerCase()) || 
     (co.courseCode && co.courseCode.toLowerCase().includes(userSearchText.toLowerCase()))
-  );
-
-  const dynPeopleForSearch = getDynamicCampusPeople(
-    userProfile.role,
-    userProfile.id || (userProfile as any).uid || (userProfile.role === 'admin' ? 'admin-cur' : userProfile.role === 'faculty' ? 'fac-1' : '2023-10492'),
-    userProfile.name,
-    userProfile.avatar,
-    userProfile.email
   );
 
   const searchResultsGlobal = userSearchText.trim() ? dynPeopleForSearch.filter(person => {
@@ -869,14 +923,14 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
   const renderSidebar = () => {
     return (
-        <div id="messenger-sidebar" className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-zinc-200/60 dark:border-zinc-850/60 flex flex-col h-full shrink-0 bg-zinc-50/40 dark:bg-zinc-950/20">
-          <div className="p-4 border-b border-zinc-150 dark:border-zinc-900 space-y-3">
+        <div id="messenger-sidebar" className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-zinc-200/60 dark:border-zinc-850/60 flex flex-col h-full shrink-0 bg-transparent">
+          <div className="p-2.5 border-b border-zinc-150 dark:border-zinc-900 space-y-2">
             {onBack && (
               <div className="flex items-center justify-between">
                 <button
                   type="button"
                   onClick={onBack}
-                  className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none"
+                  className="p-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                   title="Back"
                 >
                   <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -885,7 +939,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             </div>
           )}
 
-          {/* Facebook Messenger search bar */}
+          {/* Compact search bar */}
           <div className="relative">
             <input
               type="text"
@@ -893,15 +947,15 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
               onChange={(e) => {
                 setUserSearchText(e.target.value);
               }}
-              placeholder="Search people, subjects..."
-              className="w-full text-xs pl-8 pr-8 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-transparent focus:border-emerald-500/30 outline-none text-zinc-900 dark:text-zinc-100 font-bold"
+              placeholder="Search..."
+              className="w-full text-xs pl-7 pr-7 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-transparent focus:border-emerald-500/30 outline-none text-zinc-900 dark:text-zinc-100 font-semibold"
             />
-            <span className="absolute left-2.5 top-3 text-[11px] text-zinc-400">🔍</span>
+            <span className="absolute left-2 top-2 text-[10px] text-zinc-400">🔍</span>
             {userSearchText && (
               <button
                 type="button"
                 onClick={() => setUserSearchText('')}
-                className="absolute right-2.5 top-2.5 p-1 text-[9px] font-black text-white bg-zinc-400 dark:bg-zinc-800 rounded-full hover:bg-red-500 transition-colors"
+                className="absolute right-2 top-2 p-0.5 text-[8px] font-black text-white bg-zinc-400 dark:bg-zinc-800 rounded-full hover:bg-red-500 transition-colors"
               >
                 ✕
               </button>
@@ -1073,7 +1127,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
   const renderChatArea = () => {
     return (
-      <div className="flex-1 flex flex-col h-full min-w-0 p-4 bg-white dark:bg-zinc-950">
+      <div className="flex-1 flex flex-col h-full min-w-0 p-2.5 sm:p-3 bg-transparent">
         
         {activeMeta ? (
           activeMeta.role === 'admin' && userProfile.role !== 'admin' ? (
@@ -1112,9 +1166,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             </div>
           ) : (
             <>
-            {/* Header user identification details */}
-            <div className="pb-3 border-b border-zinc-200/60 dark:border-zinc-850/60 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
+            {/* Compact Header user details */}
+            <div className="pb-2 border-b border-zinc-200/60 dark:border-zinc-850/60 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 {(isMobile || mobileShowChat) && (
                   <button
                     type="button"
@@ -1122,59 +1176,50 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       setMobileShowChat(false);
                       speakText("Back to chat list", accessibility.readAloud);
                     }}
-                    className="lg:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm mr-2 shrink-0 animate-fade-in"
+                    className="lg:hidden p-1.5 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 mr-1 shrink-0 animate-fade-in"
                     title="Go back to list"
                   >
                     <ArrowLeft className="w-4 h-4 text-emerald-500" />
                   </button>
                 )}
                 {!(activeMeta as any).isChannel ? (
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     {(activeMeta as any).avatar ? (
                       <img 
                         src={(activeMeta as any).avatar} 
                         alt={activeMeta.name} 
-                        className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/20"
+                        className="w-8 h-8 rounded-full object-cover border border-emerald-500/20"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-indigo-650 text-white font-extrabold text-sm flex items-center justify-center uppercase border-2 border-emerald-500/20 shadow-sm">
+                      <div className="w-8 h-8 rounded-full bg-indigo-650 text-white font-extrabold text-xs flex items-center justify-center uppercase border border-emerald-500/20 shadow-2xs">
                         {activeMeta.name ? activeMeta.name[0] : '?'}
                       </div>
                     )}
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
+                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
                   </div>
                 ) : (
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black text-sm shrink-0">
                     #
                   </div>
                 )}
                 <div className="text-left min-w-0">
-                  <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
+                  <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
                     <span className="truncate">{activeMeta.name}</span>
                     {activeMeta && !(activeMeta as any).isChannel && (
                       activeMeta.id === myId ||
                       ((activeMeta as any).email && userProfile.email && (activeMeta as any).email.toLowerCase() === userProfile.email.toLowerCase()) ||
                       (activeMeta.name && userProfile.name && activeMeta.name.toLowerCase() === userProfile.name.toLowerCase())
                     ) && (
-                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                      <span className="text-[8px] font-black px-1 py-0.2 rounded uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
                         (You)
                       </span>
                     )}
-                    {(activeMeta as any).isChannel && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider animate-pulse ${
-                        isGoogleChatActive ? 'bg-sky-500/10 text-sky-500' : 'bg-emerald-500/10 text-emerald-500'
-                      }`}>
-                        {isGoogleChatActive ? 'Google Space' : 'Lobby Live'}
-                      </span>
-                    )}
                   </h3>
-                  <p className="text-[10px] text-zinc-450 dark:text-zinc-500 font-bold tracking-wide mt-0.5 truncate">
-                    {isGoogleChatActive 
-                      ? 'Secure classroom Workspace stream synchronizing in real time' 
-                      : !(activeMeta as any).isChannel 
-                        ? `Direct Secure Sync Feed` 
-                        : `Instant classroom collaborative workspace • ${currentMessages.length + 8} active participants`}
+                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-semibold truncate">
+                    {!(activeMeta as any).isChannel 
+                      ? `Direct Chat` 
+                      : `Class Room`}
                   </p>
                 </div>
               </div>
@@ -1190,7 +1235,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             </div>
 
             {/* Chat message bubbles scroll container */}
-            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+            <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4 pr-1">
               {displayMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-zinc-400 dark:text-zinc-650 space-y-2">
                   <MessageSquare className="w-10 h-10 text-emerald-500/30" />
@@ -1452,30 +1497,32 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                 </div>
               )}
 
-              {/* Input Action Panel Form */}
-              <form onSubmit={handleSendMessage} className="pt-2 border-t border-zinc-200/60 dark:border-zinc-850/60 flex gap-2">
+              {/* Compact Input Form */}
+              <form onSubmit={handleSendMessage} className="pt-1.5 border-t border-zinc-200/60 dark:border-zinc-850/60 flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                  className={`h-10 w-10 shrink-0 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-all cursor-pointer ${
+                  className={`h-9 w-9 shrink-0 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-all cursor-pointer ${
                     showAttachmentMenu ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
                   }`}
+                  title="Attach file or photo"
                 >
-                  <Paperclip className="w-4 h-4" />
+                  <Paperclip className="w-3.5 h-3.5" />
                 </button>
                 <input
                   type="text"
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}
-                  placeholder={`Send a live academic notification message to ${activeMeta.name}...`}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-205 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans shadow-inner font-bold"
+                  placeholder={`Message ${activeMeta.name}...`}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans font-medium"
                 />
                 <button
                   type="submit"
                   disabled={!inputText.trim() && !pendingImg && !pendingLink && !pendingFile}
-                  className="h-10 w-10 shrink-0 font-bold text-black bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                  className="h-9 w-9 shrink-0 font-bold text-black bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  title="Send message"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5" />
                 </button>
               </form>
             </div>
@@ -1504,7 +1551,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     return (
       <div 
         id="messenger-sidebar-admin"
-        className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-zinc-200/60 dark:border-zinc-850/60 flex flex-col h-full shrink-0 bg-zinc-50/40 dark:bg-zinc-950/20"
+        className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-zinc-200/60 dark:border-zinc-850/60 flex flex-col h-full shrink-0 bg-transparent"
       >
         <div className="p-4 border-b border-zinc-150 dark:border-zinc-900 space-y-3 p-5">
           {onBack && (
@@ -1512,7 +1559,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
               <button
                 type="button"
                 onClick={onBack}
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none"
+                className="p-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                 title="Back"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -1637,7 +1684,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     
     if (!selectedTicket) {
       return (
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-neutral-400 dark:text-zinc-650 bg-white dark:bg-zinc-950">
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-neutral-400 dark:text-zinc-650 bg-transparent">
           <MessageSquare className="w-12 h-12 stroke-[1.5] mb-3 opacity-50 text-emerald-500 animate-bounce" />
           <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-200">No Ticket Selected</h4>
           <p className="text-xs opacity-75 max-w-xs mt-1">Select an active student or faculty help desk ticket from the list to review history and draft replies.</p>
@@ -1646,7 +1693,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     }
 
     return (
-      <div className="flex-1 flex flex-col h-full min-w-0 p-5 bg-white dark:bg-zinc-950">
+      <div className="flex-1 flex flex-col h-full min-w-0 p-5 bg-transparent">
         
         {/* Active Ticket Header details */}
         <div className="pb-4 border-b border-zinc-200/60 dark:border-zinc-850/60 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
@@ -1658,7 +1705,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                   setMobileShowChat(false);
                   speakText("Back to tickets register", accessibility.readAloud);
                 }}
-                className="lg:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm mr-2 shrink-0 animate-fade-in animate-fade-in"
+                className="lg:hidden p-1.5 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 mr-2 shrink-0 animate-fade-in"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
               </button>
@@ -1722,7 +1769,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         </div>
 
         {/* Messages timeline (HelpCenter chat model style) */}
-        <div ref={ticketMessagesContainerRef} className="flex-1 overflow-y-auto py-3 space-y-3.5 pr-1 text-left">
+        <div ref={ticketMessagesContainerRef} className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3.5 pr-1 text-left">
           {selectedTicket.messages.map((m, index) => {
             const isAdmin = m.sender === 'admin';
             return (
@@ -1793,7 +1840,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   return (
     <div 
       id="messages-messenger-container"
-      className="p-0 rounded-none md:rounded-3xl bg-white dark:bg-zinc-950 border-0 md:border border-zinc-200/80 dark:border-zinc-850/60 shadow-md flex flex-col lg:flex-row h-[calc(100vh-220px)] md:h-[75vh] min-h-[520px] md:min-h-[650px] max-h-[1000px] overflow-hidden text-left relative z-10 w-full animate-fade-in"
+      className="p-0 bg-transparent flex flex-col lg:flex-row flex-1 h-full min-h-0 w-full overflow-hidden text-left relative z-10 animate-fade-in"
     >
       {isMobile ? (
         <AnimatePresence mode="wait">

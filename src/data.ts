@@ -2,7 +2,29 @@ import { ClassSession, AppNotification, FacultyStatus, AttendanceRecord, UserPro
 
 export const INITIAL_CLASSES: ClassSession[] = [];
 
-export const INITIAL_FACULTY_STATUSES: FacultyStatus[] = [];
+export const INITIAL_FACULTY_STATUSES: FacultyStatus[] = [
+  {
+    id: 'fac-01',
+    name: 'Dr. Ahmad Khan',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+    status: 'available',
+    room: 'Consultation Office 303'
+  },
+  {
+    id: 'fac-02',
+    name: 'Prof. Maria Santos',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150',
+    status: 'in-class',
+    room: 'Lab Room 201'
+  },
+  {
+    id: 'fac-03',
+    name: 'Engr. Carlos Reyes',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    status: 'unavailable',
+    room: 'Faculty Lounge'
+  }
+];
 
 export const INITIAL_NOTIFICATIONS: AppNotification[] = [];
 

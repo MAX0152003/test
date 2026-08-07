@@ -46,13 +46,16 @@ import {
   FileText,
   CheckSquare,
   AlertTriangle,
-  Mail
+  Mail,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock from './AlarmClock';
 import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
 import HelpCenter from './HelpCenter';
+import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 
 interface DashboardFacultyProps {
   activeScreen: string;
@@ -214,6 +217,7 @@ export default function DashboardFaculty({
   // Fast Class Search & Student Search states
   const [classSearchQuery, setClassSearchQuery] = React.useState('');
   const [studentSearchQuery, setStudentSearchQuery] = React.useState('');
+  const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
 
   React.useEffect(() => {
     localStorage.setItem('classpulse_faculty_bulletins_hidden', String(isBulletinsHidden));
@@ -290,7 +294,6 @@ export default function DashboardFaculty({
       } else {
         if (onAddAttendanceRecord) {
           onAddAttendanceRecord({
-            id: 'rec-batch-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
             classId: activeMonClass.id,
             className: activeMonClass.name,
             classCode: activeMonClass.code,
@@ -850,7 +853,7 @@ export default function DashboardFaculty({
   const currentStudentsCount = enrollments.length;
 
   return (
-    <div className="space-y-6">
+    <div className={activeScreen === 'messages' || activeScreen === 'help-center' ? "h-full flex flex-col min-h-0" : "space-y-6"}>
 
       <AnimatePresence mode="wait">
         {/* 1. FACULTY INSIGHTS DASHBOARD */}
@@ -861,21 +864,20 @@ export default function DashboardFaculty({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 text-left"
+            className="space-y-3.5 sm:space-y-4 text-left"
           >
-            {/* Welcome Header */}
-          <div className="p-6 md:p-8 rounded-3xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-indigo-900 via-zinc-900 to-emerald-950 text-white shadow-xl shadow-emerald-500/5">
-            <div className="relative z-10 space-y-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-white/10 text-emerald-400">
-                <Sparkles className="w-3.5 h-3.5" />
-                Faculty Command Hub
-              </span>
-              <h2 className="text-2xl md:text-3xl font-black tracking-tight">
-                Welcome Back, Professor {userProfile.name}!
-              </h2>
-              <p className="text-white/80 text-xs max-w-xl leading-relaxed">
-                Manage your academic curriculum, broadcast time-bound QR keys to enrolled students, and keep track of live campus consultation availability coordinates.
-              </p>
+            {/* Compact Welcome Header */}
+          <div className="p-3.5 sm:p-4 md:p-5 rounded-2xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-indigo-900 via-zinc-900 to-emerald-950 text-white shadow-md">
+            <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/10 text-emerald-400">
+                  <Sparkles className="w-3 h-3" />
+                  Faculty Hub
+                </span>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight">
+                  Welcome back, Prof. {userProfile.name}!
+                </h2>
+              </div>
             </div>
           </div>
 
@@ -957,12 +959,12 @@ export default function DashboardFaculty({
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Active Campus Status</span>
                   <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
-                    facultyStatus === 'available' ? 'bg-emerald-500/10 text-emerald-555' :
-                    facultyStatus === 'in-class' ? 'bg-amber-500/10 text-amber-500' :
-                    'bg-red-500/10 text-red-555'
+                    facultyStatus === 'available' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                    facultyStatus === 'in-class' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                    'bg-red-500/10 text-red-500 border border-red-500/20'
                   }`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                    {facultyStatus}
+                    {facultyStatus === 'available' ? 'Available' : facultyStatus === 'in-class' ? 'In Class' : 'Away'}
                   </span>
                 </div>
 
@@ -1045,149 +1047,8 @@ export default function DashboardFaculty({
 
           </div>
 
-          {/* Full-Width Performance Analytics and Custom Trends */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Attendance Trends (Spline plot spline path) */}
-            <div className="lg:col-span-7 p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 shadow-[0_2px_12px_rgba(0,0,0,0.01)] space-y-4">
-              <div>
-                <span className="text-[10px] font-mono font-black uppercase text-zinc-400 tracking-widest">Attendance trends frequency</span>
-                <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">Syllabus Completion & Scanning activity</h3>
-                <p className="text-xs text-zinc-400 leading-normal mt-0.5">Time-based analysis of attendance scans registered over daily classes.</p>
-              </div>
-
-              {/* Attendance trends spline plot */}
-              {(() => {
-                const hasData = attendanceRecords.length > 0;
-                const facultyAttendanceTrends = [
-                  { label: 'Monday', shortLabel: 'M', value: hasData ? 60 : 0, scans: hasData ? 142 : 0, averageTime: hasData ? '08:42 AM' : '--:--', x: 20, y: hasData ? 120 : 135, date: 'Monday, June 8, 2026', syllabus: hasData ? 'Intro & Course Overview' : 'No activity recorded' },
-                  { label: 'Tuesday', shortLabel: 'T', value: hasData ? 75 : 0, scans: hasData ? 168 : 0, averageTime: hasData ? '08:48 AM' : '--:--', x: 100, y: hasData ? 80 : 135, date: 'Tuesday, June 9, 2026', syllabus: hasData ? 'Lecture 1: Database Schemas' : 'No activity recorded' },
-                  { label: 'Wednesday', shortLabel: 'W', value: hasData ? 85 : 0, scans: hasData ? 175 : 0, averageTime: hasData ? '08:45 AM' : '--:--', x: 180, y: hasData ? 55 : 135, date: 'Wednesday, June 10, 2026', syllabus: hasData ? 'Lab session: Basic CRUD Queries' : 'No activity recorded' },
-                  { label: 'Thursday', shortLabel: 'T', value: hasData ? 89 : 0, scans: hasData ? 191 : 0, averageTime: hasData ? '08:41 AM' : '--:--', x: 260, y: hasData ? 50 : 135, date: 'Thursday, June 11, 2026', syllabus: hasData ? 'Lecture 2: Indexing & Performance' : 'No activity recorded' },
-                  { label: 'Friday', shortLabel: 'F', value: hasData ? 94 : 0, scans: hasData ? 198 : 0, averageTime: hasData ? '08:38 AM' : '--:--', x: 340, y: hasData ? 20 : 135, date: 'Friday, June 12, 2026', syllabus: hasData ? 'Topic Quiz & Weekly Review' : 'No activity recorded' }
-                ];
-
-                return (
-                  <div className="w-full h-44 rounded-2xl border border-zinc-150 dark:border-zinc-850 bg-zinc-50/50 dark:bg-zinc-900/30 p-3 relative flex items-end">
-                    <svg viewBox="0 0 400 150" className="w-full h-full overflow-visible">
-                      <defs>
-                        <linearGradient id="facAttendGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
-                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      
-                      {/* Grid lines */}
-                      <line x1="10" y1="30" x2="390" y2="30" stroke="rgba(120,120,120,0.1)" strokeWidth="0.8" />
-                      <line x1="10" y1="70" x2="390" y2="70" stroke="rgba(120,120,120,0.1)" strokeWidth="0.8" />
-                      <line x1="10" y1="110" x2="390" y2="110" stroke="rgba(120,120,120,0.1)" strokeWidth="0.8" strokeDasharray="2 2" />
-
-                      {/* Filled Area */}
-                      <path d={`M 20 ${hasData ? 120 : 135} L 100 ${hasData ? 80 : 135} L 180 ${hasData ? 55 : 135} L 260 ${hasData ? 50 : 135} L 340 ${hasData ? 20 : 135} L 340 135 L 20 135 Z`} fill="url(#facAttendGrad)" />
-                      
-                      {/* Connected Line */}
-                      <path d={`M 20 ${hasData ? 120 : 135} L 100 ${hasData ? 80 : 135} L 180 ${hasData ? 55 : 135} L 260 ${hasData ? 50 : 135} L 340 ${hasData ? 20 : 135}`} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-                      
-                      {/* Interactive nodes */}
-                      {facultyAttendanceTrends.map((d, idx) => {
-                        const isHovered = hoveredFacultyTrendIndex === idx;
-                        return (
-                          <g key={idx}>
-                            {/* Invisible touch area */}
-                            <circle 
-                              cx={d.x} 
-                              cy={d.y} 
-                              r="16" 
-                              fill="transparent" 
-                              className="cursor-pointer"
-                              onMouseEnter={() => setHoveredFacultyTrendIndex(idx)}
-                              onMouseLeave={() => setHoveredFacultyTrendIndex(null)}
-                            />
-                            {/* Inner hovered pulse ring */}
-                            {isHovered && (
-                              <circle 
-                                cx={d.x} 
-                                cy={d.y} 
-                                r="8" 
-                                fill="none" 
-                                stroke="#10b981" 
-                                strokeWidth="1.5" 
-                                className="animate-ping opacity-60"
-                              />
-                            )}
-                            {/* Center point circle */}
-                            <circle 
-                              cx={d.x} 
-                              cy={d.y} 
-                              r={isHovered ? 6 : 4} 
-                              fill="#121212" 
-                              stroke="#10b981" 
-                              strokeWidth={isHovered ? 3 : 2} 
-                            />
-                            {/* Hover highlight text label */}
-                            <text 
-                              x={d.x} 
-                              y={d.y - 12} 
-                              fontSize="8" 
-                              fontWeight="black" 
-                              fill="#10b981" 
-                              textAnchor="middle" 
-                              className="font-mono"
-                            >
-                              {d.value}%
-                            </text>
-                          </g>
-                        );
-                      })}
-
-                      {/* Day labels */}
-                      <text x="20" y="142" fontSize="8" fill="#888">Monday</text>
-                      <text x="100" y="142" fontSize="8" fill="#888">Tuesday</text>
-                      <text x="180" y="142" fontSize="8" fill="#888">Wednesday</text>
-                      <text x="260" y="142" fontSize="8" fill="#888">Thursday</text>
-                      <text x="340" y="142" fontSize="8" fill="#888">Friday</text>
-                    </svg>
-
-                    {/* Highly Polished Interactive Precise Tooltip */}
-                    {hoveredFacultyTrendIndex !== null && (() => {
-                      const data = facultyAttendanceTrends[hoveredFacultyTrendIndex];
-                      return (
-                        <div 
-                          className="absolute z-50 p-3 rounded-xl bg-white dark:bg-zinc-950/95 text-zinc-800 dark:text-white border border-zinc-200 dark:border-zinc-800 shadow-xl pointer-events-none transition-all duration-150 backdrop-blur-md flex flex-col gap-1 w-56 text-left"
-                          style={{
-                            left: `${(data.x / 400) * 100}%`,
-                            bottom: `${(150 - data.y + 12) / 150 * 100}%`,
-                            transform: 'translateX(-50%)',
-                          }}
-                        >
-                          <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900 pb-1 mb-1">
-                            <span className="text-[9px] font-mono font-bold text-emerald-500 dark:text-emerald-400 uppercase tracking-widest">{data.label}</span>
-                            <span className="text-[8px] font-mono text-zinc-400 dark:text-zinc-550">FACULTY CORE</span>
-                          </div>
-                          <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100">{data.date}</p>
-                          <p className="text-[9.5px] italic text-zinc-600 dark:text-zinc-300">"{data.syllabus}"</p>
-                          <div className="grid grid-cols-2 gap-2.5 mt-1 border-t border-zinc-100 dark:border-zinc-900 pt-1.5 font-mono text-[9px]">
-                            <div>
-                              <p className="text-[7px] text-zinc-400 dark:text-zinc-550 uppercase tracking-wider">Scans Today</p>
-                              <p className="font-extrabold text-zinc-800 dark:text-zinc-200">{data.scans} students</p>
-                            </div>
-                            <div>
-                              <p className="text-[7px] text-zinc-400 dark:text-zinc-550 uppercase tracking-wider">Avg Check-in</p>
-                              <p className="font-extrabold text-amber-600 dark:text-amber-400">{data.averageTime}</p>
-                            </div>
-                          </div>
-                          <p className="text-[8px] text-zinc-500 dark:text-zinc-450 mt-1 leading-normal border-t border-zinc-100 dark:border-zinc-900/50 pt-1">
-                            Attendance Rate: <strong className="text-emerald-500 dark:text-emerald-400 text-[10px]">{data.value}%</strong>
-                          </p>
-                          <div className="absolute left-1/2 bottom-0 w-2 h-2 bg-white dark:bg-zinc-950 border-r border-b border-zinc-200 dark:border-zinc-805 transform -translate-x-1/2 translate-y-1/2 rotate-45" />
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })()}
-            </div>            {/* Student Performance Analytics */}
-            <div className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 shadow-[0_2px_12px_rgba(0,0,0,0.01)] space-y-4">
+          {/* Student Performance Analytics */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 shadow-[0_2px_12px_rgba(0,0,0,0.01)] space-y-4">
               <div>
                 <span className="text-[10px] font-mono font-black uppercase text-zinc-400 tracking-widest">Performance Analysis</span>
                 <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">Student Performance rosters</h3>
@@ -1250,8 +1111,6 @@ export default function DashboardFaculty({
                 );
               })()}
             </div>
-
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
@@ -1654,193 +1513,255 @@ export default function DashboardFaculty({
                     <p className="text-xs text-zinc-400 mt-1">Add, edit, or configure classroom configurations and schedules.</p>
                   </div>
 
-                  <button
-                    onClick={handleOpenAddForm}
-                    type="button"
-                    className="bg-emerald-500 text-black font-black uppercase tracking-wider rounded-xl hover:bg-emerald-400 transition-all flex items-center gap-1.5 cursor-pointer animate-fade-in px-4 py-2.5 text-xs w-full sm:w-auto justify-center"
-                  >
-                    <Plus className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                    Add Class Term
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => setScheduleViewMode('grid')}
+                        className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                          scheduleViewMode === 'grid'
+                            ? 'bg-emerald-500 text-black shadow-xs'
+                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                        }`}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <span>Weekly Grid</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScheduleViewMode('cards')}
+                        className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                          scheduleViewMode === 'cards'
+                            ? 'bg-emerald-500 text-black shadow-xs'
+                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                        }`}
+                      >
+                        <List className="w-3.5 h-3.5" />
+                        <span>Card List</span>
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddForm}
+                      type="button"
+                      className="bg-emerald-500 text-black font-black uppercase tracking-wider rounded-xl hover:bg-emerald-400 transition-all flex items-center gap-1.5 cursor-pointer animate-fade-in px-4 py-2 text-xs w-full sm:w-auto justify-center"
+                    >
+                      <Plus className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                      Add Class Term
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Schedule Input Editor Form details */}
-          {isFormOpen && (
-            <div id="faculty-schedule-form" className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-md scroll-mt-6">
-              <div className="flex justify-between items-center pb-3 border-b border-zinc-100 dark:border-zinc-900 mb-4">
-                <h3 className="font-black text-sm uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                  {editingClass ? 'Edit Class specifications' : 'Formulate a New Course class'}
-                </h3>
-                <button
-                  onClick={() => setIsFormOpen(false)}
-                  type="button"
-                  className="p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-455 cursor-pointer"
+          {/* Schedule Input Editor Form Modal Overlay */}
+          <AnimatePresence>
+            {isFormOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="w-full max-w-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
                 >
-                  <X className="w-4.5 h-4.5" />
-                </button>
-              </div>
+                  <div className="flex justify-between items-center pb-3 border-b border-zinc-100 dark:border-zinc-900 mb-4 shrink-0">
+                    <h3 className="font-black text-sm uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+                      {editingClass ? 'Edit Class Specifications' : 'Formulate a New Course Class'}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setIsFormOpen(false);
+                        setEditingClass(null);
+                      }}
+                      type="button"
+                      className="w-7 h-7 rounded-full flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 text-sm font-black select-none cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </div>
 
-              <form onSubmit={handleSubmitForm} className="space-y-4">
-                {/* Real-time conflict warnings banner */}
-                {facultyConflicts.length > 0 && (
-                  <div className="p-4 rounded-xl bg-red-500/10 dark:bg-red-950/20 border border-red-500/20 text-left space-y-2">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 animate-bounce" />
-                      <span className="text-xs font-black text-red-650 dark:text-red-400 uppercase tracking-wider font-sans">
-                        Conflict Warning: Detected {facultyConflicts.length} Scheduling Clash{facultyConflicts.length > 1 ? 'es' : ''}
-                      </span>
-                    </div>
-                    <div className="divide-y divide-red-200 dark:divide-zinc-800/60 space-y-2">
-                      {facultyConflicts.map((conf, index) => (
-                        <div key={index} className="text-[11px] text-zinc-700 dark:text-zinc-300 pt-2 first:pt-0 font-sans">
-                          <p className="font-bold flex items-start sm:items-center justify-between gap-2 text-red-600 dark:text-red-400">
-                            <span>{conf.message}</span>
-                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-550/10 dark:bg-red-950/40 border border-red-500/20 uppercase font-mono tracking-widest shrink-0 font-extrabold">
-                              {conf.type} clash
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-zinc-455 dark:text-zinc-500 font-medium font-mono mt-0.5">
-                            Overlapping Slot: {conf.details} ({conf.subName})
-                          </p>
+                  <form onSubmit={handleSubmitForm} className="space-y-4 overflow-y-auto pr-1.5 custom-scrollbar">
+                    {/* Real-time conflict warnings banner */}
+                    {facultyConflicts.length > 0 && (
+                      <div className="p-4 rounded-xl bg-red-500/10 dark:bg-red-950/20 border border-red-500/20 text-left space-y-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-500 shrink-0 animate-bounce" />
+                          <span className="text-xs font-black text-red-650 dark:text-red-400 uppercase tracking-wider font-sans">
+                            Conflict Warning: Detected {facultyConflicts.length} Scheduling Clash{facultyConflicts.length > 1 ? 'es' : ''}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest">Course Code</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. CS254"
-                      value={formCode}
-                      onChange={(e) => setFormCode(e.target.value)}
-                      required
-                      className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest">Topic Title</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Distributed Computing"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      required
-                      className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-805 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Start Hours</label>
-                    <select
-                      value={formStart}
-                      onChange={(e) => setFormStart(e.target.value)}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 transition-all ${
-                        facultyConflicts.some(cf => cf.type === 'faculty') 
-                          ? 'border-red-500 ring-1 ring-red-500/20' 
-                          : 'border-zinc-200 dark:border-zinc-800'
-                      }`}
-                    >
-                      {SCHEDULING_TIME_SLOTS.map((slot) => (
-                        <option key={slot} value={slot}>{slot}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">End Hours</label>
-                    <select
-                      value={formEnd}
-                      onChange={(e) => setFormEnd(e.target.value)}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 transition-all ${
-                        facultyConflicts.some(cf => cf.type === 'faculty') 
-                          ? 'border-red-500 ring-1 ring-red-500/20' 
-                          : 'border-zinc-200 dark:border-zinc-800'
-                      }`}
-                    >
-                      {SCHEDULING_TIME_SLOTS.map((slot) => (
-                        <option key={slot} value={slot}>{slot}</option>
-                      ))}
-                    </select>
-                <div className="space-y-1.5 col-span-1 md:col-span-2 text-left">
-                  <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">lecture room</label>
-                  <select
-                    name="room-selector"
-                    value={formRoom}
-                    onChange={(e) => setFormRoom(e.target.value)}
-                    required
-                    className={`w-full text-xs p-3 rounded-xl border bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 transition-all ${
-                      facultyConflicts.some(cf => cf.type === 'room') 
-                        ? 'border-red-500 ring-1 ring-red-500/20' 
-                        : 'border-zinc-200 dark:border-zinc-800'
-                    }`}
-                  >
-                    <option value="">-- Select an Available Lecture Room --</option>
-                    {availableRoomsForForm.map(rm => (
-                      <option key={rm.id} value={rm.name}>{rm.name} ({rm.floor})</option>
-                    ))}
-                    {editingClass && !availableRoomsForForm.some(rm => (rm.name || '').toLowerCase() === (editingClass.room || '').toLowerCase()) && (
-                      <option value={editingClass.room}>{editingClass.room} (Current Room)</option>
+                        <div className="divide-y divide-red-200 dark:divide-zinc-800/60 space-y-2">
+                          {facultyConflicts.map((conf, index) => (
+                            <div key={index} className="text-[11px] text-zinc-700 dark:text-zinc-300 pt-2 first:pt-0 font-sans">
+                              <p className="font-bold flex items-start sm:items-center justify-between gap-2 text-red-600 dark:text-red-400">
+                                <span>{conf.message}</span>
+                                <span className="text-[8px] px-1.5 py-0.5 rounded bg-red-550/10 dark:bg-red-950/40 border border-red-500/20 uppercase font-mono tracking-widest shrink-0 font-extrabold">
+                                  {conf.type} clash
+                                </span>
+                              </p>
+                              <p className="text-[10px] text-zinc-455 dark:text-zinc-500 font-medium font-mono mt-0.5">
+                                Overlapping Slot: {conf.details} ({conf.subName})
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </select>
-                  {availableRoomsForForm.length === 0 && (
-                    <p className="text-red-500 text-[10px] mt-1.5 font-bold font-mono animate-pulse">
-                      ⚠️ No available laboratory/lecture rooms found in the registry for this schedule day/time. You cannot create a class.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest">Course Code</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. CS254"
+                          value={formCode}
+                          onChange={(e) => setFormCode(e.target.value)}
+                          required
+                          className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest">Topic Title</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Distributed Computing"
+                          value={formName}
+                          onChange={(e) => setFormName(e.target.value)}
+                          required
+                          className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-805 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Scheduled Recurrence Days</label>
-                  <div className="flex flex-wrap gap-2">
-                    {['MW', 'TTh', 'S', 'A'].map(day => {
-                      const selected = formDays.includes(day);
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => handleDayToggle(day)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
-                            selected 
-                              ? 'bg-emerald-500 text-black font-extrabold' 
-                              : 'bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 border border-zinc-200 dark:border-zinc-805 text-zinc-650 dark:text-zinc-300'
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Start Hours</label>
+                        <select
+                          value={formStart}
+                          onChange={(e) => setFormStart(e.target.value)}
+                          required
+                          className={`w-full text-xs p-3 rounded-xl border bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 transition-all ${
+                            facultyConflicts.some(cf => cf.type === 'faculty') 
+                              ? 'border-red-500 ring-1 ring-red-500/20' 
+                              : 'border-zinc-200 dark:border-zinc-800'
                           }`}
                         >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                          {SCHEDULING_TIME_SLOTS.map((slot) => (
+                            <option key={slot} value={slot}>{slot}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">End Hours</label>
+                        <select
+                          value={formEnd}
+                          onChange={(e) => setFormEnd(e.target.value)}
+                          required
+                          className={`w-full text-xs p-3 rounded-xl border bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 transition-all ${
+                            facultyConflicts.some(cf => cf.type === 'faculty') 
+                              ? 'border-red-500 ring-1 ring-red-500/20' 
+                              : 'border-zinc-200 dark:border-zinc-800'
+                          }`}
+                        >
+                          {SCHEDULING_TIME_SLOTS.map((slot) => (
+                            <option key={slot} value={slot}>{slot}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5 col-span-1 sm:col-span-1 text-left">
+                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Lecture Room</label>
+                        <select
+                          name="room-selector"
+                          value={formRoom}
+                          onChange={(e) => setFormRoom(e.target.value)}
+                          required
+                          className={`w-full text-xs p-3 rounded-xl border bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 transition-all ${
+                            facultyConflicts.some(cf => cf.type === 'room') 
+                              ? 'border-red-500 ring-1 ring-red-500/20' 
+                              : 'border-zinc-200 dark:border-zinc-800'
+                          }`}
+                        >
+                          <option value="">-- Select Room --</option>
+                          {availableRoomsForForm.map(rm => (
+                            <option key={rm.id} value={rm.name}>{rm.name} ({rm.floor})</option>
+                          ))}
+                          {editingClass && !availableRoomsForForm.some(rm => (rm.name || '').toLowerCase() === (editingClass.room || '').toLowerCase()) && (
+                            <option value={editingClass.room}>{editingClass.room} (Current Room)</option>
+                          )}
+                        </select>
+                        {availableRoomsForForm.length === 0 && (
+                          <p className="text-red-500 text-[10px] mt-1.5 font-bold font-mono animate-pulse">
+                            ⚠️ No available rooms found for this schedule time.
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={availableRoomsForForm.length === 0 && !formRoom}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                      availableRoomsForForm.length === 0 && !formRoom
-                        ? 'bg-zinc-300 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50'
-                        : 'bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer'
-                    }`}
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Scheduled Recurrence Days</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['MW', 'TTh', 'S', 'A'].map(day => {
+                          const selected = formDays.includes(day);
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              onClick={() => handleDayToggle(day)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                                selected 
+                                  ? 'bg-emerald-500 text-black font-extrabold' 
+                                  : 'bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 border border-zinc-200 dark:border-zinc-805 text-zinc-650 dark:text-zinc-300'
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-900">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsFormOpen(false);
+                          setEditingClass(null);
+                        }}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={availableRoomsForForm.length === 0 && !formRoom}
+                        className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                          availableRoomsForForm.length === 0 && !formRoom
+                            ? 'bg-zinc-300 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-50'
+                            : 'bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-sm'
+                        }`}
+                      >
+                        {editingClass ? 'Update Class' : 'Save New Class'}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
 
           {/* List of active schedules */}
-          {(() => {
+          {scheduleViewMode === 'grid' ? (
+            <WeeklyScheduleGrid
+              classes={classes}
+              userRole="faculty"
+              enrollments={enrollments}
+              userProfile={userProfile}
+              onOpenSubjectDetails={handleOpenSubjectDetails}
+              onEditSubject={handleOpenEditForm}
+            />
+          ) : (
+          (() => {
             const todayIndex = new Date().getDay();
             const dayMap: Record<number, string> = {
               1: 'Mon',
@@ -1955,7 +1876,7 @@ export default function DashboardFaculty({
                 </div>
               </div>
             );
-          })()}
+          })())}
         </motion.div>
       )}
 
@@ -1967,10 +1888,10 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-2xl mx-auto space-y-6 text-left"
+          className="w-full space-y-6 text-left animate-fade-in"
         >
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm text-left">
-            <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4 mb-5">
+          <div className="space-y-6 text-left">
+            <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
               <button 
                 onClick={() => setScreen('dashboard')} 
                 type="button"
@@ -2186,7 +2107,7 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-xl mx-auto space-y-4 text-left"
+          className="w-full space-y-4 text-left animate-fade-in"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-3">
@@ -2345,10 +2266,10 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-2xl mx-auto space-y-6 text-left"
+          className="w-full space-y-6 text-left animate-fade-in"
         >
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm">
-            <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4 mb-5">
+          <div className="space-y-6 text-left">
+            <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4">
               <button 
                 onClick={() => setScreen('dashboard')} 
                 type="button"
@@ -2466,6 +2387,7 @@ export default function DashboardFaculty({
         records={attendanceRecords}
         facultyStatuses={facultyStatuses}
         isDark={accessibility.theme === 'dark'}
+        userRole="faculty"
       />
 
       {/* Messages tab screen */}
@@ -2476,13 +2398,13 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
+          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="pb-4 border-b border-zinc-150 dark:border-zinc-855/60 flex items-start gap-3">
+          <div className="hidden sm:flex pb-3 border-b border-zinc-150 dark:border-zinc-855/60 items-start gap-3 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
               type="button"
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+              className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
               title="Back"
             >
               <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -3036,101 +2958,7 @@ export default function DashboardFaculty({
                     </div>
                   </div>
 
-                  {/* At-Risk Student Auto-Filter Tabs & Controls */}
-                  {(() => {
-                    const atRiskCount = monEnrollments.filter(st => {
-                      const recs = attendanceRecords.filter(r => r.classId === activeMonClass.id && (r.studentId === st.studentId || r.studentName === st.studentName));
-                      const pres = recs.filter(r => r.status === 'present').length;
-                      const late = recs.filter(r => r.status === 'late').length;
-                      const total = recs.length;
-                      const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 100;
-                      return rate < 75;
-                    }).length;
 
-                    const borderlineCount = monEnrollments.filter(st => {
-                      const recs = attendanceRecords.filter(r => r.classId === activeMonClass.id && (r.studentId === st.studentId || r.studentName === st.studentName));
-                      const pres = recs.filter(r => r.status === 'present').length;
-                      const late = recs.filter(r => r.status === 'late').length;
-                      const total = recs.length;
-                      const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 100;
-                      return rate >= 75 && rate < 85;
-                    }).length;
-
-                    return (
-                      <div className="space-y-4 mb-4">
-                        <div className="flex flex-wrap items-center gap-2 border-b border-zinc-100 dark:border-zinc-900 pb-3">
-                          <button
-                            type="button"
-                            onClick={() => setRosterFilter('all')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
-                              rosterFilter === 'all'
-                                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black shadow-xs'
-                                : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200'
-                            }`}
-                          >
-                            All Students ({monEnrollments.length})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRosterFilter('flagged')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
-                              rosterFilter === 'flagged'
-                                ? 'bg-red-500 text-white shadow-xs'
-                                : 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20'
-                            }`}
-                          >
-                            <span>🚩 Flagged At-Risk (&lt;75%)</span>
-                            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black">{atRiskCount}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRosterFilter('borderline')}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
-                              rosterFilter === 'borderline'
-                                ? 'bg-amber-500 text-black shadow-xs'
-                                : 'bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20'
-                            }`}
-                          >
-                            <span>⚠️ Borderline (75%-85%)</span>
-                            <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px] font-black">{borderlineCount}</span>
-                          </button>
-                        </div>
-
-                        {/* At-Risk Auto-Filter Action Banner */}
-                        {rosterFilter === 'flagged' && (
-                          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex flex-col md:flex-row md:items-center justify-between gap-3 text-left animate-fade-in">
-                            <div className="space-y-1">
-                              <h4 className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-                                At-Risk Student Auto-Filter Active ({atRiskCount} Student{atRiskCount === 1 ? '' : 's'})
-                              </h4>
-                              <p className="text-[11px] text-zinc-600 dark:text-zinc-300">
-                                Highlighting candidates falling below the 75% attendance threshold. Automated warning dispatches can be triggered directly to student inboxes & advisors.
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={handleDispatchAtRiskWarningEmails}
-                                className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95"
-                              >
-                                <Mail className="w-3.5 h-3.5 text-white" />
-                                <span>⚡ Auto-Dispatch Warning Emails</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDispatchedEmailsModalOpen(true)}
-                                className="px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all cursor-pointer"
-                              >
-                                <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>Email Audit Log</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
 
                   {(() => {
                     let filteredStudents = monEnrollments.filter(student => 

@@ -64,11 +64,14 @@ import {
   WifiOff,
   Check,
   Lock,
-  HelpCircle
+  HelpCircle,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
+import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 
 interface DashboardAdminProps {
   activeScreen: string;
@@ -418,6 +421,7 @@ export default function DashboardAdmin({
   }, [usersList, userProfile]);
 
   // Directory filter state
+  const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
   const [directoryRoleFilter, setDirectoryRoleFilter] = React.useState<'all' | 'student' | 'faculty' | 'admin'>('all');
   const [telemetryFilter, setTelemetryFilter] = React.useState<'all' | 'charts' | 'users' | 'leaves'>('all');
 
@@ -1917,7 +1921,7 @@ export default function DashboardAdmin({
   }, [usersList, attendanceRecords, classes, excuseLetters]);
 
   return (
-    <div className="space-y-6">
+    <div className={activeScreen === 'messages' || activeScreen === 'tickets' || activeScreen === 'help-center' ? "h-full flex flex-col min-h-0" : "space-y-6"}>
 
       <AnimatePresence mode="wait">
         {activeScreen === 'dashboard' && (
@@ -2678,77 +2682,6 @@ export default function DashboardAdmin({
                   >
                     <Plus className="w-3 h-3 stroke-[3]" /> Add Room
                   </button>
-                </div>
-
-                {/* Inline form to Add Room */}
-                {isAddingRoom && (
-                  <form onSubmit={handleAddRoom} className="space-y-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 animate-scale-up">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-500">📐 Establish Laboratory</h4>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Room Identifier Name</label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Room 301 - Robotics Lab" 
-                        value={newRoomName}
-                        onChange={(e) => setNewRoomName(e.target.value)}
-                        className="w-full text-[11px] p-2 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-850 dark:text-zinc-200 focus:border-emerald-500"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Capacity</label>
-                        <input 
-                          type="number" 
-                          min={1}
-                          value={newRoomCapacity}
-                          onChange={(e) => setNewRoomCapacity(Number(e.target.value))}
-                          className="w-full text-[11px] p-2 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-850 dark:text-zinc-200 focus:border-emerald-500"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Workstations</label>
-                        <input 
-                          type="number" 
-                          min={1}
-                          value={newRoomDevices}
-                          onChange={(e) => setNewRoomDevices(Number(e.target.value))}
-                          className="w-full text-[11px] p-2 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-850 dark:text-zinc-200 focus:border-emerald-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Located Floor</label>
-                      <select
-                        value={newRoomFloor}
-                        onChange={(e) => setNewRoomFloor(e.target.value)}
-                        className="w-full text-[11px] p-2 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-850 dark:text-zinc-200 outline-none focus:border-emerald-500 font-bold"
-                      >
-                        <option value="1st Floor" className="bg-white dark:bg-zinc-950">1st Floor</option>
-                        <option value="2nd Floor" className="bg-white dark:bg-zinc-950">2nd Floor</option>
-                        <option value="3rd Floor" className="bg-white dark:bg-zinc-950">3rd Floor</option>
-                        <option value="4th Floor" className="bg-white dark:bg-zinc-950">4th Floor</option>
-                        <option value="5th Floor" className="bg-white dark:bg-zinc-950">5th Floor</option>
-                        <option value="6th Floor" className="bg-white dark:bg-zinc-950">6th Floor</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-end gap-1.5 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingRoom(false)}
-                        className="px-2.5 py-1 text-[9px] uppercase font-bold border border-zinc-250 dark:border-zinc-800 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-3 py-1 text-[9px] uppercase font-black bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg cursor-pointer"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </form>
-                )}
 
                 {/* Rooms List */}
                 <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
@@ -3097,266 +3030,31 @@ export default function DashboardAdmin({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
-              {/* Left Column: System Graphs & Telemetry */}
+              {/* Left Column: System Telemetry & Logs */}
               {(telemetryFilter === 'all' || telemetryFilter === 'charts' || telemetryFilter === 'users') && (
                 <div className={`${telemetryFilter === 'all' ? 'lg:col-span-6' : 'lg:col-span-12'} space-y-5`}>
                   
-                  {/* Attendance Telemetry Graph */}
-                  {(telemetryFilter === 'all' || telemetryFilter === 'charts') && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Attendance Telemetry Distribution</h4>
-                        <span className="text-[9.5px] font-mono font-bold text-zinc-500">Live feed updates</span>
-                      </div>
-
-                      <div className="h-[220px] w-full bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-150 dark:border-zinc-850 rounded-2xl p-4 flex flex-col justify-between">
-                        <ResponsiveContainer width="100%" height="85%">
-                          <BarChart
-                            data={[
-                              { name: 'Present', count: attendanceRecords.filter(r => r.status === 'present').length, fill: '#10b981' },
-                              { name: 'Late', count: attendanceRecords.filter(r => r.status === 'late').length, fill: '#f59e0b' },
-                              { name: 'Absent', count: attendanceRecords.filter(r => r.status === 'absent').length, fill: '#ef4444' }
-                            ]}
-                            margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-800" />
-                            <XAxis dataKey="name" stroke="#888888" fontSize={10} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#888888" fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
-                            <RechartsTooltip 
-                              cursor={{ fill: 'transparent' }}
-                              contentStyle={{ 
-                                background: 'rgba(24, 24, 27, 0.95)', 
-                                borderColor: '#3f3f46',
-                                borderRadius: '8px',
-                                fontSize: '10px',
-                                color: '#fff'
-                              }} 
-                            />
-                            <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={40} />
-                          </BarChart>
-                        </ResponsiveContainer>
-
-                        <div className="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-150 dark:border-zinc-850 text-center">
-                          <div>
-                            <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Present</span>
-                            <span className="text-xs font-black font-mono text-emerald-500">
-                              {attendanceRecords.filter(r => r.status === 'present').length} check-ins
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Late</span>
-                            <span className="text-xs font-black font-mono text-amber-500">
-                              {attendanceRecords.filter(r => r.status === 'late').length} late
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Absent</span>
-                            <span className="text-xs font-black font-mono text-red-500">
-                              {attendanceRecords.filter(r => r.status === 'absent').length} absences
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                  {/* Attendance Breakdown Stat Cards */}
+                  <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-150 dark:border-zinc-850 rounded-2xl text-center">
+                    <div>
+                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Present</span>
+                      <span className="text-sm font-black font-mono text-emerald-500">
+                        {attendanceRecords.filter(r => r.status === 'present').length} check-ins
+                      </span>
                     </div>
-                  )}
-
-                  {/* 📊 INTERACTIVE MSU DASHBOARD ANALYTICS & GROWTH TRENDS */}
-                  {(telemetryFilter === 'all' || telemetryFilter === 'charts') && (
-                    <div className="space-y-4 pt-2">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="space-y-0.5 text-left">
-                          <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Dashboard Analytics & Growth Trends</h4>
-                          <p className="text-[10px] text-zinc-550 font-medium">Historical university metrics visualization</p>
-                        </div>
-                        <div className="flex bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200/50 dark:border-zinc-800/50 self-start sm:self-auto shrink-0 relative overflow-hidden">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveAnalyticsChart('enrollment');
-                              speakText("Switching to student enrollments growth chart", accessibility.readAloud);
-                            }}
-                            className={`px-2.5 py-1 text-[9.5px] font-extrabold rounded-md transition-all cursor-pointer relative z-10 ${
-                              activeAnalyticsChart === 'enrollment'
-                                ? 'text-zinc-850 dark:text-zinc-100'
-                                : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-350'
-                            }`}
-                          >
-                            {activeAnalyticsChart === 'enrollment' && (
-                              <motion.div
-                                layoutId="active-analytics-chart"
-                                className="absolute inset-0 bg-white dark:bg-zinc-950 rounded-md shadow-xs -z-10"
-                                transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                              />
-                            )}
-                            Enrollments
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveAnalyticsChart('attendance');
-                              speakText("Switching to attendance rate shifts chart", accessibility.readAloud);
-                            }}
-                            className={`px-2.5 py-1 text-[9.5px] font-extrabold rounded-md transition-all cursor-pointer relative z-10 ${
-                              activeAnalyticsChart === 'attendance'
-                                ? 'text-zinc-850 dark:text-zinc-100'
-                                : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-350'
-                            }`}
-                          >
-                            {activeAnalyticsChart === 'attendance' && (
-                              <motion.div
-                                layoutId="active-analytics-chart"
-                                className="absolute inset-0 bg-white dark:bg-zinc-950 rounded-md shadow-xs -z-10"
-                                transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                              />
-                            )}
-                            Attendance
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveAnalyticsChart('activity');
-                              speakText("Switching to system activity logs chart", accessibility.readAloud);
-                            }}
-                            className={`px-2.5 py-1 text-[9.5px] font-extrabold rounded-md transition-all cursor-pointer relative z-10 ${
-                              activeAnalyticsChart === 'activity'
-                                ? 'text-zinc-850 dark:text-zinc-100'
-                                : 'text-zinc-500 hover:text-zinc-850 dark:hover:text-zinc-350'
-                            }`}
-                          >
-                            {activeAnalyticsChart === 'activity' && (
-                              <motion.div
-                                layoutId="active-analytics-chart"
-                                className="absolute inset-0 bg-white dark:bg-zinc-950 rounded-md shadow-xs -z-10"
-                                transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                              />
-                            )}
-                            Activity
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="h-[250px] w-full bg-white dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850/80 rounded-2xl p-4 flex flex-col justify-between shadow-[0_2px_12px_rgba(0,0,0,0.015)]">
-                        <ResponsiveContainer width="100%" height="90%">
-                          {activeAnalyticsChart === 'enrollment' ? (
-                            <AreaChart
-                              data={isDataWiped ? [
-                                { week: 'Week 1', enrollments: 0 },
-                                { week: 'Week 2', enrollments: 0 },
-                                { week: 'Week 3', enrollments: 0 },
-                                { week: 'Week 4', enrollments: 0 },
-                                { week: 'Week 5', enrollments: 0 }
-                              ] : [
-                                { week: 'Week 1', enrollments: 120 },
-                                { week: 'Week 2', enrollments: 155 },
-                                { week: 'Week 3', enrollments: 190 },
-                                { week: 'Week 4', enrollments: 245 },
-                                { week: 'Week 5', enrollments: 320 }
-                              ]}
-                              margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                            >
-                              <defs>
-                                <linearGradient id="enrollmentGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
-                                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.01}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-900" />
-                              <XAxis dataKey="week" stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
-                              <YAxis stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
-                              <RechartsTooltip 
-                                contentStyle={{ 
-                                  background: 'rgba(24, 24, 27, 0.95)', 
-                                  borderColor: '#3f3f46',
-                                  borderRadius: '8px',
-                                  fontSize: '10px',
-                                  color: '#fff'
-                                }} 
-                              />
-                              <Area type="monotone" dataKey="enrollments" stroke="#6366f1" strokeWidth={3} activeDot={{ r: 5, strokeWidth: 0, fill: '#6366f1' }} fillOpacity={1} fill="url(#enrollmentGrad)" />
-                            </AreaChart>
-                          ) : activeAnalyticsChart === 'attendance' ? (
-                            <AreaChart
-                              data={isDataWiped ? [
-                                { day: 'Mon', rate: 0 },
-                                { day: 'Tue', rate: 0 },
-                                { day: 'Wed', rate: 0 },
-                                { day: 'Thu', rate: 0 },
-                                { day: 'Fri', rate: 0 },
-                                { day: 'Sat', rate: 0 }
-                              ] : [
-                                { day: 'Mon', rate: 88 },
-                                { day: 'Tue', rate: 91 },
-                                { day: 'Wed', rate: 89 },
-                                { day: 'Thu', rate: 94 },
-                                { day: 'Fri', rate: 92 },
-                                { day: 'Sat', rate: 85 }
-                              ]}
-                              margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                            >
-                              <defs>
-                                <linearGradient id="attendanceGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.01}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-900" />
-                              <XAxis dataKey="day" stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
-                              <YAxis stroke="#888888" fontSize={9} tickLine={false} axisLine={false} domain={[0, 100]} unit="%" />
-                              <RechartsTooltip 
-                                contentStyle={{ 
-                                  background: 'rgba(24, 24, 27, 0.95)', 
-                                  borderColor: '#3f3f46',
-                                  borderRadius: '8px',
-                                  fontSize: '10px',
-                                  color: '#fff'
-                                }} 
-                              />
-                              <Area type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={3} activeDot={{ r: 5, strokeWidth: 0, fill: '#10b981' }} fillOpacity={1} fill="url(#attendanceGrad)" />
-                            </AreaChart>
-                          ) : (
-                            <AreaChart
-                              data={isDataWiped ? [
-                                { day: 'Mon', scans: 0 },
-                                { day: 'Tue', scans: 0 },
-                                { day: 'Wed', scans: 0 },
-                                { day: 'Thu', scans: 0 },
-                                { day: 'Fri', scans: 0 },
-                                { day: 'Sat', scans: 0 }
-                              ] : [
-                                { day: 'Mon', scans: 420 },
-                                { day: 'Tue', scans: 510 },
-                                { day: 'Wed', scans: 480 },
-                                { day: 'Thu', scans: 620 },
-                                { day: 'Fri', scans: 590 },
-                                { day: 'Sat', scans: 310 }
-                              ]}
-                              margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
-                            >
-                              <defs>
-                                <linearGradient id="activityGrad" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
-                                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.01}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-900" />
-                              <XAxis dataKey="day" stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
-                              <YAxis stroke="#888888" fontSize={9} tickLine={false} axisLine={false} />
-                              <RechartsTooltip 
-                                contentStyle={{ 
-                                  background: 'rgba(24, 24, 27, 0.95)', 
-                                  borderColor: '#3f3f46',
-                                  borderRadius: '8px',
-                                  fontSize: '10px',
-                                  color: '#fff'
-                                }} 
-                              />
-                              <Area type="monotone" dataKey="scans" stroke="#f59e0b" strokeWidth={3} activeDot={{ r: 5, strokeWidth: 0, fill: '#f59e0b' }} fillOpacity={1} fill="url(#activityGrad)" />
-                            </AreaChart>
-                          )}
-                        </ResponsiveContainer>
-                      </div>
+                    <div>
+                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Late</span>
+                      <span className="text-sm font-black font-mono text-amber-500">
+                        {attendanceRecords.filter(r => r.status === 'late').length} late
+                      </span>
                     </div>
-                  )}
+                    <div>
+                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Absent</span>
+                      <span className="text-sm font-black font-mono text-red-500">
+                        {attendanceRecords.filter(r => r.status === 'absent').length} absences
+                      </span>
+                    </div>
+                  </div>
 
                   {/* Newly Registered User Logs */}
                   {(telemetryFilter === 'all' || telemetryFilter === 'users') && (
@@ -3756,6 +3454,7 @@ export default function DashboardAdmin({
 
             </div>
           </div>
+        </div>
 
         </motion.div>
       )}
@@ -4779,9 +4478,36 @@ export default function DashboardAdmin({
                 </div>
               </div>
               
-              {/* Fast Offerings searching bar and Register button */}
-              <div className="flex items-center gap-2 select-none w-full sm:w-auto">
-                <div className="relative w-full sm:max-w-xs select-none">
+              {/* Fast Offerings searching bar, View Mode Toggle and Register button */}
+              <div className="flex flex-wrap items-center gap-2 select-none w-full sm:w-auto">
+                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleViewMode('grid')}
+                    className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      scheduleViewMode === 'grid'
+                        ? 'bg-emerald-500 text-black shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span>Weekly Grid</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleViewMode('cards')}
+                    className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      scheduleViewMode === 'cards'
+                        ? 'bg-emerald-500 text-black shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span>Card List</span>
+                  </button>
+                </div>
+
+                <div className="relative flex-1 sm:w-56 select-none">
                   <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                     <Search className="w-4 h-4 text-emerald-500" />
                   </span>
@@ -4838,7 +4564,30 @@ export default function DashboardAdmin({
           </div>
 
           {/* Grid Layout of Subjects grouped by code */}
-          {(() => {
+          {scheduleViewMode === 'grid' ? (
+            <WeeklyScheduleGrid
+              classes={classes}
+              userRole="admin"
+              enrollments={enrollments}
+              userProfile={userProfile}
+              searchQuery={adminClassSearchQuery}
+              onOpenSubjectDetails={(cls) => {
+                setSelectedClassDetail(cls);
+                setIsDetailModalOpen(true);
+              }}
+              onEditSubject={(cls) => {
+                setIsAdminClassFormOpen(true);
+                setAdminFormCode(cls.code);
+                setAdminFormName(cls.name);
+                setAdminFormStart(cls.startTime);
+                setAdminFormEnd(cls.endTime);
+                setAdminFormRoom(cls.room);
+                setAdminFormDays(cls.days);
+                setAdminFormFacultyName(cls.facultyName || '');
+              }}
+            />
+          ) : (
+          (() => {
             const todayIndex = new Date().getDay();
             const dayMap: Record<number, string> = {
               1: 'Mon',
@@ -4972,7 +4721,7 @@ export default function DashboardAdmin({
                 )}
               </div>
             );
-          })()}
+          })())}
         </motion.div>
       )}
 
@@ -4984,9 +4733,9 @@ export default function DashboardAdmin({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-2xl mx-auto space-y-6 text-left animate-fade-in text-zinc-900 dark:text-zinc-100"
+          className="w-full space-y-6 text-left animate-fade-in text-zinc-900 dark:text-zinc-100"
         >
-          <div className="p-6 rounded-2xl border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm space-y-6">
+          <div className="space-y-6">
             <div className="flex justify-between items-center pb-3 border-b border-zinc-200 dark:border-zinc-855">
               <div>
                 <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100">Administrator Credentials & Biodata</h3>
@@ -5858,13 +5607,13 @@ export default function DashboardAdmin({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
+          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-4">
+          <div className="hidden sm:flex pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-4 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
               type="button"
-              className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
+              className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
               title="Back"
             >
               <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -5895,9 +5644,9 @@ export default function DashboardAdmin({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
+          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-4">
+          <div className="pb-3 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-4 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
               type="button"
@@ -5932,7 +5681,7 @@ export default function DashboardAdmin({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-xl mx-auto space-y-4 text-left"
+          className="w-full space-y-4 text-left animate-fade-in"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-4">
@@ -6149,109 +5898,8 @@ export default function DashboardAdmin({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left form drawer: add */}
-            {isAddingRoom && (
-              <div className="lg:col-span-4 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 space-y-4 animate-scale-up">
-                <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-[#CC762A] flex items-center gap-1.5 font-mono">
-                    📐 ESTABLISH ROOM
-                  </h3>
-                  <button 
-                    onClick={() => {
-                      setIsAddingRoom(false);
-                    }}
-                    className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 text-xs cursor-pointer font-bold"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <form 
-                  onSubmit={handleAddRoom} 
-                  className="space-y-4"
-                >
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Room Identifier Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Room 303 - Design Studio" 
-                      value={newRoomName}
-                      onChange={(e) => {
-                        setNewRoomName(e.target.value);
-                      }}
-                      className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-805 outline-none text-zinc-850 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3.5 text-left">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Capacity (Pax)</label>
-                      <input 
-                        type="number" 
-                        min={1}
-                        value={newRoomCapacity}
-                        onChange={(e) => {
-                          setNewRoomCapacity(Number(e.target.value));
-                        }}
-                        className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-800 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Workstations</label>
-                      <input 
-                        type="number" 
-                        min={0}
-                        value={newRoomDevices}
-                        onChange={(e) => {
-                          setNewRoomDevices(Number(e.target.value));
-                        }}
-                        className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-800 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 text-left">
-                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Located Floor</label>
-                    <select
-                      value={newRoomFloor}
-                      onChange={(e) => setNewRoomFloor(e.target.value)}
-                      className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-zinc-800 dark:text-zinc-100"
-                    >
-                      <option value="1st Floor" className="bg-white dark:bg-zinc-950">1st Floor</option>
-                      <option value="2nd Floor" className="bg-white dark:bg-zinc-950">2nd Floor</option>
-                      <option value="3rd Floor" className="bg-white dark:bg-zinc-950">3rd Floor</option>
-                      <option value="4th Floor" className="bg-white dark:bg-zinc-950">4th Floor</option>
-                      <option value="5th Floor" className="bg-white dark:bg-zinc-950">5th Floor</option>
-                      <option value="6th Floor" className="bg-white dark:bg-zinc-950">6th Floor</option>
-                    </select>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingRoom(false);
-                      }}
-                      className="flex-1 py-1.5 text-[9px] uppercase font-black tracking-wider border border-zinc-250 dark:border-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 cursor-pointer"
-                    >
-                      Dismiss
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-1 px-2.5 text-[9px] uppercase font-black bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl cursor-pointer"
-                    >
-                      Establish
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
             {/* List and Actions Grid Table */}
-            <div className={`${isAddingRoom ? 'lg:col-span-8' : 'lg:col-span-12'} p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 space-y-4`}>
+            <div className="lg:col-span-12 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
                 <span className="text-[10px] font-black uppercase tracking-widest text-[#CC762A]">Registered Room Registry</span>
                 <span className="text-[9px] font-mono text-zinc-450">{labRooms.length} ACTIVE ROOM RECORDS</span>
@@ -6476,10 +6124,11 @@ export default function DashboardAdmin({
           setSelectedClassDetail(null);
         }}
         cls={selectedClassDetail}
-         enrollments={enrollments}
+        enrollments={enrollments}
         records={attendanceRecords}
         facultyStatuses={[]}
         isDark={accessibility.theme === 'dark'}
+        userRole="admin"
       />
 
       {/* REGISTER NEW SUBJECT SCHEDULE MODAL OVERLAY */}
@@ -7127,6 +6776,113 @@ export default function DashboardAdmin({
           </div>
         </div>
       )}
+
+      {/* ESTABLISH/ADD NEW ROOM INSTANT MODAL OVERLAY */}
+      <AnimatePresence>
+        {isAddingRoom && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left relative"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900/60">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-xl">
+                    <MapPin className="w-5 h-5 text-emerald-500 shrink-0" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wide">Establish New Room</h3>
+                    <p className="text-[10px] text-zinc-450 dark:text-zinc-400">Add lecture room or lab workstation to campus registry</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingRoom(false)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100 text-xs font-black select-none cursor-pointer"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleAddRoom} className="space-y-4 pt-4">
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Room Identifier Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Room 303 - Design Studio" 
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-850 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500 font-bold"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-left">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Capacity (Pax)</label>
+                    <input 
+                      type="number" 
+                      min={1}
+                      value={newRoomCapacity}
+                      onChange={(e) => setNewRoomCapacity(Number(e.target.value))}
+                      className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-800 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500 font-bold"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Workstations</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      value={newRoomDevices}
+                      onChange={(e) => setNewRoomDevices(Number(e.target.value))}
+                      className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-800 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500 font-bold"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Located Floor</label>
+                  <select
+                    value={newRoomFloor}
+                    onChange={(e) => setNewRoomFloor(e.target.value)}
+                    className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="1st Floor" className="bg-white dark:bg-zinc-950">1st Floor</option>
+                    <option value="2nd Floor" className="bg-white dark:bg-zinc-950">2nd Floor</option>
+                    <option value="3rd Floor" className="bg-white dark:bg-zinc-950">3rd Floor</option>
+                    <option value="4th Floor" className="bg-white dark:bg-zinc-950">4th Floor</option>
+                    <option value="5th Floor" className="bg-white dark:bg-zinc-950">5th Floor</option>
+                    <option value="6th Floor" className="bg-white dark:bg-zinc-950">6th Floor</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-850">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingRoom(false)}
+                    className="flex-1 py-2.5 text-[10px] uppercase font-black tracking-wider border border-zinc-250 dark:border-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 px-3 text-[10px] uppercase font-black bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl cursor-pointer shadow-md"
+                  >
+                    Establish Room
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

@@ -48,6 +48,7 @@ import {
   CheckCircle,
   HelpCircle,
   Bell,
+  Search,
   LayoutDashboard,
   CalendarDays,
   Scan,
@@ -57,7 +58,8 @@ import {
   UserCircle,
   AlertTriangle,
   Info,
-  Menu
+  Menu,
+  Activity
 } from 'lucide-react';
 
 // Safe Local Storage Wrapper to prevent app crashes due to QuotaExceededError or browser iframe restrictions
@@ -253,7 +255,10 @@ export default function App() {
     const cached = safeStorage.getItem('cp_faculty_statuses');
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       } catch (e) {
         console.error("Error parsing cp_faculty_statuses:", e);
       }
@@ -272,6 +277,20 @@ export default function App() {
     }
     return [];
   });
+
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   React.useEffect(() => {
     safeStorage.setItem('classpulse_student_leaves', JSON.stringify(excuseLetters));
@@ -1180,16 +1199,35 @@ export default function App() {
     if (!user) return;
     
     // Update local statuses array (so students see this changed status in real-time!)
-    setFacultyStatuses(prev => 
-      prev.map(f => f.name === user.name || f.id === 'fac-1' ? { ...f, status } : f)
-    );
+    setFacultyStatuses(prev => {
+      const targetId = user.facultyId || user.id || 'fac-01';
+      const exists = prev.some(f => f.name === user.name || f.id === targetId || f.id === 'fac-1' || f.id === 'fac-01');
+      if (exists) {
+        return prev.map(f => (f.name === user.name || f.id === targetId || f.id === 'fac-1' || f.id === 'fac-01') ? { ...f, status, name: user.name, avatar: user.avatar || f.avatar } : f);
+      } else {
+        return [
+          {
+            id: targetId,
+            name: user.name,
+            avatar: user.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+            status: status,
+            room: 'Consultation Office 303'
+          },
+          ...prev
+        ];
+      }
+    });
 
-    // Add dynamic notification info
-    const notifTitle = `Status updated to ${status}`;
+    const statusLabels = {
+      available: 'Available',
+      'in-class': 'In Class',
+      unavailable: 'Away'
+    };
+    const notifTitle = `Status updated to ${statusLabels[status]}`;
     const statusMessages = {
       available: `${user.name} is now available in Consultation Office.`,
       'in-class': `${user.name} is currently teaching a section.`,
-      unavailable: `${user.name} was marked as unavailable.`
+      unavailable: `${user.name} was marked as away / unavailable.`
     };
 
     const newNotif: AppNotification = {
@@ -1378,77 +1416,226 @@ export default function App() {
           {/* Primary View Workspace */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full">
             
-            {/* Top Operational bar */}
-            <header className="hidden md:flex px-6 py-4 border-b items-center justify-between gap-4 shrink-0 bg-white/85 dark:bg-zinc-950/80 border-zinc-200 dark:border-zinc-850/80 backdrop-blur-md text-zinc-900 dark:text-zinc-100">
+            {/* Top Operational bar - Applies to all screen sizes including mobile */}
+            <header className="flex px-3 sm:px-6 py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
               
-              {/* Left Header Context title display matching image theme roles */}
-              <div className="flex items-center gap-3 text-left">
-                <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border shadow-xs ${
+              {/* Left Header Logo & Role display */}
+              <div className="flex items-center gap-2 sm:gap-3 text-left shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10">
+                  <Activity className="w-4.5 h-4.5" />
+                </div>
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 hidden sm:inline">ClassPulse</span>
+                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 sm:px-3 sm:py-1 rounded-full border shadow-2xs ${
                   user.role === 'student' ? 'bg-[#03213D] text-white border-[#03213D]/20' :
                   user.role === 'faculty' ? 'bg-emerald-600 text-white border-emerald-500/20' :
                   'bg-[#CC762A] text-white border-[#CC762A]/20'
                 }`}>
                   {user.role === 'student' ? 'Student' : user.role === 'faculty' ? 'Faculty' : 'Admin'}
                 </span>
-
-                {/* Offline state label badge */}
-                {isOffline && (
-                  <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-550/20 animate-pulse font-mono">
-                    <WifiOff className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>Offline Mode</span>
-                    {offlineQueueCount > 0 && (
-                      <span className="ml-1.5 px-2 py-0.5 rounded-md bg-amber-500 text-black text-[9px] font-black leading-none uppercase shrink-0">
-                        {offlineQueueCount} queued to sync
-                      </span>
-                    )}
-                  </span>
-                )}
               </div>
 
-              {/* Right controllers: Accessibility triggers & Quick Settings */}
-              <div className="flex items-center gap-2.5">
-                
-                {/* Manual offline syncing progress spin */}
-                {isSyncing && (
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-500">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Syncing cloud...</span>
-                  </div>
-                )}
+              {/* Header Search Bar */}
+              <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md mx-2 relative">
+                <div className="relative flex items-center">
+                  <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsSearchOpen(true);
+                    }}
+                    onFocus={() => setIsSearchOpen(true)}
+                    className="w-full pl-8 pr-7 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
+                  />
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <kbd className="hidden sm:inline-block absolute right-2 px-1 py-0.2 text-[9px] font-mono font-bold text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs pointer-events-none">
+                      ⌘K
+                    </kbd>
+                  )}
+                </div>
 
-                 {/* Notification Bell routing button instead of settings */}
+                {/* Inline Pull-down Choices Dropdown Menu */}
+                <AnimatePresence>
+                  {isSearchOpen && (
+                    <>
+                      {/* Transparent backdrop handler to dismiss pull-down dropdown when clicking outside */}
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsSearchOpen(false)} 
+                      />
+
+                      <motion.div
+                        initial={{ opacity: 0, y: 4, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 right-0 mt-2 z-50 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl shadow-xl overflow-hidden flex flex-col text-left max-h-[70vh]"
+                      >
+                        <div className="max-h-[60vh] overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar text-left">
+                          {(() => {
+                            const navMatches = [
+                              { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard },
+                              { id: 'schedule', title: 'Schedule', icon: CalendarDays },
+                              { id: 'attendance', title: 'Attendance Scan', icon: Scan },
+                              { id: 'inbox', title: 'Messages', icon: MessageSquare },
+                              { id: 'notifications', title: 'Notifications', icon: Bell },
+                              { id: 'help', title: 'Help Center', icon: HelpCircle },
+                              { id: 'settings', title: 'Settings', icon: Settings },
+                              { id: 'profile', title: 'Profile', icon: UserCircle }
+                            ].filter(item => !searchQuery || item.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                            const matchedClasses = classes.filter(cls => 
+                              !searchQuery || 
+                              cls.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              cls.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              (cls.facultyName && cls.facultyName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                              (cls.room && cls.room.toLowerCase().includes(searchQuery.toLowerCase()))
+                            );
+
+                            return (
+                              <>
+                                {navMatches.length > 0 && (
+                                  <div className="space-y-1">
+                                    <p className="px-2 text-[10px] font-black uppercase tracking-wider text-zinc-400">Navigation Views</p>
+                                    <div className="grid grid-cols-1 gap-0.5">
+                                      {navMatches.map(item => {
+                                        const IconComponent = item.icon;
+                                        return (
+                                          <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveScreen(item.id);
+                                              setIsSearchOpen(false);
+                                              setSearchQuery('');
+                                            }}
+                                            className="w-full px-2.5 py-2 rounded-lg hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center gap-2.5 transition-colors group cursor-pointer"
+                                          >
+                                            <div className="p-1 rounded-md bg-zinc-100 dark:bg-zinc-900 group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
+                                              <IconComponent className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 group-hover:text-black" />
+                                            </div>
+                                            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">{item.title}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {matchedClasses.length > 0 && (
+                                  <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                                    <p className="px-2 text-[10px] font-black uppercase tracking-wider text-zinc-400">Classes & Courses ({matchedClasses.length})</p>
+                                    <div className="grid grid-cols-1 gap-0.5">
+                                      {matchedClasses.map(cls => (
+                                        <button
+                                          key={cls.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveScreen('schedule');
+                                            setIsSearchOpen(false);
+                                            setSearchQuery('');
+                                          }}
+                                          className="w-full px-2.5 py-2 rounded-lg hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 truncate">
+                                              <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono shrink-0">{cls.code}</span>
+                                              <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{cls.name}</span>
+                                            </div>
+                                            <p className="text-[10px] text-zinc-400 mt-0.5 truncate">{cls.days} • {cls.startTime} • {cls.room}</p>
+                                          </div>
+                                          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 text-zinc-500 shrink-0">
+                                            {cls.studentsCount || 0} students
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {navMatches.length === 0 && matchedClasses.length === 0 && (
+                                  <div className="py-6 text-center space-y-1.5">
+                                    <Search className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto" />
+                                    <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">No results found for "{searchQuery}"</p>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Right controllers: Notification Bell & Profile Circle Avatar */}
+              <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
                 <button
                   onClick={() => {
                     setActiveScreen('notifications');
                     speakText("Navigating to notification center", accessibility.readAloud);
                   }}
                   type="button"
-                  className={`p-2.5 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 ${
+                  className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 ${
                     activeScreen === 'notifications'
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-extrabold shadow-sm'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-extrabold shadow-2xs'
                       : 'text-zinc-600 dark:text-zinc-400'
                   }`}
-                  title="Notification Center & System Logs"
+                  title="Notifications"
                 >
                   <Bell className="w-4.5 h-4.5" />
                   {filteredNotificationsForMe.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-550 bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] font-black leading-none font-mono">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] font-black leading-none font-mono">
                       {filteredNotificationsForMe.filter(n => !n.read).length}
                     </span>
                   )}
+                </button>
+
+                {/* Profile Circle Avatar (Active Session) */}
+                <button
+                  onClick={() => {
+                    handleSetScreen('profile');
+                    speakText("Navigating to user profile", accessibility.readAloud);
+                  }}
+                  type="button"
+                  className={`relative p-0.5 rounded-full border transition-all cursor-pointer shrink-0 hover:scale-105 active:scale-95 ${
+                    activeScreen === 'profile'
+                      ? 'ring-2 ring-emerald-500 border-emerald-500'
+                      : 'border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50'
+                  }`}
+                  title={user.name}
+                >
+                  <img
+                    src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-zinc-950 rounded-full" />
                 </button>
               </div>
 
             </header>
 
-            {/* Offline Sync Banner alerts (floating absolute / top) */}
+            {/* Offline Sync Banner alerts */}
             {syncDoneBanner && (
-              <div className="m-6 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-950 dark:text-emerald-300 flex items-center gap-3.5 shadow-md flex-row justify-between animate-fade-in text-left">
+              <div className="m-4 sm:m-6 p-3.5 sm:p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-950 dark:text-emerald-300 flex items-center gap-3.5 shadow-md flex-row justify-between animate-fade-in text-left">
                 <div className="flex items-center gap-2.5">
-                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                  <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                   <div>
-                    <h5 className="text-xs font-bold font-sans">Database Synchronized</h5>
-                    <p className="text-[11px] opacity-90 mt-0.5">Your registers has been securely committed onto ClassPulse host nodes.</p>
+                    <h5 className="text-xs font-bold">Database Synchronized</h5>
+                    <p className="text-[11px] opacity-80 mt-0.5">All attendance records are up to date.</p>
                   </div>
                 </div>
                 <button onClick={() => setSyncDoneBanner(false)} className="text-xs hover:underline cursor-pointer font-bold shrink-0 text-emerald-500">Dismiss</button>
@@ -1456,7 +1643,9 @@ export default function App() {
             )}
 
             {/* Primary content grid layout block */}
-            <main ref={mainScrollRef} className="px-2.5 sm:px-4 md:px-8 pt-2 md:pt-3 pb-24 md:pb-8 max-w-7xl w-full mx-auto space-y-6 flex-1 overflow-y-auto">
+            <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2.5 max-w-7xl w-full mx-auto flex-1 overflow-y-auto ${
+              activeScreen === 'messages' || activeScreen === 'tickets' ? 'pb-16 md:pb-2 space-y-0' : 'pb-20 md:pb-6 space-y-3.5 sm:space-y-4'
+            }`}>
               
               {/* Accessibility options expansion widget */}
               {isAccPanelOpen && (
@@ -1556,7 +1745,7 @@ export default function App() {
                         onEditClass={handleEditClass}
                         onDeleteClass={handleDeleteClass}
                         userProfile={user}
-                        facultyStatus={facultyStatuses.find(f => f.name === user.name || f.id === 'fac-1')?.status || 'available'}
+                        facultyStatus={facultyStatuses.find(f => f.name === user.name || f.id === user.facultyId || f.id === user.id || f.id === 'fac-1' || f.id === 'fac-01')?.status || 'available'}
                         onChangeFacultyStatus={handleChangeFacultyStatus}
                         accessibility={accessibility}
                         enrollments={enrollments}

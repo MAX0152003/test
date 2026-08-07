@@ -265,13 +265,13 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
 
   return (
     <div className="space-y-6 font-sans">
-      {/* Sticky top steady header layout */}
-      <div className="bg-white dark:bg-[#09090b] border border-zinc-150 dark:border-zinc-850 p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      {/* Top navigation header without rounded card background */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-200/60 dark:border-zinc-850">
+        <div className="flex items-center gap-3 text-left">
           <button 
             onClick={onBack} 
             type="button"
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none animate-fade-in"
+            className="p-2 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
             title="Back"
           >
             <ArrowLeft className="w-4 h-4 text-emerald-500" />
@@ -281,17 +281,17 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
               <LifeBuoy className="w-5 h-5 text-emerald-500" />
               Help & Administrator Support Desk
             </h2>
-            <p className="text-xs text-zinc-400">View campus instruction guidelines or submit a priority support ticket below.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">View campus instruction guidelines or submit a priority support ticket below.</p>
           </div>
         </div>
 
-        <div className="flex gap-1.5 shrink-0 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-xl">
+        <div className="flex gap-1 shrink-0 bg-zinc-100/80 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 p-1 rounded-xl">
           <button
             type="button"
             onClick={() => { setActiveTab('faq'); setSelectedTicketId(null); }}
-            className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
               activeTab === 'faq' && !selectedTicketId
-                ? 'bg-emerald-555 text-black'
+                ? 'bg-emerald-500 text-black shadow-2xs font-extrabold'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
             }`}
           >
@@ -300,14 +300,14 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
           <button
             type="button"
             onClick={() => setActiveTab('tickets')}
-            className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
               activeTab === 'tickets' || selectedTicketId
-                ? 'bg-emerald-555 text-black'
+                ? 'bg-emerald-500 text-black shadow-2xs font-extrabold'
                 : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
             }`}
           >
             My Support Tickets {tickets.filter(t => t.status === 'Open' || t.status === 'In Progress').length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 bg-black/15 text-[9px] rounded-full text-black font-black">
+              <span className="ml-1 px-1.5 py-0.5 bg-black/20 text-[9px] rounded-full text-black font-black">
                 {tickets.filter(t => t.status === 'Open' || t.status === 'In Progress').length}
               </span>
             )}
@@ -329,7 +329,7 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
               <button
                 type="button"
                 onClick={() => setSelectedTicketId(null)}
-                className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none"
+                className="p-2 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
                 title="Back to Support Tickets"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
