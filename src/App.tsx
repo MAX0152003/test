@@ -149,12 +149,47 @@ export default function App() {
     return safeStorage.getItem('cp_screen') || 'dashboard';
   });
 
+  const [selectedChatContact, setSelectedChatContact] = React.useState<{ id: string; name?: string; ts?: number } | undefined>(undefined);
+
+  const [isMobileBarVisible, setIsMobileBarVisible] = React.useState(true);
+  const lastScrollTopRef = React.useRef(0);
+
   const mainScrollRef = React.useRef<HTMLDivElement>(null);
   const prevLabRoomsRef = React.useRef<Record<string, 'occupied' | 'available' | 'maintenance'>>({});
 
-  const handleSetScreen = (screenId: string) => {
-    if (screenId === activeScreen) {
+  React.useEffect(() => {
+    const el = mainScrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const currentScrollTop = el.scrollTop;
+      const diff = currentScrollTop - lastScrollTopRef.current;
+
+      if (diff > 10 && currentScrollTop > 40) {
+        setIsMobileBarVisible(false);
+      } else if (diff < -10 || currentScrollTop < 30) {
+        setIsMobileBarVisible(true);
+      }
+
+      lastScrollTopRef.current = currentScrollTop;
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleSetScreen = (screenId: string, contactObj?: { id: string; name?: string; ts?: number }) => {
+    if (screenId === activeScreen && !contactObj) {
       window.dispatchEvent(new CustomEvent('reset-screen-state', { detail: { screenId } }));
+    }
+    if (screenId === 'messages') {
+      if (contactObj) {
+        setSelectedChatContact(contactObj);
+      } else {
+        setSelectedChatContact(undefined);
+      }
+    } else {
+      setSelectedChatContact(undefined);
     }
     setActiveScreen(screenId);
     setTimeout(() => {
@@ -442,6 +477,18 @@ export default function App() {
     return () => unsubscribeAuth();
   }, [isOffline]);
 
+  // Firestore Sync Data on mount: pulls down classes and attendance records to sync across devices
+  React.useEffect(() => {
+    syncClassesFromFirestore(false, (fetchedClasses) => {
+      setClasses(fetchedClasses);
+      safeStorage.setItem('cp_classes', JSON.stringify(fetchedClasses));
+    });
+    syncAttendanceFromFirestore(false, (fetchedRecords) => {
+      setAttendanceRecords(fetchedRecords);
+      safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
+    });
+  }, []);
+
   // Firestore Sync Data: pulls down classes and attendance records once online
   React.useEffect(() => {
     if (isOffline) return;
@@ -449,13 +496,15 @@ export default function App() {
     if (user) {
       setIsSyncing(true);
       Promise.all([
-        syncClassesFromFirestore(isOffline, (fetchedClasses) => {
+        syncClassesFromFirestore(false, (fetchedClasses) => {
           setClasses(fetchedClasses);
+          safeStorage.setItem('cp_classes', JSON.stringify(fetchedClasses));
         }),
-        syncAttendanceFromFirestore(isOffline, (fetchedRecords) => {
+        syncAttendanceFromFirestore(false, (fetchedRecords) => {
           setAttendanceRecords(fetchedRecords);
+          safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
         }),
-        saveUserProfileToFirestore(isOffline, user)
+        saveUserProfileToFirestore(false, user)
       ])
         .then(() => {
           console.log("Initial Firestore synchronization completed successfully.");
@@ -760,9 +809,7 @@ export default function App() {
       : (registered?.id || 'usr-' + Math.random().toString(36).substring(2, 9));
 
     if (role === 'admin') {
-      if (email?.toLowerCase().trim() === 'admin2@msu.edu.ph') {
-        resolvedId = 'admin-02';
-      } else if (email?.toLowerCase().trim() === 'admin@msu.edu.ph') {
+      if (email?.toLowerCase().trim() === 'admin@msu.edu.ph') {
         resolvedId = 'admin-01';
       } else {
         resolvedId = registered?.uid || registered?.id || 'admin-' + Math.random().toString(36).substring(2, 7);
@@ -804,6 +851,7 @@ export default function App() {
     }
  
     setUser(profile);
+    saveUserProfileToFirestore(false, profile).catch(err => console.error("Firestore user profile error:", err));
     setActiveScreen('dashboard');
     speakText(`Welcome to ClassPulse. Successfully loaded your ${role} dashboard.`, accessibility.readAloud);
   };
@@ -920,7 +968,7 @@ export default function App() {
     };
 
     setAttendanceRecords(prev => [...prev, newRecord]);
-    saveAttendanceToFirestore(isOffline, newRecord).catch(err => console.error("Firestore save attendance error:", err));
+    saveAttendanceToFirestore(false, newRecord).catch(err => console.error("Firestore save attendance error:", err));
 
     if (isOffline) {
       setOfflineQueueCount(prev => prev + 1);
@@ -1022,7 +1070,7 @@ export default function App() {
   // Profile Update callback - ensures propagation to enrollments globally
   const handleUpdateProfile = (updatedProfile: UserProfile) => {
     setUser(updatedProfile);
-    saveUserProfileToFirestore(isOffline, updatedProfile).catch(err => console.error("Firestore update profile error:", err));
+    saveUserProfileToFirestore(false, updatedProfile).catch(err => console.error("Firestore update profile error:", err));
 
     // Update the local enrollments list matching this student IDs
     setEnrollments(prev => prev.map(e => {
@@ -1062,7 +1110,7 @@ export default function App() {
       id: 'class-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
     };
     setClasses(prev => [freshClass, ...prev]);
-    saveClassToFirestore(isOffline, freshClass).catch(err => console.error("Firestore add class error:", err));
+    saveClassToFirestore(false, freshClass).catch(err => console.error("Firestore add class error:", err));
 
     // Add alert
     const newNotif: AppNotification = {
@@ -1114,7 +1162,7 @@ export default function App() {
     }
 
     setClasses(prev => prev.map(c => c.id === sanitizedClass.id ? sanitizedClass : c));
-    saveClassToFirestore(isOffline, sanitizedClass).catch(err => console.error("Firestore edit class error:", err));
+    saveClassToFirestore(false, sanitizedClass).catch(err => console.error("Firestore edit class error:", err));
   };
 
   // Faculty Actions: Delete Class
@@ -1140,7 +1188,7 @@ export default function App() {
       }));
     }
 
-    deleteClassFromFirestore(isOffline, classId).catch(err => console.error("Firestore delete class error:", err));
+    deleteClassFromFirestore(false, classId).catch(err => console.error("Firestore delete class error:", err));
   };
 
   // Admin Action: Hard Reset & System Purge
@@ -1249,7 +1297,7 @@ export default function App() {
     const target = attendanceRecords.find(r => r.id === recordId);
     if (target) {
       const updatedRec = { ...target, status };
-      saveAttendanceToFirestore(isOffline, updatedRec).catch(err => console.error("Firestore update attendance error:", err));
+      saveAttendanceToFirestore(false, updatedRec).catch(err => console.error("Firestore update attendance error:", err));
 
       const newNotif: AppNotification = {
         id: 'notif-corr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
@@ -1269,7 +1317,7 @@ export default function App() {
       id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
     };
     setAttendanceRecords(prev => [...prev, record]);
-    saveAttendanceToFirestore(isOffline, record).catch(err => console.error("Firestore add attendance error:", err));
+    saveAttendanceToFirestore(false, record).catch(err => console.error("Firestore add attendance error:", err));
   };
 
   // Shared Excuse Status validation Action
@@ -1644,7 +1692,7 @@ export default function App() {
 
             {/* Primary content grid layout block */}
             <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2.5 max-w-7xl w-full mx-auto flex-1 overflow-y-auto ${
-              activeScreen === 'messages' || activeScreen === 'tickets' ? 'pb-16 md:pb-2 space-y-0' : 'pb-20 md:pb-6 space-y-3.5 sm:space-y-4'
+              activeScreen === 'messages' || activeScreen === 'tickets' ? 'pb-20 md:pb-2 space-y-0' : 'pb-24 md:pb-6 space-y-3.5 sm:space-y-4'
             }`}>
               
               {/* Accessibility options expansion widget */}
@@ -1704,6 +1752,7 @@ export default function App() {
                       <DashboardStudent
                         activeScreen={activeScreen}
                         setScreen={handleSetScreen}
+                        selectedChatContact={selectedChatContact}
                         classes={classes}
                         attendanceRecords={attendanceRecords.filter(r => 
                           r.studentId === user.studentId || 
@@ -1736,6 +1785,7 @@ export default function App() {
                       <DashboardFaculty
                         activeScreen={activeScreen}
                         setScreen={handleSetScreen}
+                        selectedChatContact={selectedChatContact}
                         classes={classes.filter(c => 
                           c.facultyId === user.id || 
                           c.facultyId === user.facultyId || 
@@ -1779,6 +1829,7 @@ export default function App() {
                       <DashboardAdmin
                         activeScreen={activeScreen}
                         setScreen={handleSetScreen}
+                        selectedChatContact={selectedChatContact}
                         classes={classes}
                         onAddClass={handleAddClass}
                         onEditClass={handleEditClass}
@@ -1807,8 +1858,10 @@ export default function App() {
 
             </main>
 
-            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly) */}
-            <div className="md:hidden fixed bottom-4 left-4 right-4 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-850 px-3 py-2 flex justify-around items-center h-16 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
+            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly, Hide on Scroll) */}
+            <div className={`md:hidden fixed bottom-4 left-4 right-4 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-850 px-3 py-2 flex justify-around items-center h-16 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.1)] transition-all duration-300 transform ${
+              isMobileBarVisible ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'
+            }`}>
               {getBottomNavItems().map(item => {
                 const Icon = item.icon;
                 const isActive = item.id === 'menu_toggle' ? false : activeScreen === item.id;

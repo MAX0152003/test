@@ -59,7 +59,7 @@ import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 
 interface DashboardFacultyProps {
   activeScreen: string;
-  setScreen: (screen: string) => void;
+  setScreen: (screen: string, contactObj?: { id: string; name?: string; ts?: number }) => void;
   classes: ClassSession[];
   onAddClass: (newClass: Omit<ClassSession, 'id'>) => void;
   onEditClass: (updatedClass: ClassSession) => void;
@@ -82,6 +82,7 @@ interface DashboardFacultyProps {
   onAddAttendanceRecord?: (record: Omit<AttendanceRecord, 'id'>) => void;
   labRooms?: LabRoom[];
   onUpdateLabRooms?: (rooms: LabRoom[]) => void;
+  selectedChatContact?: { id: string; name?: string; ts?: number };
 }
 
 const parseTimeToMinutesVal = (timeStr: string) => {
@@ -175,6 +176,7 @@ const checkDaysOverlapVal = (daysA: string[], daysB: string[]): boolean => {
 export default function DashboardFaculty({
   activeScreen,
   setScreen,
+  selectedChatContact,
   classes,
   onAddClass,
   onEditClass,
@@ -2398,9 +2400,9 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          className="h-[calc(100vh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="hidden sm:flex pb-3 border-b border-zinc-150 dark:border-zinc-855/60 items-start gap-3 shrink-0">
+          <div className="flex sm:hidden pb-3 border-b border-zinc-150 dark:border-zinc-855/60 items-start gap-3 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
               type="button"
@@ -2423,6 +2425,8 @@ export default function DashboardFaculty({
             enrollments={enrollments} 
             accessibility={accessibility} 
             setScreen={setScreen}
+            onBack={() => setScreen('dashboard')}
+            initialContactId={selectedChatContact}
           />
         </motion.div>
       )}

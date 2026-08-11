@@ -75,7 +75,8 @@ import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 
 interface DashboardAdminProps {
   activeScreen: string;
-  setScreen: (screen: string) => void;
+  setScreen: (screen: string, contactObj?: { id: string; name?: string; ts?: number }) => void;
+  selectedChatContact?: { id: string; name?: string; ts?: number };
   classes: ClassSession[];
   onAddClass: (newClass: Omit<ClassSession, 'id'>) => void;
   onEditClass: (updatedClass: ClassSession) => void;
@@ -364,6 +365,7 @@ interface MockUser {
 export default function DashboardAdmin({
   activeScreen,
   setScreen,
+  selectedChatContact,
   classes,
   onAddClass,
   onEditClass,
@@ -398,24 +400,28 @@ export default function DashboardAdmin({
     }
   });
 
-  // Ensure all registered users and current admin profile are present in directory
+  // Ensure registered users and only the primary active admin profile are present in directory (removing generated co-admins)
   const allDirectoryUsers = React.useMemo(() => {
-    const combined = [...usersList];
+    const nonAdminUsers = usersList.filter(u => u.role !== 'admin');
+    const combined = [...nonAdminUsers];
     if (userProfile && userProfile.role === 'admin') {
-      const exists = combined.some(u => 
-        (u.email && userProfile.email && u.email.toLowerCase() === userProfile.email.toLowerCase()) || 
-        u.id === userProfile.id
-      );
-      if (!exists) {
-        combined.unshift({
-          id: userProfile.id || 'admin-current',
-          name: userProfile.name || 'Admin User',
-          email: userProfile.email || 'registrar@msu.edu.ph',
-          role: 'admin',
-          uid: 'ADM-' + (userProfile.id ? userProfile.id.substring(0, 5).toUpperCase() : 'SYSTEM'),
-          department: userProfile.department || 'Academic Registrar Board'
-        });
-      }
+      combined.unshift({
+        id: userProfile.id || 'admin-01',
+        name: userProfile.name || 'Master Admin',
+        email: userProfile.email || 'admin@msu.edu.ph',
+        role: 'admin',
+        uid: 'ADM-' + (userProfile.id ? userProfile.id.substring(0, 5).toUpperCase() : '01'),
+        department: userProfile.department || 'Academic Registrar Board'
+      });
+    } else {
+      combined.unshift({
+        id: 'admin-01',
+        name: 'Master Admin',
+        email: 'admin@msu.edu.ph',
+        role: 'admin',
+        uid: 'ADM-01',
+        department: 'Academic Registrar Board'
+      });
     }
     return combined;
   }, [usersList, userProfile]);
@@ -1114,6 +1120,8 @@ export default function DashboardAdmin({
   const [showStickyHeader] = React.useState(true);
   const isScrolled = false;
   const [selectedClassIdFilter, setSelectedClassIdFilter] = React.useState<string>('all');
+  const [isClassFilterOpen, setIsClassFilterOpen] = React.useState(false);
+  const [classFilterSearch, setClassFilterSearch] = React.useState('');
   const [notifSearch, setNotifSearch] = React.useState('');
   const [notifFilter, setNotifFilter] = React.useState<'all' | 'alerts' | 'updates'>('all');
 
@@ -2033,14 +2041,14 @@ export default function DashboardAdmin({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Left Main Analytics Console: Attendance & Enrollment */}
-            <div className="p-6 rounded-[1.5rem] border lg:col-span-8 space-y-6 text-left bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm">
+            <div className="p-3.5 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border lg:col-span-8 space-y-4 sm:space-y-6 text-left bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                    <TrendingUp className="w-5 h-5 text-emerald-500" />
+                  <h3 className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
                     University Attendance & Enrollment Analytics
                   </h3>
-                  <p className="text-xs text-zinc-400 mt-1">Cross-referencing student registrations and daily attendance trends</p>
+                  <p className="hidden sm:block text-xs text-zinc-400 mt-1">Cross-referencing student registrations and daily attendance trends</p>
                 </div>
                 {/* Visual selector pills & Fast CSV dispatcher */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -2664,7 +2672,7 @@ export default function DashboardAdmin({
             <div className="space-y-6 lg:col-span-4">
               
               {/* LAB ROOMS CABINET CARD */}
-              <div className="p-6 rounded-[1.5rem] border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-855 text-left space-y-4">
+              <div className="p-3.5 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-855 text-left space-y-3 sm:space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-900">
                   <div>
                     <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
@@ -2890,13 +2898,13 @@ export default function DashboardAdmin({
               </div>
 
               {/* TIMELINE LOGS */}
-              <div className="p-6 rounded-[1.5rem] border space-y-4 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-855 text-left">
+              <div className="p-3.5 sm:p-6 rounded-2xl sm:rounded-[1.5rem] border space-y-3 sm:space-y-4 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-855 text-left">
                 <div>
-                  <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                    <Clock className="w-5 h-5 text-indigo-500" />
+                  <h3 className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
                     Live Audit Timeline
                   </h3>
-                  <p className="text-xs text-zinc-400">Real-time system events register flow</p>
+                  <p className="hidden sm:block text-xs text-zinc-400">Real-time system events register flow</p>
                 </div>
 
                 <div className="relative pt-2">
@@ -2929,14 +2937,14 @@ export default function DashboardAdmin({
           </div>
 
           {/* NEW SECTION: Administrative System Analytics & Active Dispatch */}
-          <div className="p-6 rounded-2xl border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm space-y-6 text-left">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b border-zinc-100 dark:border-zinc-900">
+          <div className="p-3.5 sm:p-6 rounded-2xl border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm space-y-4 sm:space-y-6 text-left">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-3 sm:pb-4 border-b border-zinc-100 dark:border-zinc-900">
               <div>
-                <h3 className="font-black text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-500 animate-pulse" />
+                <h3 className="font-black text-sm sm:text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500 animate-pulse" />
                   Administrative System Analytics & Active Dispatch
                 </h3>
-                <p className="text-xs text-zinc-400">Real-time attendance metrics telemetry, pending student excuse approvals, and live account registration audits</p>
+                <p className="hidden sm:block text-xs text-zinc-400">Real-time attendance metrics telemetry, pending student excuse approvals, and live account registration audits</p>
               </div>
               
               {/* Filter Tabs matching focus selectors */}
@@ -4054,33 +4062,163 @@ export default function DashboardAdmin({
                   </div>
 
                   {/* Class Filter Dropdown for Students Directory */}
-                  <div className="flex items-center gap-2 font-sans select-none pb-2 sm:pb-0">
+                  <div className="flex items-center gap-2 font-sans select-none pb-2 sm:pb-0 relative">
                     <span className="text-[10px] font-extrabold text-zinc-450 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1">
-                      <Filter className="w-3 h-3 text-zinc-400" />
+                      <Filter className="w-3.5 h-3.5 text-emerald-500" />
                       Class Filter:
                     </span>
-                    <div className="relative flex items-center bg-white dark:bg-zinc-900 border border-zinc-205 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors rounded-xl px-2.5 py-1.5 cursor-pointer">
-                      <BookOpen className="w-3 h-3 text-emerald-500 mr-1.5 shrink-0" />
-                      <span className="text-[10px] font-black text-zinc-700 dark:text-zinc-300 pr-5 truncate max-w-[150px]">
-                        {selectedClassIdFilter === 'all' 
-                          ? 'All Registered Classes' 
-                          : (() => {
-                              const found = classes.find(c => c.id === selectedClassIdFilter);
-                              return found ? `${found.code}: ${found.name}` : 'All Registered Classes';
-                            })()
-                        }
-                      </span>
-                      <ChevronDown className="w-3 h-3 text-zinc-400 absolute right-2 pointer-events-none" />
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsClassFilterOpen(!isClassFilterOpen)}
+                        className={`flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border transition-all rounded-xl px-3 py-1.5 cursor-pointer shadow-sm font-sans ${
+                          selectedClassIdFilter !== 'all'
+                            ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-400 shadow-emerald-500/10'
+                            : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-800 dark:text-zinc-200'
+                        }`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        <span className="text-xs font-bold truncate max-w-[170px] sm:max-w-[200px]">
+                          {selectedClassIdFilter === 'all' 
+                            ? 'All Registered Classes' 
+                            : (() => {
+                                const found = classes.find(c => c.id === selectedClassIdFilter);
+                                return found ? `${found.code}: ${found.name}` : 'All Registered Classes';
+                              })()
+                          }
+                        </span>
+                        <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 shrink-0 transition-transform duration-200 ${isClassFilterOpen ? 'rotate-180 text-emerald-500' : ''}`} />
+                      </button>
+
+                      {/* Native select accessibility layer matching CSS selector */}
                       <select
                         value={selectedClassIdFilter}
-                        onChange={(e) => setSelectedClassIdFilter(e.target.value)}
-                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full text-[10px]"
+                        onChange={(e) => {
+                          setSelectedClassIdFilter(e.target.value);
+                          setIsClassFilterOpen(false);
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full text-[10px] z-10"
                       >
-                        <option value="all" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">📖 All Registered Classes</option>
+                        <option value="all" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">All Registered Classes</option>
                         {sortedClasses.map(c => (
                           <option key={c.id} value={c.id} className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">{c.code}: {c.name}</option>
                         ))}
                       </select>
+
+                      {/* Pop-up Custom Refined Filter Menu Overlay */}
+                      <AnimatePresence>
+                        {isClassFilterOpen && (
+                          <>
+                            {/* Backdrop click dismiss */}
+                            <div 
+                              className="fixed inset-0 z-40" 
+                              onClick={() => setIsClassFilterOpen(false)} 
+                            />
+                            
+                            <motion.div
+                              initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                              transition={{ duration: 0.18, ease: 'easeOut' }}
+                              className="absolute right-0 sm:left-0 top-full mt-2.5 w-72 sm:w-80 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-zinc-200/90 dark:border-zinc-800/90 shadow-2xl rounded-2xl p-3 z-50 text-left space-y-2.5"
+                            >
+                              <div className="flex items-center justify-between px-1 pt-1 pb-2 border-b border-zinc-150 dark:border-zinc-850">
+                                <div className="flex items-center gap-1.5">
+                                  <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                                    Filter Roster by Course
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                  {sortedClasses.length} Courses
+                                </span>
+                              </div>
+
+                              {/* Search Box inside Popup */}
+                              {sortedClasses.length > 3 && (
+                                <div className="relative">
+                                  <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                  <input
+                                    type="text"
+                                    value={classFilterSearch}
+                                    onChange={(e) => setClassFilterSearch(e.target.value)}
+                                    placeholder="Search course code or title..."
+                                    className="w-full text-xs pl-8 pr-3 py-1.5 bg-zinc-100/70 dark:bg-zinc-900/80 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:border-emerald-500 text-zinc-850 dark:text-zinc-150 font-medium placeholder:text-zinc-400"
+                                  />
+                                </div>
+                              )}
+
+                              {/* Filter Options List */}
+                              <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                                {/* Option: All Registered Classes */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedClassIdFilter('all');
+                                    setIsClassFilterOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                                    selectedClassIdFilter === 'all'
+                                      ? 'bg-emerald-500 text-black shadow-md font-extrabold'
+                                      : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-800 dark:text-zinc-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <BookOpen className={`w-3.5 h-3.5 ${selectedClassIdFilter === 'all' ? 'text-black' : 'text-emerald-500'}`} />
+                                    <span className="truncate">All Registered Classes</span>
+                                  </div>
+                                  {selectedClassIdFilter === 'all' && (
+                                    <Check className="w-4 h-4 text-black shrink-0" />
+                                  )}
+                                </button>
+
+                                {/* Course options */}
+                                {sortedClasses
+                                  .filter(c => 
+                                    !classFilterSearch || 
+                                    c.code.toLowerCase().includes(classFilterSearch.toLowerCase()) || 
+                                    c.name.toLowerCase().includes(classFilterSearch.toLowerCase())
+                                  )
+                                  .map(c => {
+                                    const isSelected = selectedClassIdFilter === c.id;
+                                    return (
+                                      <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedClassIdFilter(c.id);
+                                          setIsClassFilterOpen(false);
+                                        }}
+                                        className={`w-full flex items-center justify-between p-2 rounded-xl text-xs cursor-pointer transition-all ${
+                                          isSelected
+                                            ? 'bg-emerald-500 text-black shadow-md font-extrabold'
+                                            : 'hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-800 dark:text-zinc-200'
+                                        }`}
+                                      >
+                                        <div className="flex flex-col text-left min-w-0 pr-2">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className={`font-mono text-[10px] font-black px-1.5 py-0.2 rounded ${
+                                              isSelected ? 'bg-black/20 text-black' : 'bg-emerald-500/15 text-emerald-500'
+                                            }`}>
+                                              {c.code}
+                                            </span>
+                                            <span className="truncate font-bold text-xs">{c.name}</span>
+                                          </div>
+                                          <span className={`text-[10px] truncate mt-0.5 ${isSelected ? 'text-black/80 font-medium' : 'text-zinc-400'}`}>
+                                            {c.facultyName ? `Prof. ${c.facultyName}` : 'Faculty Unassigned'} • Room {c.room}
+                                          </span>
+                                        </div>
+                                        {isSelected && (
+                                          <Check className="w-4 h-4 text-black shrink-0" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </div>
@@ -5607,9 +5745,9 @@ export default function DashboardAdmin({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          className="h-[calc(100vh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="hidden sm:flex pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-4 shrink-0">
+          <div className="flex sm:hidden pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-4 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
               type="button"
@@ -5632,6 +5770,8 @@ export default function DashboardAdmin({
             enrollments={enrollments} 
             accessibility={accessibility} 
             mode="private"
+            onBack={() => setScreen('dashboard')}
+            initialContactId={selectedChatContact}
           />
         </motion.div>
       )}

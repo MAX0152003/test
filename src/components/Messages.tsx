@@ -51,9 +51,7 @@ const ALL_CAMPUS_PEOPLE = [
   { id: '2023-77215', name: 'Charlie Dean', role: 'student', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150', dept: 'ComSci', email: 'charlie.dean@msu.edu.ph' },
   { id: '2023-33491', name: 'Diana Ross', role: 'student', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150', dept: 'Nursing', email: 'diana.ross@msu.edu.ph' },
   { id: 'fac-1', name: 'Dr. Ahmad Khan', role: 'faculty', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150', dept: 'Information Technology', email: 'ahmad.khan@msu.edu.ph' },
-  { id: 'fac-2', name: 'Prof. Maria Santos', role: 'faculty', avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150', dept: 'Computer Science', email: 'maria.santos@msu.edu.ph' },
-  { id: 'fac-3', name: 'Dr. Ali Hassan', role: 'faculty', avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=85&w=150', dept: 'Engineering Physics', email: 'ali.hassan@msu.edu.ph' },
-  { id: 'admin-01', name: 'Master Admin One', role: 'admin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150', dept: 'Registrar Board', email: 'admin@msu.edu.ph' }
+  { id: 'admin-01', name: 'Master Admin', role: 'admin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150', dept: 'Registrar Board', email: 'admin@msu.edu.ph' }
 ];
 
 export const getDynamicCampusPeople = (userRole?: string, userId?: string, userName?: string, userAvatar?: string, userEmail?: string) => {
@@ -624,6 +622,28 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       }
     });
 
+    const initObj = typeof initialContactId === 'object' ? initialContactId : null;
+    const initId = initObj ? initObj.id : (typeof initialContactId === 'string' ? initialContactId : undefined);
+    const initName = initObj ? initObj.name : undefined;
+
+    if (initId) {
+      const exists = list.some(item => 
+        item.id === initId || 
+        (initName && item.name?.toLowerCase() === initName.toLowerCase()) ||
+        (item.id && item.id.replace('fac-0', 'fac-') === initId.replace('fac-0', 'fac-'))
+      );
+      if (!exists) {
+        const matchedP = dynPeople.find(p => p.id === initId || (initName && p.name?.toLowerCase() === initName.toLowerCase()));
+        list.push({
+          id: matchedP?.id || initId,
+          name: initName || matchedP?.name || 'Faculty Member',
+          role: matchedP?.role || 'faculty',
+          avatar: matchedP?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
+          courseCode: matchedP?.dept || 'Faculty Member'
+        });
+      }
+    }
+
     // Deduplicate
     const seen = new Set();
     return list.filter(el => {
@@ -650,13 +670,22 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   const channels = getChannels();
   const contacts = getContacts();
 
-  // Set initial contact or channel
+  const prevInitialContactRef = useRef<any>(null);
+
+  // Set initial contact or channel safely without re-locking on state updates
   useEffect(() => {
-    const targetId = typeof initialContactId === 'object' ? initialContactId?.id : initialContactId;
+    if (prevInitialContactRef.current === initialContactId) return;
+    prevInitialContactRef.current = initialContactId;
+
+    const targetObj = typeof initialContactId === 'object' ? initialContactId : null;
+    const targetId = targetObj ? targetObj.id : (typeof initialContactId === 'string' ? initialContactId : undefined);
+    const targetName = targetObj ? targetObj.name : undefined;
+
     if (targetId) {
       const match = contacts.find(c => 
         c.id === targetId || 
         (c.name && targetId && c.name.toLowerCase() === targetId.toLowerCase()) ||
+        (c.name && targetName && c.name.toLowerCase() === targetName.toLowerCase()) ||
         (c.id && targetId && c.id.replace('-', '') === targetId.replace('-', '')) ||
         (c.id && targetId && c.id.replace('fac-0', 'fac-') === targetId.replace('fac-0', 'fac-'))
       );
@@ -666,10 +695,21 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         setActiveContactId(targetId);
       }
       setMobileShowChat(true);
-    } else if (userProfile.role === 'admin') {
-      if (mode === 'tickets') {
-        if (!activeContactId && adminTickets && adminTickets.length > 0) {
-          setActiveContactId(adminTickets[0].id);
+    } else {
+      setMobileShowChat(false);
+      if (userProfile.role === 'admin') {
+        if (mode === 'tickets') {
+          if (!activeContactId && adminTickets && adminTickets.length > 0) {
+            setActiveContactId(adminTickets[0].id);
+          }
+        } else {
+          if (!activeContactId) {
+            if (channels.length > 0) {
+              setActiveContactId(channels[0].id);
+            } else if (contacts.length > 0) {
+              setActiveContactId(contacts[0].id);
+            }
+          }
         }
       } else {
         if (!activeContactId) {
@@ -678,14 +718,6 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
           } else if (contacts.length > 0) {
             setActiveContactId(contacts[0].id);
           }
-        }
-      }
-    } else {
-      if (!activeContactId) {
-        if (channels.length > 0) {
-          setActiveContactId(channels[0].id);
-        } else if (contacts.length > 0) {
-          setActiveContactId(contacts[0].id);
         }
       }
     }
@@ -1387,7 +1419,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             )}
 
             {/* Chat inputs and Attachment menu */}
-            <div className="relative shrink-0">
+            <div className="relative shrink-0 pb-20 sm:pb-0">
               {showAttachmentMenu && (
                 <div className="absolute bottom-full left-0 mb-2 p-4 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 shadow-xl z-50 w-72 space-y-3.5 text-left animate-fade-in">
                   <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-900">
@@ -1814,7 +1846,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         </div>
 
         {/* Input area for Admin message reply */}
-        <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-850/60 shrink-0">
+        <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-850/60 shrink-0 pb-20 sm:pb-0">
           <form onSubmit={handleSendAdminTicketReply} className="flex gap-2">
             <input
               type="text"

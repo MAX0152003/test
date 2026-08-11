@@ -64,6 +64,24 @@ export default function Sidebar({
   const [pendingResetsCount, setPendingResetsCount] = React.useState(0);
   const [pendingTicketsCount, setPendingTicketsCount] = React.useState(0);
 
+  const [isMobile, setIsMobile] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Minimize/collapse state only applies on desktop (md screens and up). On mobile, sidebar drawer is always expanded.
+  const isEffectiveCollapsed = isCollapsed && !isMobile;
+
   React.useEffect(() => {
     const updateResetsCount = () => {
       try {
@@ -297,16 +315,16 @@ export default function Sidebar({
         className={`max-md:fixed max-md:inset-y-0 max-md:left-0 z-50 h-screen flex flex-col justify-between transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${
           isOpen ? 'translate-x-0 shadow-2xl' : 'max-md:-translate-x-full'
         } ${
-          isCollapsed ? 'md:w-20' : 'w-60 md:w-60'
+          isEffectiveCollapsed ? 'w-64 md:w-20' : 'w-64 md:w-60'
         } bg-white dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-850 text-zinc-900 dark:text-zinc-100 md:relative md:translate-x-0 md:shadow-lg`}
       >
         {/* Top Area - Brand Logo & Integrated Header Collapse Button */}
         <div className="relative shrink-0 border-b border-zinc-100 dark:border-zinc-900/60 p-3.5">
           <div className="flex items-center justify-between">
             <div 
-              onClick={isCollapsed ? toggleCollapse : undefined}
+              onClick={isEffectiveCollapsed ? toggleCollapse : undefined}
               className={`flex items-center gap-3 transition-all duration-300 ${
-                isCollapsed ? 'justify-center w-full cursor-pointer' : ''
+                isEffectiveCollapsed ? 'justify-center w-full cursor-pointer' : ''
               }`}
             >
               <motion.div
@@ -319,7 +337,7 @@ export default function Sidebar({
                 <Activity className="w-5 h-5 stroke-[2.5]" />
               </motion.div>
 
-              {!isCollapsed && (
+              {!isEffectiveCollapsed && (
                 <div className="text-left flex flex-col justify-center min-w-0">
                   <h1 className="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase truncate">
                     Class<span className="text-emerald-500">Pulse</span>
@@ -334,9 +352,9 @@ export default function Sidebar({
               type="button"
               onClick={toggleCollapse}
               className="hidden md:flex p-1.5 rounded-xl text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all cursor-pointer"
-              title={isCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu"}
+              title={isEffectiveCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu"}
             >
-              <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180 text-emerald-500' : ''}`} />
+              <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isEffectiveCollapsed ? 'rotate-180 text-emerald-500' : ''}`} />
             </button>
 
             {/* Mobile Drawer Close */}
@@ -355,7 +373,7 @@ export default function Sidebar({
           <nav className="px-3 space-y-4 text-left">
             {navSections.map((section, idx) => (
               <div key={idx} className="space-y-1">
-                {!isCollapsed ? (
+                {!isEffectiveCollapsed ? (
                   <div className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                     {section.title}
                   </div>
@@ -370,26 +388,26 @@ export default function Sidebar({
                       key={item.id}
                       onClick={() => handleNavClick(item.id, item.label)}
                       type="button"
-                      title={isCollapsed ? item.label : undefined}
+                      title={isEffectiveCollapsed ? item.label : undefined}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 group relative isolate ${
                         isActive 
                           ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold' 
                           : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60 hover:text-zinc-900 dark:hover:text-zinc-100'
-                      } ${isCollapsed ? 'justify-center px-1' : ''}`}
+                      } ${isEffectiveCollapsed ? 'justify-center px-1' : ''}`}
                     >
                       <div className="flex items-center gap-3 relative z-10 min-w-0">
                         <Icon className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
                           isActive ? 'text-emerald-500' : ''
                         }`} />
-                        {!isCollapsed && <span className="truncate">{item.label}</span>}
+                        {!isEffectiveCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
 
-                      {!isCollapsed && item.badge !== undefined && item.badge > 0 && (
+                      {!isEffectiveCollapsed && item.badge !== undefined && item.badge > 0 && (
                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500 text-black shrink-0 font-mono">
                           {item.badge}
                         </span>
                       )}
-                      {isCollapsed && item.badge !== undefined && item.badge > 0 && (
+                      {isEffectiveCollapsed && item.badge !== undefined && item.badge > 0 && (
                         <div className="absolute right-2 top-2 w-2 h-2 rounded-full bg-emerald-500 z-10" />
                       )}
                     </button>
@@ -402,7 +420,7 @@ export default function Sidebar({
 
         {/* Footer Area - Sleek User Card & Logout Button */}
         <div className="p-3 border-t border-zinc-100 dark:border-zinc-900 shrink-0 bg-white dark:bg-zinc-950 space-y-2">
-          {!isCollapsed && (
+          {!isEffectiveCollapsed && (
             <div className="flex items-center gap-2.5 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60">
               <img 
                 src={userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} 
@@ -423,13 +441,13 @@ export default function Sidebar({
               speakText("Logged out successfully.", accessibility.readAloud);
             }}
             type="button"
-            title={isCollapsed ? "Log Out" : undefined}
+            title={isEffectiveCollapsed ? "Log Out" : undefined}
             className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 active:scale-95 ${
-              isCollapsed ? 'justify-center px-1' : ''
+              isEffectiveCollapsed ? 'justify-center px-1' : ''
             }`}
           >
             <LogOut className="w-4 h-4 shrink-0 opacity-80" />
-            {!isCollapsed && <span>Log Out</span>}
+            {!isEffectiveCollapsed && <span>Log Out</span>}
           </button>
         </div>
       </div>

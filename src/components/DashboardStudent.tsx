@@ -114,7 +114,7 @@ const expandDaysToSpecificOnesVal = (days: string[]): string[] => {
 
 interface DashboardStudentProps {
   activeScreen: string;
-  setScreen: (screen: string) => void;
+  setScreen: (screen: string, contactObj?: { id: string; name?: string; ts?: number }) => void;
   classes: ClassSession[];
   attendanceRecords: AttendanceRecord[];
   notifications: AppNotification[];
@@ -132,11 +132,13 @@ interface DashboardStudentProps {
   onAddExcuseLetter?: (newReq: any) => void;
   onDropSubject?: (classId: string) => void;
   onEnrollSubject?: (classId: string) => void;
+  selectedChatContact?: { id: string; name?: string; ts?: number };
 }
 
 export default function DashboardStudent({
   activeScreen,
   setScreen,
+  selectedChatContact,
   classes,
   attendanceRecords,
   notifications,
@@ -161,6 +163,13 @@ export default function DashboardStudent({
   const [registeredCourseSearch, setRegisteredCourseSearch] = React.useState('');
   const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
   const [selectedFacultyForChat, setSelectedFacultyForChat] = React.useState<{ id: string; name?: string; ts: number } | undefined>(undefined);
+
+  // Automatically reset selectedFacultyForChat when leaving messages screen
+  React.useEffect(() => {
+    if (activeScreen !== 'messages') {
+      setSelectedFacultyForChat(undefined);
+    }
+  }, [activeScreen]);
   
   // State for customizing the attendance trends graph
   const [graphPeriod, setGraphPeriod] = React.useState<'days' | 'weeks' | 'months'>('weeks');
@@ -192,6 +201,7 @@ export default function DashboardStudent({
   const [isCameraLoading, setIsCameraLoading] = React.useState(false);
   const [scanningProgress, setScanningProgress] = React.useState(0);
   const [scanResult, setScanResult] = React.useState<{ success: boolean; message: string } | null>(null);
+  const [showScanRipple, setShowScanRipple] = React.useState(false);
 
   // Anti-Screenshot and Attendance Fraud Prevention state
   const [showScreenshotWarning, setShowScreenshotWarning] = React.useState(false);
@@ -478,6 +488,9 @@ export default function DashboardStudent({
     onRecordAttendance(matchedClass.id, status);
 
     setIsScanning(false);
+    setShowScanRipple(true);
+    setTimeout(() => setShowScanRipple(false), 2400);
+
     setScanResult({
       success: true,
       message: `Verified! Auto-scanned QR signature. Attendance checked into ${matchedClass.code} (${matchedClass.name}) at Room ${matchedClass.room} successfully as ${status.toUpperCase()}!`
@@ -722,6 +735,9 @@ export default function DashboardStudent({
 
       const status = Math.random() > 0.85 ? 'late' : 'present';
       onRecordAttendance(matchedClass.id, status);
+
+      setShowScanRipple(true);
+      setTimeout(() => setShowScanRipple(false), 2400);
 
       setScanResult({
         success: true,
@@ -986,6 +1002,7 @@ export default function DashboardStudent({
               <button
                 type="button"
                 onClick={() => {
+                  setSelectedFacultyForChat(undefined);
                   setScreen('messages');
                   speakText("Opening professor direct message interface.", accessibility.readAloud);
                 }}
@@ -1226,8 +1243,9 @@ export default function DashboardStudent({
                       type="button"
                       onClick={() => {
                         const targetFacId = fac.id || 'fac-1';
-                        setSelectedFacultyForChat({ id: targetFacId, name: fac.name, ts: Date.now() });
-                        setScreen('messages');
+                        const contactObj = { id: targetFacId, name: fac.name, ts: Date.now() };
+                        setSelectedFacultyForChat(contactObj);
+                        setScreen('messages', contactObj);
                         speakText(`Directing to message ${fac.name}`, accessibility.readAloud);
                       }}
                       className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/20 transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-[10px] font-bold active:scale-95 shrink-0"
@@ -2030,6 +2048,62 @@ export default function DashboardStudent({
                   {/* Camera Feed Target Container */}
                   <div id="live-qr-reader" className="w-full h-[280px] sm:h-[300px] bg-zinc-950 overflow-hidden relative"></div>
 
+                  {/* Ripple Animation Overlay on Valid QR Detection */}
+                  <AnimatePresence>
+                    {showScanRipple && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute inset-0 z-30 pointer-events-none flex flex-col items-center justify-center bg-emerald-950/30 backdrop-blur-[2px] overflow-hidden"
+                      >
+                        {/* Concentric Expanding Ripple Rings */}
+                        <motion.div
+                          initial={{ scale: 0.2, opacity: 0.95 }}
+                          animate={{ scale: 2.8, opacity: 0 }}
+                          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+                          className="absolute w-44 h-44 rounded-3xl border-2 border-emerald-400/90 bg-emerald-500/10 shadow-[0_0_40px_rgba(16,185,129,0.8)]"
+                        />
+                        <motion.div
+                          initial={{ scale: 0.2, opacity: 0.9 }}
+                          animate={{ scale: 2.2, opacity: 0 }}
+                          transition={{ duration: 1.2, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+                          className="absolute w-44 h-44 rounded-3xl border-2 border-emerald-300 bg-emerald-400/15 shadow-[0_0_50px_rgba(52,211,153,0.9)]"
+                        />
+                        <motion.div
+                          initial={{ scale: 0.2, opacity: 0.85 }}
+                          animate={{ scale: 1.6, opacity: 0 }}
+                          transition={{ duration: 1.0, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
+                          className="absolute w-44 h-44 rounded-3xl border-2 border-emerald-200 bg-emerald-300/20 shadow-[0_0_60px_rgba(167,243,208,1)]"
+                        />
+
+                        {/* Interactive Frame Lock Glow and Pulse Badge */}
+                        <motion.div
+                          initial={{ scale: 0.8, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.25, ease: 'easeOut' }}
+                          className="w-44 h-44 border-2 border-emerald-400 rounded-2xl relative flex items-center justify-center shadow-[0_0_35px_rgba(16,185,129,0.9)] bg-emerald-500/15 z-10"
+                        >
+                          <div className="absolute -top-1 -left-1 w-5 h-5 border-t-2 border-l-2 border-emerald-300 shadow-[0_0_10px_#10b981]"></div>
+                          <div className="absolute -top-1 -right-1 w-5 h-5 border-t-2 border-r-2 border-emerald-300 shadow-[0_0_10px_#10b981]"></div>
+                          <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-2 border-l-2 border-emerald-300 shadow-[0_0_10px_#10b981]"></div>
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-2 border-r-2 border-emerald-300 shadow-[0_0_10px_#10b981]"></div>
+
+                          <motion.div
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: [0.5, 1.15, 1], opacity: 1 }}
+                            transition={{ duration: 0.4, delay: 0.1, ease: 'backOut' }}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-500 text-black shadow-[0_0_25px_rgba(16,185,129,1)] flex items-center gap-1.5 font-mono font-black text-[10px] sm:text-[11px] tracking-wider uppercase"
+                          >
+                            <CheckCircle className="w-4 h-4 text-black animate-bounce" />
+                            <span>VALID QR DETECTED</span>
+                          </motion.div>
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Active QR Scanner Feed Loading Skeleton */}
                   {isCameraLoading && (
                     <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center text-center p-6 z-20 space-y-4">
@@ -2202,11 +2276,14 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          className="h-[calc(100vh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
         >
-          <div className="hidden sm:flex pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-3 shrink-0">
+          <div className="flex sm:hidden pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-3 shrink-0">
             <button 
-              onClick={() => setScreen('dashboard')} 
+              onClick={() => {
+                setSelectedFacultyForChat(undefined);
+                setScreen('dashboard');
+              }} 
               type="button"
               className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
               title="Back"
@@ -2227,7 +2304,11 @@ export default function DashboardStudent({
             enrollments={enrollments} 
             accessibility={accessibility} 
             setScreen={setScreen}
-            initialContactId={selectedFacultyForChat}
+            onBack={() => {
+              setSelectedFacultyForChat(undefined);
+              setScreen('dashboard');
+            }}
+            initialContactId={selectedChatContact || selectedFacultyForChat}
           />
         </motion.div>
       )}
