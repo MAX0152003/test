@@ -36,6 +36,7 @@ interface MessagesProps {
   mode?: 'private' | 'tickets';
   setScreen?: (screen: string) => void;
   initialContactId?: string | { id: string; name?: string; ts?: number };
+  isOffline?: boolean;
 }
 
 interface EnrichedChatMessage extends ChatMessage {
@@ -162,7 +163,41 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
   return result;
 };
 
-export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen, initialContactId }: MessagesProps) {
+export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen, initialContactId, isOffline: propIsOffline }: MessagesProps) {
+  const isOfflineMode = propIsOffline ?? (typeof window !== 'undefined' && localStorage.getItem('cp_offline') === 'true');
+
+  const myId = userProfile.id || (userProfile as any).uid || (userProfile.role === 'student' 
+    ? (userProfile.studentId || '2023-10492') 
+    : userProfile.role === 'faculty' 
+      ? (userProfile.facultyId || 'fac-1') 
+      : 'admin-cur');
+
+  const isUserOffline = (contactObj: any) => {
+    if (!contactObj) return true;
+    if (contactObj.isChannel) return false;
+
+    // Check if contact explicitly has status 'offline', 'unavailable', or isOffline === true, or isOnline === false
+    if (contactObj.status === 'offline' || contactObj.isOffline === true || contactObj.isOnline === false || contactObj.status === 'unavailable') {
+      return true;
+    }
+
+    // Check self
+    const isSelf = contactObj.id === myId || 
+                   (userProfile.email && contactObj.email && contactObj.email.toLowerCase() === userProfile.email.toLowerCase()) ||
+                   (userProfile.name && contactObj.name && contactObj.name.toLowerCase() === userProfile.name.toLowerCase());
+
+    if (isSelf) {
+      return isOfflineMode;
+    }
+
+    // If whole app is operating offline, non-self contacts are offline
+    if (isOfflineMode) {
+      return true;
+    }
+
+    return false;
+  };
+
   const [messages, setMessages] = useState<EnrichedChatMessage[]>(() => {
     const cached = localStorage.getItem('cp_chat_messages_v2');
     if (cached) {
@@ -655,6 +690,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   };
 
   const getChannels = () => {
+    if (userProfile.role === 'admin') {
+      return [];
+    }
     if (userProfile.role === 'student') {
       const studentId = userProfile.studentId || '2023-10492';
       const myClassIds = enrollments.filter(e => e.studentId === studentId).map(e => e.classId);
@@ -663,7 +701,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       const facultyId = userProfile.facultyId || 'fac-1';
       return classes.filter(c => c.facultyId === facultyId || c.facultyName === userProfile.name);
     } else {
-      return classes; // Admin sees all
+      return [];
     }
   };
 
@@ -735,12 +773,6 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       setShowAttachmentMenu(false);
     }
   }, [activeContactId]);
-
-  const myId = userProfile.role === 'student' 
-    ? (userProfile.studentId || '2023-10492') 
-    : userProfile.role === 'faculty' 
-      ? (userProfile.facultyId || 'fac-1') 
-      : (userProfile.id || 'admin-01');
 
   // Helper to count unread messages for a specific room or contact
   const getUnreadCount = (id: string) => {
@@ -998,49 +1030,51 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         {/* Channels/Contacts Unified Iterator list */}
         <div className="flex-1 overflow-y-auto space-y-4 p-3 text-left">
           
-          {/* Active Channels / Subject Groups */}
-          <div>
-            <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest px-2.5 block pb-2">Subject Class Rooms</span>
-            {filteredChannels.map(ch => {
-              const unreadCount = getUnreadCount(ch.id);
-              return (
-                <button
-                  key={ch.id}
-                  onClick={() => {
-                    setActiveContactId(ch.id);
-                    setMobileShowChat(true);
-                  }}
-                  className={`w-full flex items-center justify-between gap-3 p-2.5 rounded-xl text-left border cursor-pointer transition-all mb-1 ${
-                    activeContactId === ch.id
-                      ? 'bg-zinc-900 dark:bg-zinc-900 text-white border-zinc-900 dark:border-zinc-800 font-extrabold shadow-sm'
-                      : 'bg-transparent border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900/50 text-zinc-900 dark:text-zinc-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
-                      activeContactId === ch.id ? 'bg-zinc-950/20 text-white' : 'bg-emerald-500/10 text-emerald-500'
-                    }`}>
-                      #
+          {/* Active Channels / Subject Groups (Hidden for Admins) */}
+          {userProfile.role !== 'admin' && (
+            <div>
+              <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest px-2.5 block pb-2">Subject Class Rooms</span>
+              {filteredChannels.map(ch => {
+                const unreadCount = getUnreadCount(ch.id);
+                return (
+                  <button
+                    key={ch.id}
+                    onClick={() => {
+                      setActiveContactId(ch.id);
+                      setMobileShowChat(true);
+                    }}
+                    className={`w-full flex items-center justify-between gap-3 p-2.5 rounded-xl text-left border cursor-pointer transition-all mb-1 ${
+                      activeContactId === ch.id
+                        ? 'bg-zinc-900 dark:bg-zinc-900 text-white border-zinc-900 dark:border-zinc-800 font-extrabold shadow-sm'
+                        : 'bg-transparent border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900/50 text-zinc-900 dark:text-zinc-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
+                        activeContactId === ch.id ? 'bg-zinc-950/20 text-white' : 'bg-emerald-500/10 text-emerald-500'
+                      }`}>
+                        #
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className={`text-xs font-extrabold truncate ${activeContactId === ch.id ? 'text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>{ch.name}</h4>
+                        <p className={`text-[9px] truncate uppercase mt-0.5 font-bold ${activeContactId === ch.id ? 'text-zinc-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{ch.code} Room</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className={`text-xs font-extrabold truncate ${activeContactId === ch.id ? 'text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>{ch.name}</h4>
-                      <p className={`text-[9px] truncate uppercase mt-0.5 font-bold ${activeContactId === ch.id ? 'text-zinc-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{ch.code} Room</p>
-                    </div>
-                  </div>
-                  {unreadCount > 0 && (
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full select-none shrink-0 ${
-                      activeContactId === ch.id ? 'bg-emerald-500 text-black' : 'bg-emerald-500 text-black'
-                    }`}>
-                      {unreadCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-            {filteredChannels.length === 0 && (
-              <p className="text-[10px] text-zinc-405 italic px-2.5 py-1">No matching subject rooms</p>
-            )}
-          </div>
+                    {unreadCount > 0 && (
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full select-none shrink-0 ${
+                        activeContactId === ch.id ? 'bg-emerald-500 text-black' : 'bg-emerald-500 text-black'
+                      }`}>
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              {filteredChannels.length === 0 && (
+                <p className="text-[10px] text-zinc-405 italic px-2.5 py-1">No matching subject rooms</p>
+              )}
+            </div>
+          )}
 
           {/* Active Conversations */}
           <div>
@@ -1072,7 +1106,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                           {c.name ? c.name[0] : '?'}
                         </div>
                       )}
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950" />
+                      {!isUserOffline(c) && (
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <h4 className={`text-xs font-extrabold truncate flex items-center gap-1.5 ${activeContactId === c.id ? 'text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>
@@ -1127,13 +1163,18 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                     }}
                     className="w-full flex items-center gap-3 p-2.5 rounded-xl text-left hover:bg-emerald-500/10 text-zinc-900 dark:text-zinc-100 cursor-pointer transition-all mb-1 border border-dashed border-emerald-500/20 bg-emerald-500/5"
                   >
-                    {person.avatar ? (
-                      <img src={person.avatar} alt={person.name} className="w-9 h-9 rounded-full object-cover border border-emerald-500/30" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-emerald-550 text-white font-extrabold text-xs flex items-center justify-center uppercase border border-emerald-500/30 shrink-0">
-                        {person.name ? person.name[0] : '?'}
-                      </div>
-                    )}
+                    <div className="relative shrink-0">
+                      {person.avatar ? (
+                        <img src={person.avatar} alt={person.name} className="w-9 h-9 rounded-full object-cover border border-emerald-500/30" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-emerald-550 text-white font-extrabold text-xs flex items-center justify-center uppercase border border-emerald-500/30 shrink-0">
+                          {person.name ? person.name[0] : '?'}
+                        </div>
+                      )}
+                      {!isUserOffline(person) && (
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-1.5">
                         <span className="truncate">{person.name}</span>
@@ -1228,7 +1269,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         {activeMeta.name ? activeMeta.name[0] : '?'}
                       </div>
                     )}
-                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
+                    {!isUserOffline(activeMeta) && (
+                      <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
+                    )}
                   </div>
                 ) : (
                   <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black text-sm shrink-0">
@@ -1419,7 +1462,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             )}
 
             {/* Chat inputs and Attachment menu */}
-            <div className="relative shrink-0 pb-20 sm:pb-0">
+            <div className="relative shrink-0 pb-1 sm:pb-0 bg-white dark:bg-zinc-950 sticky bottom-0 z-20">
               {showAttachmentMenu && (
                 <div className="absolute bottom-full left-0 mb-2 p-4 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 shadow-xl z-50 w-72 space-y-3.5 text-left animate-fade-in">
                   <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-900">
@@ -1846,7 +1889,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         </div>
 
         {/* Input area for Admin message reply */}
-        <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-850/60 shrink-0 pb-20 sm:pb-0">
+        <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-850/60 shrink-0 pb-1 sm:pb-0 bg-white dark:bg-zinc-950 sticky bottom-0 z-20">
           <form onSubmit={handleSendAdminTicketReply} className="flex gap-2">
             <input
               type="text"

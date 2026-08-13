@@ -19,8 +19,19 @@ import {
   deleteClassFromFirestore,
   syncAttendanceFromFirestore,
   saveAttendanceToFirestore,
-  saveUserProfileToFirestore
+  saveUserProfileToFirestore,
+  syncAllAccountsFromFirestore,
+  listenToClasses,
+  listenToAttendance,
+  listenToRegisteredUsers,
+  listenToCredentials,
+  listenToPasswordResets,
+  claimSessionLinkFromFirestore,
+  forceResyncAllFromFirestore
 } from './lib/firestoreSync';
+import { normalizeUserIdentity } from './lib/authUtils';
+import AccountLinkQRModal from './components/AccountLinkQRModal';
+import SyncStatusMonitor from './components/SyncStatusMonitor';
 import { auth, db } from './lib/googleAuth';
 import { 
   INITIAL_CLASSES, 
@@ -50,6 +61,7 @@ import {
   Bell,
   Search,
   LayoutDashboard,
+  QrCode,
   CalendarDays,
   Scan,
   MessageSquare,
@@ -152,7 +164,50 @@ export default function App() {
   const [selectedChatContact, setSelectedChatContact] = React.useState<{ id: string; name?: string; ts?: number } | undefined>(undefined);
 
   const [isMobileBarVisible, setIsMobileBarVisible] = React.useState(true);
+  const [isKeyboardOpen, setIsKeyboardOpen] = React.useState(false);
   const lastScrollTopRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        setIsKeyboardOpen(true);
+      }
+    };
+
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active || !(active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+          setIsKeyboardOpen(false);
+        }
+      }, 100);
+    };
+
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleFocusOut);
+
+    const handleViewportResize = () => {
+      if (window.visualViewport) {
+        const isShrunk = window.innerHeight - window.visualViewport.height > 120;
+        if (isShrunk) {
+          setIsKeyboardOpen(true);
+        }
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+    }
+
+    return () => {
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('focusout', handleFocusOut);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+      }
+    };
+  }, []);
 
   const mainScrollRef = React.useRef<HTMLDivElement>(null);
   const prevLabRoomsRef = React.useRef<Record<string, 'occupied' | 'available' | 'maintenance'>>({});
@@ -315,16 +370,38 @@ export default function App() {
 
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+        setIsMobileBarVisible(true);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsSearchOpen(prev => !prev);
+        setIsSearchOpen(prev => {
+          const next = !prev;
+          setIsMobileBarVisible(!next);
+          return next;
+        });
+      } else if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        setIsMobileBarVisible(true);
       }
     };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -452,6 +529,7 @@ export default function App() {
   const [syncDoneBanner, setSyncDoneBanner] = React.useState(false);
   const [isAccPanelOpen, setIsAccPanelOpen] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [isAccountLinkModalOpen, setIsAccountLinkModalOpen] = React.useState(false);
 
   // Synchronize Dark / Light class on the HTML document element
   React.useEffect(() => {
@@ -477,8 +555,24 @@ export default function App() {
     return () => unsubscribeAuth();
   }, [isOffline]);
 
-  // Firestore Sync Data on mount: pulls down classes and attendance records to sync across devices
+  // Firestore Sync Data on mount: pulls down classes, attendance records, users and credentials to sync across devices
   React.useEffect(() => {
+    // Check if URL contains session_token for QR session handoff
+    if (typeof window !== 'undefined' && window.location.search.includes('session_token=')) {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('session_token');
+      if (token) {
+        claimSessionLinkFromFirestore(false, token).then((claimedProfile) => {
+          if (claimedProfile) {
+            const normUser = normalizeUserIdentity(claimedProfile);
+            handleLoginSuccess(normUser.role as Role, normUser.name, normUser.email);
+            speakText(`Session synchronized from QR code. Welcome back, ${normUser.name}!`, accessibility.readAloud);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        });
+      }
+    }
+
     syncClassesFromFirestore(false, (fetchedClasses) => {
       setClasses(fetchedClasses);
       safeStorage.setItem('cp_classes', JSON.stringify(fetchedClasses));
@@ -487,6 +581,27 @@ export default function App() {
       setAttendanceRecords(fetchedRecords);
       safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
     });
+    syncAllAccountsFromFirestore(false);
+
+    const unsubClasses = listenToClasses(false, (fetchedClasses) => {
+      setClasses(fetchedClasses);
+      safeStorage.setItem('cp_classes', JSON.stringify(fetchedClasses));
+    });
+    const unsubAttendance = listenToAttendance(false, (fetchedRecords) => {
+      setAttendanceRecords(fetchedRecords);
+      safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
+    });
+    const unsubUsers = listenToRegisteredUsers(false);
+    const unsubCreds = listenToCredentials(false);
+    const unsubResets = listenToPasswordResets(false);
+
+    return () => {
+      unsubClasses();
+      unsubAttendance();
+      unsubUsers();
+      unsubCreds();
+      unsubResets();
+    };
   }, []);
 
   // Firestore Sync Data: pulls down classes and attendance records once online
@@ -714,40 +829,78 @@ export default function App() {
     };
   }, [user]);
 
+  // Process offline attendance queue and auto-upload to Firestore when online
+  const processOfflineQueueAndSync = React.useCallback(async () => {
+    setIsSyncing(true);
+    let pendingQueue: AttendanceRecord[] = [];
+    try {
+      pendingQueue = JSON.parse(safeStorage.getItem('cp_pending_attendance_queue') || '[]');
+    } catch {}
+
+    let uploadedCount = 0;
+    if (pendingQueue.length > 0) {
+      for (const rec of pendingQueue) {
+        try {
+          await saveAttendanceToFirestore(false, rec);
+          uploadedCount++;
+        } catch (err) {
+          console.error("Failed to upload pending offline attendance record:", rec, err);
+        }
+      }
+      safeStorage.removeItem('cp_pending_attendance_queue');
+      setOfflineQueueCount(0);
+    }
+
+    try {
+      await forceResyncAllFromFirestore(false, {
+        onClassesSync: (fetchedClasses) => setClasses(fetchedClasses),
+        onAttendanceSync: (fetchedRecords) => setAttendanceRecords(fetchedRecords)
+      });
+    } catch (err) {
+      console.warn("Error force-resyncing Firestore:", err);
+    }
+
+    setIsSyncing(false);
+    setSyncDoneBanner(true);
+    setTimeout(() => setSyncDoneBanner(false), 3800);
+
+    const messageStr = uploadedCount > 0
+      ? `Auto-Uploaded ${uploadedCount} offline attendance scan(s) to Firestore cloud database!`
+      : 'All offline local records successfully synchronized with Firestore cloud registry.';
+
+    const syncNotif: AppNotification = {
+      id: 'notif-autosync-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+      title: 'Database Auto-Synchronized',
+      message: messageStr,
+      timestamp: 'Just Now',
+      type: 'success',
+      read: false
+    };
+    setNotifications(prev => [syncNotif, ...prev]);
+    speakText(messageStr, accessibility.readAloud);
+  }, [accessibility.readAloud]);
+
+  // Window network event listener for auto reconnection upload
+  React.useEffect(() => {
+    const handleWindowOnline = () => {
+      console.log("[Network] Device came back online! Triggering automatic queue upload & sync...");
+      setIsOffline(false);
+      processOfflineQueueAndSync();
+    };
+
+    window.addEventListener('online', handleWindowOnline);
+    return () => window.removeEventListener('online', handleWindowOnline);
+  }, [processOfflineQueueAndSync]);
+
   // Synchronize when offline state is flipped back to online
   const handleToggleOffline = () => {
     if (isOffline) {
-      // Transitioning to online -> Simulate synchronization
       setIsOffline(false);
-      setIsSyncing(true);
-      speakText("Restoring network link. Synchronizing local cache with main campus nodes.", accessibility.readAloud);
-      
-      setTimeout(() => {
-        setIsSyncing(false);
-        setOfflineQueueCount(0);
-        setSyncDoneBanner(true);
-        speakText("Database synchronization completed. All attendance rosters are fully persistent.", accessibility.readAloud);
-        
-        // Add a notification toast dynamically
-        const newNotif: AppNotification = {
-          id: 'notif-sync-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-          title: 'Offline records synchronized',
-          message: 'Local logs for schedules and scan codes successfully merged into cloud registry.',
-          timestamp: 'Just Now',
-          type: 'success',
-          read: false
-        };
-        setNotifications(prev => [newNotif, ...prev]);
- 
-        setTimeout(() => setSyncDoneBanner(false), 3550);
-      }, 1500);
+      speakText("Restoring network link. Auto-uploading offline attendance scans to cloud.", accessibility.readAloud);
+      processOfflineQueueAndSync();
     } else {
       setIsOffline(true);
-      // Give it an initial simulated offline queue value if 0, so students immediately see the badge
-      if (offlineQueueCount === 0) {
-        setOfflineQueueCount(2);
-      }
-      speakText("Network connection paused. You are now working using persistent local-storage database mode.", accessibility.readAloud);
+      speakText("Network connection paused. Offline QR scanning mode active.", accessibility.readAloud);
     }
   };
 
@@ -850,8 +1003,9 @@ export default function App() {
       };
     }
  
-    setUser(profile);
-    saveUserProfileToFirestore(false, profile).catch(err => console.error("Firestore user profile error:", err));
+    const normalizedProfile = normalizeUserIdentity(profile);
+    setUser(normalizedProfile);
+    saveUserProfileToFirestore(false, normalizedProfile).catch(err => console.error("Firestore user profile error:", err));
     setActiveScreen('dashboard');
     speakText(`Welcome to ClassPulse. Successfully loaded your ${role} dashboard.`, accessibility.readAloud);
   };
@@ -968,10 +1122,29 @@ export default function App() {
     };
 
     setAttendanceRecords(prev => [...prev, newRecord]);
-    saveAttendanceToFirestore(false, newRecord).catch(err => console.error("Firestore save attendance error:", err));
 
-    if (isOffline) {
-      setOfflineQueueCount(prev => prev + 1);
+    const isCurrentlyOffline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
+
+    if (isCurrentlyOffline) {
+      let pendingQueue: AttendanceRecord[] = [];
+      try {
+        pendingQueue = JSON.parse(safeStorage.getItem('cp_pending_attendance_queue') || '[]');
+      } catch {}
+      pendingQueue.push(newRecord);
+      safeStorage.setItem('cp_pending_attendance_queue', JSON.stringify(pendingQueue));
+      setOfflineQueueCount(pendingQueue.length);
+
+      const offlineNotif: AppNotification = {
+        id: 'notif-offline-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+        title: 'Offline Attendance Cached',
+        message: `Saved QR scan for ${matchedClass.code} (${status.toUpperCase()}) in local queue. Will automatically upload to Firestore database once reconnected online!`,
+        timestamp: 'Just Now',
+        type: 'info',
+        read: false
+      };
+      setNotifications(prev => [offlineNotif, ...prev]);
+    } else {
+      saveAttendanceToFirestore(false, newRecord).catch(err => console.error("Firestore save attendance error:", err));
     }
 
     // Send warning if late, else success
@@ -1465,12 +1638,16 @@ export default function App() {
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full">
             
             {/* Top Operational bar - Applies to all screen sizes including mobile */}
-            <header className="flex px-3 sm:px-6 py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+            <header className={`flex px-2.5 sm:px-6 py-2 sm:py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200/80 dark:border-zinc-850/80 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md text-zinc-900 dark:text-zinc-100 relative ${
+              isSearchOpen ? 'z-[100]' : 'z-30'
+            }`}>
               
               {/* Left Header Logo & Role display */}
-              <div className="flex items-center gap-2 sm:gap-3 text-left shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10">
-                  <Activity className="w-4.5 h-4.5" />
+              <div className={`items-center gap-2 sm:gap-3 text-left shrink-0 transition-all duration-300 ${
+                isSearchOpen ? 'hidden sm:flex' : 'flex'
+              }`}>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10">
+                  <Activity className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 hidden sm:inline">ClassPulse</span>
                 <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 sm:px-3 sm:py-1 rounded-full border shadow-2xs ${
@@ -1482,52 +1659,80 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Header Search Bar */}
-              <div className="flex-1 max-w-xs sm:max-w-sm md:max-w-md mx-2 relative">
-                <div className="relative flex items-center">
-                  <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setIsSearchOpen(true);
-                    }}
-                    onFocus={() => setIsSearchOpen(true)}
-                    className="w-full pl-8 pr-7 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
-                  />
-                  {searchQuery ? (
+              {/* Header Search & Filter Bar */}
+              <div 
+                ref={searchContainerRef} 
+                className={`transition-all duration-300 mx-1.5 sm:mx-2 relative z-[100] ${
+                  isSearchOpen 
+                    ? 'w-full max-w-full sm:max-w-sm md:max-w-md' 
+                    : 'flex-1 max-w-xs sm:max-w-sm md:max-w-md'
+                }`}
+              >
+                <div className="relative flex items-center z-[100] gap-2">
+                  <div className="relative flex-1 flex items-center">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setIsSearchOpen(true);
+                        setIsMobileBarVisible(false);
+                      }}
+                      onFocus={() => {
+                        setIsSearchOpen(true);
+                        setIsMobileBarVisible(false);
+                      }}
+                      className="w-full pl-8 pr-7 py-1.5 sm:py-1 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/70 dark:bg-zinc-900/70 backdrop-blur-md text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
+                    />
+                    {searchQuery ? (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <kbd className="hidden sm:inline-block absolute right-2 px-1 py-0.2 text-[9px] font-mono font-bold text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs pointer-events-none">
+                        ⌘K
+                      </kbd>
+                    )}
+                  </div>
+                  {isSearchOpen && (
                     <button
                       type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2 p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer"
+                      onClick={() => {
+                        setIsSearchOpen(false);
+                        setIsMobileBarVisible(true);
+                      }}
+                      className="sm:hidden px-2 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 shrink-0 cursor-pointer"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      Cancel
                     </button>
-                  ) : (
-                    <kbd className="hidden sm:inline-block absolute right-2 px-1 py-0.2 text-[9px] font-mono font-bold text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs pointer-events-none">
-                      ⌘K
-                    </kbd>
                   )}
                 </div>
 
-                {/* Inline Pull-down Choices Dropdown Menu */}
+                {/* Inline Glassmorphic Choices Dropdown Menu */}
                 <AnimatePresence>
                   {isSearchOpen && (
                     <>
-                      {/* Transparent backdrop handler to dismiss pull-down dropdown when clicking outside */}
+                      {/* Dimmed backdrop handler to dismiss pull-down dropdown when clicking outside */}
                       <div 
-                        className="fixed inset-0 z-40" 
-                        onClick={() => setIsSearchOpen(false)} 
+                        className="fixed inset-0 z-[90] bg-black/20 dark:bg-black/50 backdrop-blur-2xs" 
+                        onClick={() => {
+                          setIsSearchOpen(false);
+                          setIsMobileBarVisible(true);
+                        }} 
                       />
 
                       <motion.div
-                        initial={{ opacity: 0, y: 4, scale: 0.98 }}
+                        initial={{ opacity: 0, y: -10, scale: 0.97 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 4, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full left-0 right-0 mt-2 z-50 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-xl shadow-xl overflow-hidden flex flex-col text-left max-h-[70vh]"
+                        exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                        transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                        className="absolute top-full left-0 right-0 mt-2 z-[100] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-left max-h-[70vh]"
                       >
                         <div className="max-h-[60vh] overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar text-left">
                           {(() => {
@@ -1565,6 +1770,7 @@ export default function App() {
                                             onClick={() => {
                                               setActiveScreen(item.id);
                                               setIsSearchOpen(false);
+                                              setIsMobileBarVisible(true);
                                               setSearchQuery('');
                                             }}
                                             className="w-full px-2.5 py-2 rounded-lg hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center gap-2.5 transition-colors group cursor-pointer"
@@ -1591,6 +1797,7 @@ export default function App() {
                                           onClick={() => {
                                             setActiveScreen('schedule');
                                             setIsSearchOpen(false);
+                                            setIsMobileBarVisible(true);
                                             setSearchQuery('');
                                           }}
                                           className="w-full px-2.5 py-2 rounded-lg hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
@@ -1628,7 +1835,19 @@ export default function App() {
               </div>
 
               {/* Right controllers: Notification Bell & Profile Circle Avatar */}
-              <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+              <div className={`items-center gap-2 sm:gap-2.5 shrink-0 transition-all duration-300 ${
+                isSearchOpen ? 'hidden sm:flex' : 'flex'
+              }`}>
+                {/* Account Link QR Button */}
+                <button
+                  onClick={() => setIsAccountLinkModalOpen(true)}
+                  type="button"
+                  className="p-2 rounded-xl border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-all cursor-pointer relative shrink-0"
+                  title="Account Link QR Code (Desktop <-> Mobile Sync)"
+                >
+                  <QrCode className="w-4.5 h-4.5 text-emerald-500" />
+                </button>
+
                 <button
                   onClick={() => {
                     setActiveScreen('notifications');
@@ -1662,7 +1881,7 @@ export default function App() {
                       ? 'ring-2 ring-emerald-500 border-emerald-500'
                       : 'border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50'
                   }`}
-                  title={user.name}
+                  title={`${user.name} (${isOffline ? 'Offline Mode' : 'Cloud Synced'})`}
                 >
                   <img
                     src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"}
@@ -1670,7 +1889,14 @@ export default function App() {
                     className="w-8 h-8 rounded-full object-cover"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-zinc-950 rounded-full" />
+                  <span 
+                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-950 ${
+                      isOffline 
+                        ? 'bg-amber-500 shadow-xs shadow-amber-500/50' 
+                        : 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse'
+                    }`} 
+                    title={isOffline ? "Offline Mode (Local Storage)" : "Cloud Synced (Firestore)"}
+                  />
                 </button>
               </div>
 
@@ -1692,7 +1918,7 @@ export default function App() {
 
             {/* Primary content grid layout block */}
             <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2.5 max-w-7xl w-full mx-auto flex-1 overflow-y-auto ${
-              activeScreen === 'messages' || activeScreen === 'tickets' ? 'pb-20 md:pb-2 space-y-0' : 'pb-24 md:pb-6 space-y-3.5 sm:space-y-4'
+              activeScreen === 'messages' || activeScreen === 'tickets' ? 'pb-16 md:pb-2 space-y-0' : 'pb-20 md:pb-6 space-y-2.5 sm:space-y-4'
             }`}>
               
               {/* Accessibility options expansion widget */}
@@ -1737,6 +1963,8 @@ export default function App() {
                       onUpdateColorAccent={setColorAccent}
                       setScreen={handleSetScreen}
                       classes={classes}
+                      onOpenAccountLinkQR={() => setIsAccountLinkModalOpen(true)}
+                      isOffline={isOffline}
                     />
                   </motion.div>
                 ) : (
@@ -1858,9 +2086,13 @@ export default function App() {
 
             </main>
 
-            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly, Hide on Scroll) */}
-            <div className={`md:hidden fixed bottom-4 left-4 right-4 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-850 px-3 py-2 flex justify-around items-center h-16 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.1)] transition-all duration-300 transform ${
-              isMobileBarVisible ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none'
+            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Glassmorphic Dock) */}
+            <div className={`md:hidden fixed bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 z-40 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-xl shadow-zinc-950/10 transition-all duration-300 transform ${
+              isKeyboardOpen 
+                ? 'hidden opacity-0 pointer-events-none' 
+                : isMobileBarVisible 
+                  ? 'translate-y-0 opacity-100' 
+                  : 'translate-y-24 opacity-0 pointer-events-none'
             }`}>
               {getBottomNavItems().map(item => {
                 const Icon = item.icon;
@@ -1877,13 +2109,13 @@ export default function App() {
                       }
                     }}
                     type="button"
-                    className={`flex flex-col items-center justify-center gap-1 transition-all flex-1 py-1 cursor-pointer scale-100 active:scale-95 ${
+                    className={`flex flex-col items-center justify-center gap-0.5 transition-all flex-1 py-1 cursor-pointer scale-100 active:scale-95 ${
                       isActive 
                         ? 'text-emerald-500 font-black' 
                         : 'text-zinc-450 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
                     }`}
                   >
-                    <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-450 dark:text-zinc-455'}`} />
+                    <Icon className={`w-4.5 h-4.5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-450 dark:text-zinc-455'}`} />
                     <span className="text-[9px] font-black tracking-wider uppercase">{item.label}</span>
                   </button>
                 );
@@ -1902,12 +2134,12 @@ export default function App() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15 } }}
-            className="fixed bottom-6 right-6 z-50 max-w-sm w-[calc(100vw-3rem)] p-3 rounded-xl shadow-xl bg-zinc-900/95 dark:bg-zinc-950/95 border border-zinc-805/80 text-white backdrop-blur-md flex items-center justify-between gap-3 text-left"
+            className="fixed bottom-20 left-3 right-3 sm:left-auto sm:right-6 sm:bottom-6 z-50 max-w-sm p-3 rounded-2xl shadow-2xl bg-zinc-900/90 dark:bg-zinc-950/90 border border-zinc-800/80 text-white backdrop-blur-xl flex items-center justify-between gap-3 text-left"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <span className={`w-2 h-2 rounded-full shrink-0 ${
                 toast.type === 'success' ? 'bg-emerald-500' :
-                toast.type === 'warning' ? 'bg-amber-550 bg-amber-500' :
+                toast.type === 'warning' ? 'bg-amber-500' :
                 toast.type === 'error' ? 'bg-red-500' :
                 'bg-indigo-500'
               }`} />
@@ -1926,6 +2158,18 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Account Link QR Session Modal */}
+      <AccountLinkQRModal
+        isOpen={isAccountLinkModalOpen}
+        onClose={() => setIsAccountLinkModalOpen(false)}
+        userProfile={user}
+        isOffline={isOffline}
+        onSessionClaimed={(claimedProfile) => {
+          const norm = normalizeUserIdentity(claimedProfile);
+          handleLoginSuccess(norm.role as Role, norm.name, norm.email);
+        }}
+      />
 
     </div>
   );

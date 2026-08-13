@@ -28,6 +28,7 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  Filter,
   Camera,
   UploadCloud,
   TrendingUp,
@@ -2782,9 +2783,10 @@ export default function DashboardFaculty({
             </div>
 
               {/* Subject Filter tab Selection Option Dropdown */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-sans w-full pt-1 pb-2 border-b border-zinc-100 dark:border-zinc-900">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans w-full p-2.5 sm:p-3 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-sm shadow-zinc-950/5">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full max-w-md">
-                  <label htmlFor="faculty-class-monitor-select" className="text-xs font-extrabold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest shrink-0">
+                  <label htmlFor="faculty-class-monitor-select" className="text-xs font-extrabold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest shrink-0 flex items-center gap-1.5">
+                    <Filter className="w-3.5 h-3.5 text-emerald-500" />
                     Select Class:
                   </label>
                   <div className="relative w-full">
@@ -2795,7 +2797,7 @@ export default function DashboardFaculty({
                         setSelectedMonitoringClassId(e.target.value);
                         speakText(`Displaying student roster for class code ${classes.find(c => c.id === e.target.value)?.code || ''}`, accessibility.readAloud);
                       }}
-                      className="w-full appearance-none px-4 py-2 text-xs md:text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 rounded-xl font-black text-zinc-800 dark:text-zinc-200 outline-none focus:border-emerald-500 shadow-xs cursor-pointer pr-10"
+                      className="w-full appearance-none px-4 py-2 text-xs md:text-xs bg-white/90 dark:bg-zinc-950/90 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-emerald-500 shadow-2xs cursor-pointer pr-10"
                     >
                       {sortedClasses.map((cls) => {
                         const count = enrollments.filter(e => e.classId === cls.id).length;

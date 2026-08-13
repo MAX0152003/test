@@ -39,6 +39,7 @@ interface SidebarProps {
   unreadMessages?: number;
   pendingExcuseCount?: number;
   accessibility: AccessibilityConfig;
+  isOffline?: boolean;
 }
 
 export default function Sidebar({
@@ -51,7 +52,8 @@ export default function Sidebar({
   unreadNotifications,
   unreadMessages = 0,
   pendingExcuseCount = 0,
-  accessibility
+  accessibility,
+  isOffline = false
 }: SidebarProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isCollapsed, setIsCollapsed] = React.useState(() => {
@@ -422,12 +424,20 @@ export default function Sidebar({
         <div className="p-3 border-t border-zinc-100 dark:border-zinc-900 shrink-0 bg-white dark:bg-zinc-950 space-y-2">
           {!isEffectiveCollapsed && (
             <div className="flex items-center gap-2.5 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60">
-              <img 
-                src={userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} 
-                alt={userName}
-                className="w-7 h-7 rounded-full object-cover shrink-0 border border-emerald-500/30"
-                referrerPolicy="no-referrer"
-              />
+              <div className="relative shrink-0">
+                <img 
+                  src={userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} 
+                  alt={userName}
+                  className="w-7 h-7 rounded-full object-cover shrink-0 border border-emerald-500/30"
+                  referrerPolicy="no-referrer"
+                />
+                <span 
+                  className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-950 ${
+                    isOffline ? 'bg-amber-500 shadow-xs shadow-amber-500/50' : 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse'
+                  }`}
+                  title={isOffline ? "Offline Mode (Local Storage)" : "Cloud Synced (Firestore)"}
+                />
+              </div>
               <div className="min-w-0 flex-1 text-left">
                 <p className="text-[11px] font-extrabold text-zinc-900 dark:text-zinc-100 truncate">{userName}</p>
                 <p className="text-[9px] font-semibold text-zinc-400 truncate capitalize">{role}</p>

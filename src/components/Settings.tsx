@@ -25,10 +25,13 @@ import {
   Lock,
   Key,
   Calendar,
-  CloudLightning
+  CloudLightning,
+  QrCode
 } from 'lucide-react';
 import { UserProfile, AccessibilityConfig, ClassSession } from '../types';
 import { speakText } from './AccessibilitySettings';
+import { saveUserCredentialToFirestore, saveUserProfileToFirestore } from '../lib/firestoreSync';
+import SyncStatusMonitor from './SyncStatusMonitor';
 
 interface SettingsProps {
   userProfile: UserProfile;
@@ -39,6 +42,8 @@ interface SettingsProps {
   onUpdateColorAccent?: (accent: string) => void;
   setScreen: (screen: string) => void;
   classes?: ClassSession[];
+  onOpenAccountLinkQR?: () => void;
+  isOffline?: boolean;
 }
 
 export default function Settings({
@@ -49,7 +54,9 @@ export default function Settings({
   onUpdateCompactMode,
   onUpdateColorAccent,
   setScreen,
-  classes = []
+  classes = [],
+  onOpenAccountLinkQR,
+  isOffline = false
 }: SettingsProps) {
   // 1. Current category selection
   const [activeCategory, setActiveCategory] = React.useState<'account' | 'appearance' | 'notifications' | 'security'>('account');
@@ -147,7 +154,7 @@ export default function Settings({
     // Simulate database network write latency
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    onUpdateProfile({
+    const updatedProfile = {
       ...userProfile,
       name: name.trim(),
       email: email.trim(),
@@ -155,7 +162,12 @@ export default function Settings({
       phone: phone.trim(),
       bio: bio.trim(),
       avatar: avatar
-    });
+    };
+
+    onUpdateProfile(updatedProfile);
+
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    saveUserProfileToFirestore(isOffline, updatedProfile).catch(err => console.error(err));
 
     setIsSaving(false);
     setSaveSuccess(true);
@@ -213,6 +225,9 @@ export default function Settings({
 
     savedPasswords[userEmailKey] = newPassword.trim();
     localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
+
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    saveUserCredentialToFirestore(isOffline, userEmailKey, newPassword.trim()).catch(err => console.error(err));
 
     setIsUpdatingPwd(false);
     setPwdSuccessMsg("Your password has been customized successfully! You can use this custom password for subsequent sign-ins.");
@@ -328,15 +343,32 @@ export default function Settings({
           </div>
         </div>
 
-        {/* Action badge reset */}
-        <button
-          onClick={() => setShowResetConfirm(true)}
-          type="button"
-          className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white border border-red-500/10 hover:border-red-600 transition-all scale-100 active:scale-95 cursor-pointer flex items-center gap-1.5"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          Reset to Factory Defaults
-        </button>
+        {/* Action badge reset & Account Link QR */}
+        <div className="flex items-center gap-2">
+          {onOpenAccountLinkQR && (
+            <button
+              onClick={onOpenAccountLinkQR}
+              type="button"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-black border border-emerald-500/20 transition-all scale-100 active:scale-95 cursor-pointer flex items-center gap-1.5"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              Account Link QR
+            </button>
+          )}
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            type="button"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-red-600/10 hover:bg-red-600 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white border border-red-500/10 hover:border-red-600 transition-all scale-100 active:scale-95 cursor-pointer flex items-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Reset Defaults
+          </button>
+        </div>
+      </div>
+
+      {/* Sync Status Monitor Widget */}
+      <div className="mb-6">
+        <SyncStatusMonitor isOffline={isOffline} />
       </div>
 
       {/* Confirmation Model Popup for defaults reset */}

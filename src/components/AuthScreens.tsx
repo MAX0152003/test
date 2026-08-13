@@ -17,7 +17,13 @@ import {
 import { speakText } from './AccessibilitySettings';
 import { motion } from 'motion/react';
 import { googleSignIn } from '../lib/googleAuth';
-import { saveUserProfileToFirestore } from '../lib/firestoreSync';
+import { 
+  saveUserProfileToFirestore,
+  saveRegisteredUserToFirestore,
+  saveUserCredentialToFirestore,
+  savePasswordResetToFirestore,
+  syncAllAccountsFromFirestore
+} from '../lib/firestoreSync';
 
 interface AuthScreensProps {
   onLoginSuccess: (role: Role, customName?: string, customEmail?: string) => void;
@@ -47,6 +53,11 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
   const [newFpPassword, setNewFpPassword] = React.useState('');
   const [confirmFpPassword, setConfirmFpPassword] = React.useState('');
   const [fpResetSuccess, setFpResetSuccess] = React.useState(false);
+
+  React.useEffect(() => {
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    syncAllAccountsFromFirestore(isOffline).catch(err => console.error(err));
+  }, []);
 
   const handleForgotPasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,6 +117,10 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
 
     savedReqs.push(newRequest);
     localStorage.setItem('classpulse_password_reset_requests', JSON.stringify(savedReqs));
+
+    // Save reset request to Firestore so admin on any device sees it
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    savePasswordResetToFirestore(isOffline, newRequest).catch(err => console.error(err));
 
     // notify storage listeners
     window.dispatchEvent(new Event('password-reset-requests-changed'));
@@ -213,6 +228,13 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
 
     localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
 
+    // Save customized password to Firestore so login works across mobile and desktop
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    if (approvedResetRequest?.idNumber) {
+      saveUserCredentialToFirestore(isOffline, approvedResetRequest.idNumber, newFpPassword.trim()).catch(err => console.error(err));
+    }
+    saveUserCredentialToFirestore(isOffline, userEmail, newFpPassword.trim()).catch(err => console.error(err));
+
     // 2. Mark request as resolved (remove or update status so they can't re-use it)
     const savedReqsRaw = localStorage.getItem('classpulse_password_reset_requests') || '[]';
     let savedReqs = [];
@@ -224,7 +246,9 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
 
     const updatedReqs = savedReqs.map((r: any) => {
       if (r.id === approvedResetRequest.id) {
-        return { ...r, status: 'resolved' };
+        const resolvedObj = { ...r, status: 'resolved' };
+        savePasswordResetToFirestore(isOffline, resolvedObj).catch(err => console.error(err));
+        return resolvedObj;
       }
       return r;
     });
@@ -372,6 +396,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
 
         const isOffline = localStorage.getItem('cp_offline') === 'true';
         await saveUserProfileToFirestore(isOffline, userProfileObj);
+        await saveRegisteredUserToFirestore(isOffline, newUserObj);
       }
 
       speakText(`Google identity authenticated as ${name} with auto-detected ${resolvedRole} role`, accessibility.readAloud);
@@ -455,6 +480,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
         // Save user profile to Firestore
         const isOffline = localStorage.getItem('cp_offline') === 'true';
         await saveUserProfileToFirestore(isOffline, userProfileObj);
+        await saveRegisteredUserToFirestore(isOffline, newUserObj);
       }
 
       speakText(`Google identity authenticated as ${name} with auto-detected ${resolvedRole} role`, accessibility.readAloud);
@@ -717,6 +743,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
       bio: 'Registered securely via ClassPulse credentials.'
     };
     saveUserProfileToFirestore(isOffline, userProfileObj).catch(err => console.error(err));
+    saveRegisteredUserToFirestore(isOffline, newUserObj).catch(err => console.error(err));
 
     // Save custom password
     let savedPasswords: any = {};
@@ -727,6 +754,8 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
     }
     savedPasswords[regEmail.toLowerCase().trim()] = regPassword;
     localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
+
+    saveUserCredentialToFirestore(isOffline, regEmail.toLowerCase().trim(), regPassword.trim()).catch(err => console.error(err));
 
     speakText(`Account registered successfully. Loading ${regRole} portal now.`, accessibility.readAloud);
     

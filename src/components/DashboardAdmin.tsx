@@ -69,6 +69,11 @@ import {
   List
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
+import { 
+  saveRegisteredUserToFirestore, 
+  deleteRegisteredUserFromFirestore, 
+  savePasswordResetToFirestore 
+} from '../lib/firestoreSync';
 import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
@@ -596,9 +601,12 @@ export default function DashboardAdmin({
 
   const handleBatchApproveResets = () => {
     if (selectedResetIds.length === 0) return;
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
     const updated = passwordResetRequests.map((r: any) => {
       if (selectedResetIds.includes(r.id)) {
-        return { ...r, status: 'approved' };
+        const approvedReq = { ...r, status: 'approved' };
+        savePasswordResetToFirestore(isOffline, approvedReq).catch(err => console.error(err));
+        return approvedReq;
       }
       return r;
     });
@@ -614,9 +622,12 @@ export default function DashboardAdmin({
 
   const handleBatchRejectResets = () => {
     if (selectedResetIds.length === 0) return;
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
     const updated = passwordResetRequests.map((r: any) => {
       if (selectedResetIds.includes(r.id)) {
-        return { ...r, status: 'rejected' };
+        const rejectedReq = { ...r, status: 'rejected' };
+        savePasswordResetToFirestore(isOffline, rejectedReq).catch(err => console.error(err));
+        return rejectedReq;
       }
       return r;
     });
@@ -682,6 +693,11 @@ export default function DashboardAdmin({
     const combined = [...existingUsers, ...newUsers];
     localStorage.setItem('classpulse_registered_users', JSON.stringify(combined));
     setUsersList(prev => [...prev, ...newUsers]);
+
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    for (const u of newUsers) {
+      saveRegisteredUserToFirestore(isOffline, u).catch(err => console.error(err));
+    }
 
     const toastMsg = `✅ Bulk CSV Import Complete: ${newUsers.length} users registered successfully!`;
     speakText(toastMsg, accessibility.readAloud);
@@ -1383,6 +1399,10 @@ export default function DashboardAdmin({
     localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedUsers));
     window.dispatchEvent(new Event('registered-users-changed'));
 
+    // Save user to Firestore so mobile and desktop window recognise the user
+    const isOffline = localStorage.getItem('cp_offline') === 'true';
+    saveRegisteredUserToFirestore(isOffline, newUserRecord).catch(err => console.error(err));
+
     // Sync classpulse_registered_admins
     const adminsList = updatedUsers.filter((u: any) => u.role === 'admin');
     localStorage.setItem('classpulse_registered_admins', JSON.stringify(adminsList));
@@ -1414,6 +1434,10 @@ export default function DashboardAdmin({
         const updatedUsers = registeredUsers.filter((u: any) => u.id !== id);
         localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedUsers));
         window.dispatchEvent(new Event('registered-users-changed'));
+
+        // Delete user from Firestore
+        const isOffline = localStorage.getItem('cp_offline') === 'true';
+        deleteRegisteredUserFromFirestore(isOffline, id).catch(err => console.error(err));
 
         // Sync classpulse_registered_admins
         const adminsList = updatedUsers.filter((u: any) => u.role === 'admin');
@@ -2690,6 +2714,7 @@ export default function DashboardAdmin({
                   >
                     <Plus className="w-3 h-3 stroke-[3]" /> Add Room
                   </button>
+                </div>
 
                 {/* Rooms List */}
                 <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
@@ -3043,24 +3068,27 @@ export default function DashboardAdmin({
                 <div className={`${telemetryFilter === 'all' ? 'lg:col-span-6' : 'lg:col-span-12'} space-y-5`}>
                   
                   {/* Attendance Breakdown Stat Cards */}
-                  <div className="grid grid-cols-3 gap-3 p-4 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-150 dark:border-zinc-850 rounded-2xl text-center">
-                    <div>
-                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Present</span>
-                      <span className="text-sm font-black font-mono text-emerald-500">
-                        {attendanceRecords.filter(r => r.status === 'present').length} check-ins
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3 p-3 sm:p-4 bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-150 dark:border-zinc-850 rounded-2xl text-center">
+                    <div className="p-1">
+                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block mb-0.5">Present</span>
+                      <span className="text-base sm:text-lg font-black font-mono text-emerald-500 block leading-none">
+                        {attendanceRecords.filter(r => r.status === 'present').length}
                       </span>
+                      <span className="text-[9px] font-extrabold text-emerald-600/80 dark:text-emerald-400/80 block mt-0.5 whitespace-nowrap">check-ins</span>
                     </div>
-                    <div>
-                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Late</span>
-                      <span className="text-sm font-black font-mono text-amber-500">
-                        {attendanceRecords.filter(r => r.status === 'late').length} late
+                    <div className="p-1">
+                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block mb-0.5">Late</span>
+                      <span className="text-base sm:text-lg font-black font-mono text-amber-500 block leading-none">
+                        {attendanceRecords.filter(r => r.status === 'late').length}
                       </span>
+                      <span className="text-[9px] font-extrabold text-amber-600/80 dark:text-amber-400/80 block mt-0.5 whitespace-nowrap">late</span>
                     </div>
-                    <div>
-                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block">Absent</span>
-                      <span className="text-sm font-black font-mono text-red-500">
-                        {attendanceRecords.filter(r => r.status === 'absent').length} absences
+                    <div className="p-1">
+                      <span className="text-[8.5px] font-bold text-zinc-450 uppercase block mb-0.5">Absent</span>
+                      <span className="text-base sm:text-lg font-black font-mono text-red-500 block leading-none">
+                        {attendanceRecords.filter(r => r.status === 'absent').length}
                       </span>
+                      <span className="text-[9px] font-extrabold text-red-600/80 dark:text-red-400/80 block mt-0.5 whitespace-nowrap">absences</span>
                     </div>
                   </div>
 
@@ -3462,7 +3490,6 @@ export default function DashboardAdmin({
 
             </div>
           </div>
-        </div>
 
         </motion.div>
       )}
@@ -4071,10 +4098,10 @@ export default function DashboardAdmin({
                       <button
                         type="button"
                         onClick={() => setIsClassFilterOpen(!isClassFilterOpen)}
-                        className={`flex items-center gap-2 bg-zinc-50 dark:bg-zinc-900 border transition-all rounded-xl px-3 py-1.5 cursor-pointer shadow-sm font-sans ${
+                        className={`flex items-center gap-2 backdrop-blur-xl transition-all rounded-2xl px-3 py-1.5 cursor-pointer shadow-sm font-sans border ${
                           selectedClassIdFilter !== 'all'
-                            ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-400 shadow-emerald-500/10'
-                            : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-800 dark:text-zinc-200'
+                            ? 'border-emerald-500/80 bg-emerald-500/15 text-emerald-400 shadow-emerald-500/10'
+                            : 'bg-white/80 dark:bg-zinc-900/80 border-zinc-200/80 dark:border-zinc-800/80 hover:border-emerald-500/50 text-zinc-800 dark:text-zinc-200'
                         }`}
                       >
                         <BookOpen className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -5463,8 +5490,8 @@ export default function DashboardAdmin({
               </div>
 
               {/* Filter Row */}
-              <div className="flex items-center justify-between gap-4 flex-wrap pt-2">
-                <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-zinc-850 p-1 rounded-xl relative overflow-hidden">
+              <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
+                <div className="flex items-center gap-1 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-1.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-md shadow-zinc-950/5 relative overflow-hidden flex-wrap sm:flex-nowrap">
                   <button
                     onClick={() => setSyncFilter('all')}
                     className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer relative z-10 ${
@@ -5862,7 +5889,7 @@ export default function DashboardAdmin({
           </div>
 
           {/* Search/Filters */}
-          <div className="flex gap-2 bg-zinc-50/50 dark:bg-zinc-950/40 p-3.5 rounded-2xl border border-zinc-150 dark:border-zinc-900">
+          <div className="flex items-center gap-2.5 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-2.5 sm:p-3 rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 shadow-md shadow-zinc-950/5">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
               <input
@@ -5870,21 +5897,24 @@ export default function DashboardAdmin({
                 value={notifSearch}
                 onChange={(e) => setNotifSearch(e.target.value)}
                 placeholder="Search system wide logs..."
-                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-8 py-2 text-base md:text-xs font-medium placeholder-zinc-400 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full bg-white/90 dark:bg-zinc-950/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl pl-9 pr-8 py-2 text-xs font-medium placeholder-zinc-400 text-zinc-850 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs"
               />
               {notifSearch && (
                 <button
                   type="button"
                   onClick={() => setNotifSearch('')}
-                  className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                  className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
 
-            <div className="relative shrink-0 w-9 h-9 flex items-center justify-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all cursor-pointer" title="Filter notification logs">
-              <SlidersHorizontal className="w-4 h-4 text-zinc-550 dark:text-zinc-400" />
+            <div className="relative shrink-0 h-9 px-3 flex items-center justify-center gap-2 bg-white/90 dark:bg-zinc-950/80 border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer shadow-2xs group" title="Filter notification logs">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-300 hidden sm:inline">
+                Filter: {notifFilter}
+              </span>
               <select
                 value={notifFilter}
                 onChange={(e) => {
