@@ -34,10 +34,12 @@ export default function AttendanceGraph({ classId, classCode, className, records
   const total = classRecords.length;
   const present = classRecords.filter(r => r.status === 'present').length;
   const late = classRecords.filter(r => r.status === 'late').length;
+  const excused = classRecords.filter(r => r.status === 'excused').length;
   const absent = classRecords.filter(r => r.status === 'absent').length;
 
   const presentPercent = total > 0 ? Math.round((present / total) * 100) : 100;
   const latePercent = total > 0 ? Math.round((late / total) * 100) : 0;
+  const excusedPercent = total > 0 ? Math.round((excused / total) * 100) : 0;
   const absentPercent = total > 0 ? Math.round((absent / total) * 100) : 0;
 
   useEffect(() => {
@@ -66,9 +68,10 @@ export default function AttendanceGraph({ classId, classCode, className, records
       return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
     });
     
-    // Convert status to value for trending (Present = 100, Late = 70, Absent = 0)
+    // Convert status to value for trending (Present = 100, Excused = 90, Late = 70, Absent = 0)
     const trendValues = classRecords.map(r => {
       if (r.status === 'present') return 100;
+      if (r.status === 'excused') return 90;
       if (r.status === 'late') return 70;
       return 0;
     });
@@ -181,6 +184,7 @@ export default function AttendanceGraph({ classId, classCode, className, records
               },
               callback: (value) => {
                 if (value === 100) return 'Present';
+                if (value === 90) return 'Excused';
                 if (value === 70) return 'Late';
                 if (value === 0) return 'Absent';
                 return '';
@@ -232,7 +236,7 @@ export default function AttendanceGraph({ classId, classCode, className, records
   return (
     <div className="space-y-4">
       {/* Tally Cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid ${excused > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-3`}>
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
           <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
             <CheckCircle className="w-4 h-4 text-emerald-500" />
@@ -254,6 +258,19 @@ export default function AttendanceGraph({ classId, classCode, className, records
             <span className="text-xs text-zinc-400 font-mono">({latePercent}%)</span>
           </div>
         </div>
+
+        {excused > 0 && (
+          <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
+            <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
+              <CheckCircle className="w-4 h-4 text-blue-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Excused</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-zinc-900 dark:text-zinc-100">{excused}</span>
+              <span className="text-xs text-zinc-400 font-mono">({excusedPercent}%)</span>
+            </div>
+          </div>
+        )}
 
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
           <div className="flex items-center gap-1.5 text-zinc-500 mb-1">

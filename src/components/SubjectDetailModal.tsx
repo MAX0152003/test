@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { ClassSession, Enrollment, AttendanceRecord, UserProfile, FacultyStatus } from '../types';
 import AttendanceGraph from './AttendanceGraph';
 import { X, Calendar, Clock, MapPin, User, Users, ShieldAlert, CheckCircle, Activity, Download, Search } from 'lucide-react';
@@ -323,11 +324,18 @@ export default function SubjectDetailModal({
                 No students match "{rosterSearch}"
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
-                {filteredRoster.map(student => (
-                  <div 
-                    key={student.id}
-                    className="p-3 rounded-xl border border-zinc-150 dark:border-zinc-850 bg-white dark:bg-zinc-900 flex items-center gap-3"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                {filteredRoster.map((student, rIdx) => (
+                  <motion.div 
+                    key={student.id || rIdx}
+                    initial={{ opacity: 0, scale: 0.96, y: 5 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{
+                      duration: 0.2,
+                      ease: [0.16, 1, 0.3, 1],
+                      delay: Math.min(rIdx * 0.025, 0.22)
+                    }}
+                    className="p-2.5 rounded-xl border border-zinc-150 dark:border-zinc-850 bg-white dark:bg-zinc-900 flex items-center gap-2.5 shadow-2xs"
                   >
                     <img 
                       src={student.studentAvatar} 
@@ -343,7 +351,7 @@ export default function SubjectDetailModal({
                         {student.studentId} • {student.studentEmail}
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             )}

@@ -11,7 +11,8 @@ import {
   Enrollment,
   Announcement,
   LeaveRequest,
-  LabRoom
+  LabRoom,
+  ViewDensity
 } from './types';
 import { 
   syncClassesFromFirestore,
@@ -31,7 +32,6 @@ import {
 } from './lib/firestoreSync';
 import { normalizeUserIdentity } from './lib/authUtils';
 import AccountLinkQRModal from './components/AccountLinkQRModal';
-import SyncStatusMonitor from './components/SyncStatusMonitor';
 import { auth, db } from './lib/googleAuth';
 import { 
   INITIAL_CLASSES, 
@@ -211,27 +211,75 @@ export default function App() {
 
   const mainScrollRef = React.useRef<HTMLDivElement>(null);
   const prevLabRoomsRef = React.useRef<Record<string, 'occupied' | 'available' | 'maintenance'>>({});
+  const touchStartYRef = React.useRef<number | null>(null);
 
+  // Robust multi-tier scroll and gesture detection for mobile & iOS devices
   React.useEffect(() => {
-    const el = mainScrollRef.current;
-    if (!el) return;
+    const handleScrollEvent = (e?: Event) => {
+      let currentTop = 0;
+      if (mainScrollRef.current) {
+        currentTop = mainScrollRef.current.scrollTop;
+      }
+      if (!currentTop && typeof window !== 'undefined') {
+        currentTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      }
+      
+      const diff = currentTop - lastScrollTopRef.current;
 
-    const handleScroll = () => {
-      const currentScrollTop = el.scrollTop;
-      const diff = currentScrollTop - lastScrollTopRef.current;
-
-      if (diff > 10 && currentScrollTop > 40) {
+      if (diff > 8 && currentTop > 30) {
         setIsMobileBarVisible(false);
-      } else if (diff < -10 || currentScrollTop < 30) {
+      } else if (diff < -8 || currentTop <= 25) {
         setIsMobileBarVisible(true);
       }
 
-      lastScrollTopRef.current = currentScrollTop;
+      lastScrollTopRef.current = Math.max(0, currentTop);
     };
 
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, []);
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches && e.touches.length > 0) {
+        touchStartYRef.current = e.touches[0].clientY;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (touchStartYRef.current === null || !e.touches || e.touches.length === 0) return;
+      const currentY = e.touches[0].clientY;
+      const deltaY = touchStartYRef.current - currentY; // Positive = scrolling down
+
+      if (deltaY > 18) {
+        // Swiping finger upwards (scrolling down the content) -> Hide dock
+        setIsMobileBarVisible(false);
+      } else if (deltaY < -18) {
+        // Swiping finger downwards (scrolling up the content) -> Show dock
+        setIsMobileBarVisible(true);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      touchStartYRef.current = null;
+    };
+
+    // Attach to window and document with capture mode for deep nested scroll event interception
+    window.addEventListener('scroll', handleScrollEvent, { passive: true, capture: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true, capture: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true, capture: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true, capture: true });
+
+    const mainEl = mainScrollRef.current;
+    if (mainEl) {
+      mainEl.addEventListener('scroll', handleScrollEvent, { passive: true });
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollEvent, { capture: true } as any);
+      window.removeEventListener('touchstart', handleTouchStart, { capture: true } as any);
+      window.removeEventListener('touchmove', handleTouchMove, { capture: true } as any);
+      window.removeEventListener('touchend', handleTouchEnd, { capture: true } as any);
+      if (mainEl) {
+        mainEl.removeEventListener('scroll', handleScrollEvent);
+      }
+    };
+  }, [user, activeScreen]);
 
   const handleSetScreen = (screenId: string, contactObj?: { id: string; name?: string; ts?: number }) => {
     if (screenId === activeScreen && !contactObj) {
@@ -427,9 +475,23 @@ export default function App() {
     };
   });
 
-  const [compactMode, setCompactMode] = React.useState(() => {
-    return safeStorage.getItem('cp_pref_compact_mode') === 'true';
+  const [viewDensity, setViewDensity] = React.useState<ViewDensity>(() => {
+    const cached = safeStorage.getItem('cp_pref_view_density');
+    if (cached === 'compact' || cached === 'comfortable') return cached;
+    return safeStorage.getItem('cp_pref_compact_mode') === 'true' ? 'compact' : 'comfortable';
   });
+
+  const [compactMode, setCompactMode] = React.useState(() => {
+    return safeStorage.getItem('cp_pref_compact_mode') === 'true' || safeStorage.getItem('cp_pref_view_density') === 'compact';
+  });
+
+  const handleUpdateDensity = (newDensity: ViewDensity) => {
+    setViewDensity(newDensity);
+    const isCompact = newDensity === 'compact';
+    setCompactMode(isCompact);
+    safeStorage.setItem('cp_pref_view_density', newDensity);
+    safeStorage.setItem('cp_pref_compact_mode', String(isCompact));
+  };
 
   const [colorAccent, setColorAccent] = React.useState(() => {
     return safeStorage.getItem('cp_pref_color_accent') || 'emerald';
@@ -839,7 +901,15 @@ export default function App() {
 
     let uploadedCount = 0;
     if (pendingQueue.length > 0) {
+      // Deduplicate queue items before sending to Firestore
+      const dedupeMap = new Map<string, AttendanceRecord>();
       for (const rec of pendingQueue) {
+        const key = `${rec.studentId || rec.studentName || 'anon'}_${rec.classId}_${rec.date}`;
+        dedupeMap.set(key, rec);
+      }
+      const uniqueRecords = Array.from(dedupeMap.values());
+
+      for (const rec of uniqueRecords) {
         try {
           await saveAttendanceToFirestore(false, rec);
           uploadedCount++;
@@ -891,6 +961,21 @@ export default function App() {
     window.addEventListener('online', handleWindowOnline);
     return () => window.removeEventListener('online', handleWindowOnline);
   }, [processOfflineQueueAndSync]);
+
+  // Periodic automatic silent background sync when online (no manual clicking needed)
+  React.useEffect(() => {
+    if (isOffline) return;
+    const interval = setInterval(() => {
+      let pendingQueue: AttendanceRecord[] = [];
+      try {
+        pendingQueue = JSON.parse(safeStorage.getItem('cp_pending_attendance_queue') || '[]');
+      } catch {}
+      if (pendingQueue.length > 0) {
+        processOfflineQueueAndSync();
+      }
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [isOffline, processOfflineQueueAndSync]);
 
   // Synchronize when offline state is flipped back to online
   const handleToggleOffline = () => {
@@ -1014,6 +1099,16 @@ export default function App() {
     setUser(null);
     setActiveScreen('dashboard');
     safeStorage.removeItem('cp_user');
+    safeStorage.removeItem('cp_pending_attendance_queue');
+    safeStorage.removeItem('cp_offline_queue_count');
+    safeStorage.removeItem('classpulse_active_session_token');
+    
+    // Privacy protection on public/shared computer lab terminals
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.clear();
+      } catch (e) {}
+    }
   };
 
   const getBottomNavItems = () => {
@@ -1104,24 +1199,40 @@ export default function App() {
       speakText(`Auto-registered course registration for ${matchedClass.name}`, accessibility.readAloud);
     }
 
-    // B. LOG ATTENDANCE LOG
+    // B. LOG ATTENDANCE LOG (With Deduplication protection)
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const todayISO = new Date().toISOString().split('T')[0];
+    const studentIdentifier = user?.studentId || user?.id || user?.email || '2023-10492';
 
-    const newRecord: AttendanceRecord = {
-      id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-      classId,
-      className: matchedClass.name,
-      classCode: matchedClass.code,
-      date: todayISO,
-      time: timeString,
-      status,
-      role: 'student',
-      studentName: user?.name || 'John Doe',
-      studentId: user?.studentId || '2023-10492'
-    };
+    let finalRecord: AttendanceRecord;
+    const existingIndex = attendanceRecords.findIndex(
+      r => r.classId === classId && (r.studentId === studentIdentifier || r.studentName === user?.name) && r.date === todayISO
+    );
 
-    setAttendanceRecords(prev => [...prev, newRecord]);
+    if (existingIndex >= 0) {
+      finalRecord = {
+        ...attendanceRecords[existingIndex],
+        time: timeString,
+        status,
+        className: matchedClass.name,
+        classCode: matchedClass.code
+      };
+      setAttendanceRecords(prev => prev.map((r, idx) => idx === existingIndex ? finalRecord : r));
+    } else {
+      finalRecord = {
+        id: 'rec-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+        classId,
+        className: matchedClass.name,
+        classCode: matchedClass.code,
+        date: todayISO,
+        time: timeString,
+        status,
+        role: 'student',
+        studentName: user?.name || 'John Doe',
+        studentId: studentIdentifier
+      };
+      setAttendanceRecords(prev => [...prev, finalRecord]);
+    }
 
     const isCurrentlyOffline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
 
@@ -1130,7 +1241,17 @@ export default function App() {
       try {
         pendingQueue = JSON.parse(safeStorage.getItem('cp_pending_attendance_queue') || '[]');
       } catch {}
-      pendingQueue.push(newRecord);
+      
+      // Deduplicate offline queue by student + class + date
+      const queueIdx = pendingQueue.findIndex(
+        q => q.classId === classId && (q.studentId === studentIdentifier || q.studentName === user?.name) && q.date === todayISO
+      );
+      if (queueIdx >= 0) {
+        pendingQueue[queueIdx] = finalRecord;
+      } else {
+        pendingQueue.push(finalRecord);
+      }
+
       safeStorage.setItem('cp_pending_attendance_queue', JSON.stringify(pendingQueue));
       setOfflineQueueCount(pendingQueue.length);
 
@@ -1144,7 +1265,7 @@ export default function App() {
       };
       setNotifications(prev => [offlineNotif, ...prev]);
     } else {
-      saveAttendanceToFirestore(false, newRecord).catch(err => console.error("Firestore save attendance error:", err));
+      saveAttendanceToFirestore(false, finalRecord).catch(err => console.error("Firestore save attendance error:", err));
     }
 
     // Send warning if late, else success
@@ -1152,6 +1273,28 @@ export default function App() {
     const msg = status === 'late' 
       ? `Recorded attendance for ${matchedClass.code} at ${timeString} marked as late.`
       : `Checked into ${matchedClass.code} successfully as present.`;
+
+    // Automatically set the instructor of this class to 'in-class' status
+    const facName = matchedClass.facultyName;
+    const facId = matchedClass.facultyId;
+    setFacultyStatuses(prev => {
+      const hasMatch = prev.some(f => (facId && f.id === facId) || (facName && (f.name || '').toLowerCase() === facName.toLowerCase()) || f.id === 'fac-1');
+      if (hasMatch) {
+        return prev.map(f => ((facId && f.id === facId) || (facName && (f.name || '').toLowerCase() === facName.toLowerCase()) || (f.id === 'fac-1' && !facId && !facName)) ? { ...f, status: 'in-class' } : f);
+      } else if (facName || facId) {
+        return [
+          {
+            id: facId || 'fac-dyn-' + Date.now(),
+            name: facName || 'Faculty Instructor',
+            avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+            status: 'in-class',
+            room: matchedClass.room || 'Room 303'
+          },
+          ...prev
+        ];
+      }
+      return prev;
+    });
 
     const newNotif: AppNotification = {
       id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
@@ -1463,7 +1606,7 @@ export default function App() {
   };
 
   // Shared Attendance Correction Action
-  const handleUpdateAttendanceRecord = (recordId: string, status: 'present' | 'late' | 'absent') => {
+  const handleUpdateAttendanceRecord = (recordId: string, status: 'present' | 'late' | 'absent' | 'excused') => {
     setAttendanceRecords(prev => prev.map(rec => rec.id === recordId ? { ...rec, status } : rec));
     
     // Find record context for logging
@@ -1500,15 +1643,71 @@ export default function App() {
     
     const target = excuseLetters.find(e => e.id === id);
     if (target) {
-      const newNotif: AppNotification = {
-        id: 'notif-exced-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-        title: 'Excuse Decision Logged',
-        message: `Excuse Letter ${id} (Student: ${target.studentName}) marked as ${finalStatus.toUpperCase()}.`,
-        timestamp: 'Just Now',
-        type: 'success',
-        read: false
-      };
-      setNotifications(prev => [newNotif, ...prev]);
+      // If approved/valid, auto-update the student's attendance records to 'excused'
+      if (finalStatus === 'valid') {
+        const targetStartDate = target.startDate || (target.createdAt ? target.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+        const targetEndDate = target.endDate || targetStartDate;
+
+        setAttendanceRecords(prev => {
+          let updatedAny = false;
+          const updatedList = prev.map(rec => {
+            const isMatchingStudent = (rec.studentId && rec.studentId === target.studentId) || (rec.studentName && rec.studentName === target.studentName);
+            const isMatchingClass = rec.classId === target.classId;
+            const isWithinDateRange = rec.date >= targetStartDate && rec.date <= targetEndDate;
+
+            if (isMatchingStudent && isMatchingClass && isWithinDateRange) {
+              updatedAny = true;
+              const excusedRec: AttendanceRecord = { ...rec, status: 'excused' };
+              saveAttendanceToFirestore(false, excusedRec).catch(err => console.error("Firestore excused sync error:", err));
+              return excusedRec;
+            }
+            return rec;
+          });
+
+          // If no existing record was found on the excused date, create a new excused record
+          if (!updatedAny) {
+            const classObj = classes.find(c => c.id === target.classId);
+            const newExcusedRecord: AttendanceRecord = {
+              id: 'rec-exc-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+              classId: target.classId,
+              className: target.className || classObj?.name || 'Class Session',
+              classCode: classObj?.code || 'CRS',
+              date: targetStartDate,
+              time: '08:00 AM',
+              status: 'excused',
+              role: 'student',
+              studentName: target.studentName,
+              studentId: target.studentId,
+              isSynced: false
+            };
+            saveAttendanceToFirestore(false, newExcusedRecord).catch(err => console.error("Firestore new excused sync error:", err));
+            return [...updatedList, newExcusedRecord];
+          }
+
+          return updatedList;
+        });
+
+        const newNotif: AppNotification = {
+          id: 'notif-exced-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+          title: 'Excuse Approved & Record Excused',
+          message: `Excuse Letter approved for ${target.studentName} in ${target.className}. Attendance record for ${targetStartDate} marked as EXCUSED (clearing unexcused absences).`,
+          timestamp: 'Just Now',
+          type: 'success',
+          read: false
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+        speakText(`Excuse letter approved for ${target.studentName}. Attendance record has been updated to excused.`, accessibility.readAloud);
+      } else {
+        const newNotif: AppNotification = {
+          id: 'notif-exced-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+          title: 'Excuse Decision Logged',
+          message: `Excuse Letter ${id} (Student: ${target.studentName}) marked as ${finalStatus.toUpperCase()}.`,
+          timestamp: 'Just Now',
+          type: finalStatus === 'invalid' ? 'alert' : 'info',
+          read: false
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+      }
     }
   };
 
@@ -1535,7 +1734,7 @@ export default function App() {
   return (
     <div 
       id="app-root-level-wrapper"
-      className={`${getThemeClass(accessibility.theme)} theme-accent-${colorAccent} ${compactMode ? 'app-compact-mode' : ''} trans-all-theme`}
+      className={`${getThemeClass(accessibility.theme)} theme-accent-${colorAccent} ${viewDensity === 'compact' ? 'density-compact app-compact-mode' : 'density-comfortable'} trans-all-theme`}
     >
       
       {/* 1. AUTHENTICATOR ENVELOPE */}
@@ -1637,6 +1836,31 @@ export default function App() {
           {/* Primary View Workspace */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden h-full">
             
+            {/* Top Offline Mode / Sync Persistent Banner */}
+            {isOffline && (
+              <div className="bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-500/20 px-3 sm:px-6 py-1.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 shrink-0 font-medium z-20">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                  <span className="font-extrabold text-[11px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">Offline Mode Active</span>
+                  <span className="hidden md:inline text-[11px] text-zinc-600 dark:text-zinc-400 truncate">
+                    Attendance QR scans safely queued in local cache — will automatically upload to Firestore upon reconnecting.
+                  </span>
+                  {offlineQueueCount > 0 && (
+                    <span className="bg-amber-500 text-black font-extrabold text-[10px] px-2 py-0.5 rounded-full shrink-0 shadow-xs">
+                      {offlineQueueCount} queued
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleOffline}
+                  className="px-2.5 py-0.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold transition-all cursor-pointer shrink-0 ml-2 shadow-xs"
+                >
+                  Go Online
+                </button>
+              </div>
+            )}
+
             {/* Top Operational bar - Applies to all screen sizes including mobile */}
             <header className={`flex px-2.5 sm:px-6 py-2 sm:py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200/80 dark:border-zinc-850/80 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md text-zinc-900 dark:text-zinc-100 relative ${
               isSearchOpen ? 'z-[100]' : 'z-30'
@@ -1959,6 +2183,7 @@ export default function App() {
                       accessibility={accessibility}
                       onUpdateProfile={handleUpdateProfile}
                       onUpdateAccessibility={setAccessibility}
+                      onUpdateDensity={handleUpdateDensity}
                       onUpdateCompactMode={setCompactMode}
                       onUpdateColorAccent={setColorAccent}
                       setScreen={handleSetScreen}
@@ -2086,13 +2311,13 @@ export default function App() {
 
             </main>
 
-            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Glassmorphic Dock) */}
-            <div className={`md:hidden fixed bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4 z-40 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-xl shadow-zinc-950/10 transition-all duration-300 transform ${
+            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Glassmorphic Dock with iOS Safe-Area support) */}
+            <div className={`md:hidden fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-4 sm:right-4 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-xl shadow-zinc-950/15 transition-all duration-300 ease-in-out transform ${
               isKeyboardOpen 
                 ? 'hidden opacity-0 pointer-events-none' 
                 : isMobileBarVisible 
                   ? 'translate-y-0 opacity-100' 
-                  : 'translate-y-24 opacity-0 pointer-events-none'
+                  : 'translate-y-28 opacity-0 pointer-events-none'
             }`}>
               {getBottomNavItems().map(item => {
                 const Icon = item.icon;

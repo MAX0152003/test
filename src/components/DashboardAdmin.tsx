@@ -23,6 +23,7 @@ import {
   LabRoom,
   ScannerLog
 } from '../types';
+import { calculateStudentStanding } from '../lib/attendanceRules';
 import { 
   Users, 
   UserCheck, 
@@ -93,7 +94,7 @@ interface DashboardAdminProps {
   onUpdateAnnouncements?: (announcements: Announcement[]) => void;
   userProfile?: UserProfile;
   onUpdateProfile?: (updatedUserProfile: UserProfile) => void;
-  onUpdateAttendanceRecord?: (recordId: string, status: 'present' | 'late' | 'absent') => void;
+  onUpdateAttendanceRecord?: (recordId: string, status: 'present' | 'late' | 'absent' | 'excused') => void;
   onAddAttendanceRecord?: (newRec: any) => void;
   notifications: AppNotification[];
   onClearAllNotifications: () => void;
@@ -4281,33 +4282,10 @@ export default function DashboardAdmin({
                       const studentRecords = attendanceRecords.filter(
                         r => r.studentId === u.uid || (r.studentName || '').toLowerCase() === (u.name || '').toLowerCase()
                       );
-                      const absentsCount = studentRecords.filter(r => r.status === 'absent').length;
-
-                      let maxConsecutive = 0;
-                      let currConsecutive = 0;
-                      const sortedRecs = [...studentRecords].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                      for (const r of sortedRecs) {
-                        if (r.status === 'absent') {
-                          currConsecutive++;
-                          if (currConsecutive > maxConsecutive) maxConsecutive = currConsecutive;
-                        } else {
-                          currConsecutive = 0;
-                        }
-                      }
-
-                      let standingLabel = 'Good Standing';
-                      let standingColor = 'bg-emerald-500/10 text-emerald-650 dark:text-emerald-400';
-                      let isMonitored = false;
-
-                      if (absentsCount >= 5 || maxConsecutive >= 3) {
-                        standingLabel = '🚫 Dropped';
-                        standingColor = 'bg-red-500/10 text-red-500 font-extrabold';
-                        isMonitored = true;
-                      } else if (absentsCount >= 3) {
-                        standingLabel = '⚠️ Warning';
-                        standingColor = 'bg-amber-500/10 text-amber-500 font-extrabold';
-                        isMonitored = true;
-                      }
+                      const standing = calculateStudentStanding(studentRecords);
+                      const standingLabel = standing.label;
+                      const standingColor = standing.badgeColor;
+                      const isMonitored = standing.isDropped || standing.status === 'warning';
 
                       return (
                         <div 
@@ -5772,25 +5750,8 @@ export default function DashboardAdmin({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          className="h-[calc(100dvh-5.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden pb-0"
         >
-          <div className="flex sm:hidden pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-4 shrink-0">
-            <button 
-              onClick={() => setScreen('dashboard')} 
-              type="button"
-              className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
-              title="Back"
-            >
-              <ArrowLeft className="w-4 h-4 text-emerald-500" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
-                <MessageSquare className="w-5.5 h-5.5 text-orange-500" />
-                Administrative Command Chat Hub
-              </h2>
-              <p className="text-xs text-zinc-400 mt-1 font-medium">Coordinate smoothly with system registrars, key faculty, and student representatives.</p>
-            </div>
-          </div>
           <Messages 
             userProfile={userProfile || { id: 'admin-01', name: 'Master Admin One', email: 'admin@msu.edu.ph', role: 'admin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150', department: 'Academic Registrar Board' }} 
             classes={classes} 

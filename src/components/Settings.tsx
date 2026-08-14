@@ -26,18 +26,21 @@ import {
   Key,
   Calendar,
   CloudLightning,
-  QrCode
+  QrCode,
+  Maximize2,
+  Minimize2,
+  Layers
 } from 'lucide-react';
-import { UserProfile, AccessibilityConfig, ClassSession } from '../types';
+import { UserProfile, AccessibilityConfig, ClassSession, ViewDensity } from '../types';
 import { speakText } from './AccessibilitySettings';
 import { saveUserCredentialToFirestore, saveUserProfileToFirestore } from '../lib/firestoreSync';
-import SyncStatusMonitor from './SyncStatusMonitor';
 
 interface SettingsProps {
   userProfile: UserProfile;
   accessibility: AccessibilityConfig;
   onUpdateProfile: (updatedProfile: UserProfile) => void;
   onUpdateAccessibility: (config: AccessibilityConfig) => void;
+  onUpdateDensity?: (density: ViewDensity) => void;
   onUpdateCompactMode?: (compact: boolean) => void;
   onUpdateColorAccent?: (accent: string) => void;
   setScreen: (screen: string) => void;
@@ -51,6 +54,7 @@ export default function Settings({
   accessibility,
   onUpdateProfile,
   onUpdateAccessibility,
+  onUpdateDensity,
   onUpdateCompactMode,
   onUpdateColorAccent,
   setScreen,
@@ -97,8 +101,13 @@ export default function Settings({
   });
 
   // 4. Appearance Prefs states (Tied with globally accessible AccessibilityConfig & Auto-saved)
+  const [viewDensity, setViewDensity] = React.useState<ViewDensity>(() => {
+    const cached = localStorage.getItem('cp_pref_view_density');
+    if (cached === 'compact' || cached === 'comfortable') return cached;
+    return localStorage.getItem('cp_pref_compact_mode') === 'true' ? 'compact' : 'comfortable';
+  });
   const [compactMode, setCompactMode] = React.useState(() => {
-    return localStorage.getItem('cp_pref_compact_mode') === 'true';
+    return localStorage.getItem('cp_pref_compact_mode') === 'true' || localStorage.getItem('cp_pref_view_density') === 'compact';
   });
   const [colorAccent, setColorAccent] = React.useState(() => {
     return localStorage.getItem('cp_pref_color_accent') || 'emerald';
@@ -237,13 +246,21 @@ export default function Settings({
     setConfirmPassword('');
   };
 
-  // Auto-save toggle for compact viewport preference
+  // User-selectable View Density handler (Comfortable vs Compact)
+  const handleDensityChange = (density: ViewDensity) => {
+    setViewDensity(density);
+    const isCompact = density === 'compact';
+    setCompactMode(isCompact);
+    localStorage.setItem('cp_pref_view_density', density);
+    localStorage.setItem('cp_pref_compact_mode', String(isCompact));
+    onUpdateDensity?.(density);
+    onUpdateCompactMode?.(isCompact);
+    speakText(`View density set to ${density === 'compact' ? 'Compact' : 'Comfortable'}.`, accessibility.readAloud);
+  };
+
+  // Legacy toggle support
   const toggleCompactMode = () => {
-    const nextVal = !compactMode;
-    setCompactMode(nextVal);
-    localStorage.setItem('cp_pref_compact_mode', String(nextVal));
-    onUpdateCompactMode?.(nextVal);
-    speakText(`Compact structure visual ratio turned ${nextVal ? 'on' : 'off'}.`, accessibility.readAloud);
+    handleDensityChange(viewDensity === 'compact' ? 'comfortable' : 'compact');
   };
 
   // Change color accent (auto-save preference)
@@ -275,8 +292,10 @@ export default function Settings({
     });
 
     // C. Reset custom viewports & accent toggles
+    setViewDensity('comfortable');
     setCompactMode(false);
     setColorAccent('emerald');
+    onUpdateDensity?.('comfortable');
     onUpdateCompactMode?.(false);
     onUpdateColorAccent?.('emerald');
     setEmailDigest(true);
@@ -284,6 +303,7 @@ export default function Settings({
     setScheduleAlarms(true);
     setSoundFeedback(false);
 
+    localStorage.removeItem('cp_pref_view_density');
     localStorage.removeItem('cp_pref_compact_mode');
     localStorage.removeItem('cp_pref_color_accent');
     localStorage.removeItem('cp_pref_email_digest');
@@ -364,11 +384,6 @@ export default function Settings({
             Reset Defaults
           </button>
         </div>
-      </div>
-
-      {/* Sync Status Monitor Widget */}
-      <div className="mb-6">
-        <SyncStatusMonitor isOffline={isOffline} />
       </div>
 
       {/* Confirmation Model Popup for defaults reset */}
@@ -807,6 +822,91 @@ export default function Settings({
                   >
                     <Moon className="w-5 h-5 shrink-0" />
                     <span className="text-xs">Dark Mode</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* View Density (Comfortable vs Compact) */}
+              <div className="space-y-2.5 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">
+                      View Density & Spacing
+                    </label>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                      Adjust layout padding and spacing throughout the app for better usability on smaller screens and mobile devices.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                    {viewDensity === 'compact' ? 'Compact' : 'Comfortable'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Comfortable Option */}
+                  <button
+                    onClick={() => handleDensityChange('comfortable')}
+                    type="button"
+                    className={`p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 cursor-pointer transition-all ${
+                      viewDensity === 'comfortable'
+                        ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 ring-2 ring-emerald-500/20 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-xl ${viewDensity === 'comfortable' ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
+                          <Maximize2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100">Comfortable</h4>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Spacious & Relaxed</p>
+                        </div>
+                      </div>
+                      {viewDensity === 'comfortable' && (
+                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Generous padding and open margins. Ideal for desktop viewports and relaxed reading.
+                    </p>
+                    <div className="flex items-center gap-1.5 pt-1 text-[10px] font-bold text-zinc-450 dark:text-zinc-500">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500/40" />
+                      Standard 16–24px padding
+                    </div>
+                  </button>
+
+                  {/* Compact Option */}
+                  <button
+                    onClick={() => handleDensityChange('compact')}
+                    type="button"
+                    className={`p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 cursor-pointer transition-all ${
+                      viewDensity === 'compact'
+                        ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 ring-2 ring-emerald-500/20 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-xl ${viewDensity === 'compact' ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
+                          <Minimize2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100">Compact</h4>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">High Density & Mobile</p>
+                        </div>
+                      </div>
+                      {viewDensity === 'compact' && (
+                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                      Snug padding and tighter margins. Perfect for smaller screens, mobile ergonomics, and data-dense dashboards.
+                    </p>
+                    <div className="flex items-center gap-1.5 pt-1 text-[10px] font-bold text-zinc-450 dark:text-zinc-500">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500/40" />
+                      Optimized 8–14px padding
+                    </div>
                   </button>
                 </div>
               </div>

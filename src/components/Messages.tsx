@@ -1106,8 +1106,16 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                           {c.name ? c.name[0] : '?'}
                         </div>
                       )}
-                      {!isUserOffline(c) && (
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950" />
+                      {isUserOffline(c) ? (
+                        <span 
+                          title="Offline"
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/25 dark:bg-emerald-500/20 border-2 border-white dark:border-zinc-950 opacity-60" 
+                        />
+                      ) : (
+                        <span 
+                          title="Online"
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-2xs" 
+                        />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1171,8 +1179,16 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                           {person.name ? person.name[0] : '?'}
                         </div>
                       )}
-                      {!isUserOffline(person) && (
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950" />
+                      {isUserOffline(person) ? (
+                        <span 
+                          title="Offline"
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/25 dark:bg-emerald-500/20 border-2 border-white dark:border-zinc-950 opacity-60" 
+                        />
+                      ) : (
+                        <span 
+                          title="Online"
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-2xs" 
+                        />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1269,8 +1285,16 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         {activeMeta.name ? activeMeta.name[0] : '?'}
                       </div>
                     )}
-                    {!isUserOffline(activeMeta) && (
-                      <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" />
+                    {isUserOffline(activeMeta) ? (
+                      <span 
+                        title="Offline"
+                        className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500/25 dark:bg-emerald-500/20 border border-white dark:border-zinc-950 opacity-60" 
+                      />
+                    ) : (
+                      <span 
+                        title="Online"
+                        className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" 
+                      />
                     )}
                   </div>
                 ) : (

@@ -25,7 +25,7 @@ export interface AttendanceRecord {
   classCode: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM AM/PM
-  status: 'present' | 'late' | 'absent';
+  status: 'present' | 'late' | 'absent' | 'excused';
   role: Role;
   studentName?: string;
   studentId?: string;
@@ -59,6 +59,8 @@ export interface AccessibilityConfig {
   theme: 'light' | 'dark';
   readAloud: boolean;
 }
+
+export type ViewDensity = 'comfortable' | 'compact';
 
 export interface FacultyStatus {
   id: string;
@@ -160,5 +162,16 @@ export interface DispatchedWarningEmail {
   status: 'Delivered' | 'Pending' | 'Failed';
   subject: string;
   body: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  operatorId: string;
+  operatorName: string;
+  operatorRole: Role;
+  action: string;
+  details: string;
+  targetId?: string;
 }
 

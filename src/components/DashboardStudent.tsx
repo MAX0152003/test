@@ -11,6 +11,8 @@ import {
   Enrollment,
   Announcement
 } from '../types';
+import { calculateStudentStanding } from '../lib/attendanceRules';
+import { playSuccessChime, playWarningChime, triggerHapticFeedback } from '../lib/soundUtils';
 import { 
   Scan, 
   Calendar, 
@@ -58,6 +60,7 @@ import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
 import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
+import StudentWeeklyAttendanceChart from './StudentWeeklyAttendanceChart';
 import { 
   BarChart, 
   Bar, 
@@ -479,6 +482,8 @@ export default function DashboardStudent({
     if (!matchedClass) {
       setIsScanning(false);
       setScanResult({ success: false, message: "No active class registered in current curriculums." });
+      playWarningChime();
+      triggerHapticFeedback([100, 50, 100]);
       speakText("Scan failed. No active class recognized.", accessibility.readAloud);
       return;
     }
@@ -486,6 +491,10 @@ export default function DashboardStudent({
     // Determine present or late state
     const status = Math.random() > 0.8 ? 'late' : 'present';
     onRecordAttendance(matchedClass.id, status);
+
+    // Provide immediate haptic and audio confirmation
+    playSuccessChime();
+    triggerHapticFeedback([60, 30, 90]);
 
     setIsScanning(false);
     setShowScanRipple(true);
@@ -725,6 +734,8 @@ export default function DashboardStudent({
       }
 
       if (!matchedClass) {
+        playWarningChime();
+        triggerHapticFeedback([100, 50, 100]);
         setScanResult({
           success: false,
           message: `Unrecognized token: "${decodedText.substring(0, 40)}${decodedText.length > 40 ? '...' : ''}". Match the active rotation keys from your professor.`
@@ -735,6 +746,9 @@ export default function DashboardStudent({
 
       const status = Math.random() > 0.85 ? 'late' : 'present';
       onRecordAttendance(matchedClass.id, status);
+
+      playSuccessChime();
+      triggerHapticFeedback([60, 30, 90]);
 
       setShowScanRipple(true);
       setTimeout(() => setShowScanRipple(false), 2400);
@@ -1434,6 +1448,14 @@ export default function DashboardStudent({
 
           </div>
 
+          {/* 4-Week Attendance Trends & Punctuality Consistency Bar Chart */}
+          <StudentWeeklyAttendanceChart 
+            records={attendanceRecords} 
+            classes={classes} 
+            enrollments={enrollments} 
+            userProfile={userProfile} 
+          />
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             
             {/* LEFT ROW: Faculty list & Today's classes */}
@@ -1523,30 +1545,9 @@ export default function DashboardStudent({
                       const studentRecordsForClass = attendanceRecords.filter(
                         r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
                       );
-                      const absentsForClass = studentRecordsForClass.filter(r => r.status === 'absent');
-                      const countAbsentsForClass = absentsForClass.length;
-
-                      let maxConsecutive = 0;
-                      let currConsecutive = 0;
-                      const sortedRecs = [...studentRecordsForClass].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                      for (const r of sortedRecs) {
-                        if (r.status === 'absent') {
-                          currConsecutive++;
-                          if (currConsecutive > maxConsecutive) maxConsecutive = currConsecutive;
-                        } else {
-                          currConsecutive = 0;
-                        }
-                      }
-
-                      let standingLabel = 'Good Standing';
-                      let standingColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450';
-                      if (countAbsentsForClass >= 5 || maxConsecutive >= 3) {
-                        standingLabel = '🚫 Dropped';
-                        standingColor = 'bg-red-500/10 text-red-600 dark:text-red-400';
-                      } else if (countAbsentsForClass >= 3) {
-                        standingLabel = '⚠️ Warning';
-                        standingColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-505';
-                      }
+                      const standing = calculateStudentStanding(studentRecordsForClass);
+                      const standingLabel = standing.label;
+                      const standingColor = standing.badgeColor;
 
                       return (
                         <div 
@@ -1795,30 +1796,9 @@ export default function DashboardStudent({
               const studentRecordsForClass = attendanceRecords.filter(
                 r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
               );
-              const absentsForClass = studentRecordsForClass.filter(r => r.status === 'absent');
-              const countAbsentsForClass = absentsForClass.length;
-
-              let maxConsecutive = 0;
-              let currConsecutive = 0;
-              const sortedRecs = [...studentRecordsForClass].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-              for (const r of sortedRecs) {
-                if (r.status === 'absent') {
-                  currConsecutive++;
-                  if (currConsecutive > maxConsecutive) maxConsecutive = currConsecutive;
-                } else {
-                  currConsecutive = 0;
-                }
-              }
-
-              let standingLabel = 'Good Standing';
-              let standingColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450';
-              if (countAbsentsForClass >= 5 || maxConsecutive >= 3) {
-                standingLabel = '🚫 Dropped';
-                standingColor = 'bg-red-500/10 text-red-600 dark:text-red-400';
-              } else if (countAbsentsForClass >= 3) {
-                standingLabel = '⚠️ Warning';
-                standingColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-505';
-              }
+              const standing = calculateStudentStanding(studentRecordsForClass);
+              const standingLabel = standing.label;
+              const standingColor = standing.badgeColor;
 
               const isExpanded = !!expandedCardIds[cls.id];
               const toggleExpand = (e: React.MouseEvent) => {
@@ -2276,28 +2256,8 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          className="h-[calc(100dvh-5.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden pb-0"
         >
-          <div className="flex sm:hidden pb-3 border-b border-zinc-150 dark:border-zinc-850/60 items-start gap-3 shrink-0">
-            <button 
-              onClick={() => {
-                setSelectedFacultyForChat(undefined);
-                setScreen('dashboard');
-              }} 
-              type="button"
-              className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
-              title="Back"
-            >
-              <ArrowLeft className="w-4 h-4 text-emerald-500" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
-                <MessageSquare className="w-5.5 h-5.5 text-blue-600" />
-                Active Chat Hub
-              </h2>
-              <p className="text-xs text-zinc-400 mt-1">Message your instructors and join classroom group discussions instantly.</p>
-            </div>
-          </div>
           <Messages 
             userProfile={userProfile} 
             classes={classes} 
@@ -2528,12 +2488,19 @@ export default function DashboardStudent({
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                        {studentScans.slice(0, 8).map((scan) => {
+                        {studentScans.slice(0, 8).map((scan, scIdx) => {
                           const isLate = scan.status === 'late';
                           const isAbsent = scan.status === 'absent';
                           return (
-                            <div 
-                              key={scan.id}
+                            <motion.div 
+                              key={scan.id || scIdx}
+                              initial={{ opacity: 0, scale: 0.97, y: 5 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              transition={{
+                                duration: 0.22,
+                                ease: [0.16, 1, 0.3, 1],
+                                delay: Math.min(scIdx * 0.03, 0.24)
+                              }}
                               className="p-3.5 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/30 border border-zinc-150/80 dark:border-zinc-900/60 flex items-start gap-3 transition-all hover:translate-x-0.5"
                             >
                               <div className={`p-1.5 rounded-lg shrink-0 ${
@@ -2577,7 +2544,7 @@ export default function DashboardStudent({
                                   </span>
                                 </div>
                               </div>
-                            </div>
+                            </motion.div>
                           );
                         })}
                         {studentScans.length > 8 && (

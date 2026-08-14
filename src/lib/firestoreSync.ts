@@ -10,7 +10,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from './googleAuth';
-import { ClassSession, AttendanceRecord, ChatMessage, UserProfile } from '../types';
+import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry } from '../types';
 import { normalizeUserIdentity, normalizeUid, normalizeEmail, generateSessionToken } from './authUtils';
 
 /**
@@ -654,6 +654,55 @@ export function listenToSessionLink(
     return unsubscribe;
   } catch (error) {
     console.warn("listenToSessionLink error:", error);
+    return () => {};
+  }
+}
+
+/**
+ * Saves an immutable AuditLogEntry to Firestore.
+ */
+export async function saveAuditLogToFirestore(
+  isOffline: boolean,
+  auditLog: AuditLogEntry
+): Promise<void> {
+  if (isOffline) return;
+  const colPath = 'audit_logs';
+  try {
+    await setDoc(doc(db, colPath, auditLog.id), auditLog, { merge: true });
+  } catch (error) {
+    console.warn("[Firestore] Could not save audit log:", error);
+  }
+}
+
+/**
+ * Listens to real-time Audit Logs from Firestore.
+ */
+export function listenToAuditLogs(
+  isOffline: boolean,
+  onSync: (logs: AuditLogEntry[]) => void
+): () => void {
+  if (isOffline) return () => {};
+  const colPath = 'audit_logs';
+  try {
+    const q = query(collection(db, colPath), orderBy('timestamp', 'desc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const logs: AuditLogEntry[] = [];
+        snapshot.forEach((docSnap) => {
+          logs.push(docSnap.data() as AuditLogEntry);
+        });
+        if (logs.length > 0) {
+          onSync(logs);
+        }
+      },
+      (error) => {
+        console.warn("[Firestore] listenToAuditLogs error caught safely:", error);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    console.warn("[Firestore] listenToAuditLogs setup error:", error);
     return () => {};
   }
 }

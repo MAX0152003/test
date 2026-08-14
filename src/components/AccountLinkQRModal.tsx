@@ -3,6 +3,7 @@ import { QrCode, Smartphone, CheckCircle2, Copy, RefreshCw, X, ShieldCheck, Came
 import { motion, AnimatePresence } from 'motion/react';
 import { createSessionLinkInFirestore, listenToSessionLink, claimSessionLinkFromFirestore } from '../lib/firestoreSync';
 import { parseSessionToken } from '../lib/authUtils';
+import { playSuccessChime, triggerHapticFeedback } from '../lib/soundUtils';
 
 interface AccountLinkQRModalProps {
   isOpen: boolean;
@@ -84,6 +85,8 @@ export default function AccountLinkQRModal({
     setIsScanning(false);
 
     if (claimed) {
+      playSuccessChime();
+      triggerHapticFeedback([60, 30, 90]);
       setClaimedUser(claimed);
       if (onSessionClaimed) {
         onSessionClaimed(claimed);

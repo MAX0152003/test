@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, Database, CheckCircle2, Wifi, WifiOff, ShieldCheck, Layers, Clock } from 'lucide-react';
 import { forceResyncAllFromFirestore } from '../lib/firestoreSync';
+import { playSuccessChime, triggerHapticFeedback } from '../lib/soundUtils';
 
 interface SyncStatusMonitorProps {
   isOffline: boolean;
@@ -32,6 +33,8 @@ export default function SyncStatusMonitor({
     setIsSyncing(false);
 
     if (res.success) {
+      playSuccessChime();
+      triggerHapticFeedback([40, 30, 80]);
       setLastSyncTime(new Date().toLocaleTimeString());
       setSyncStats(res.stats);
       setToastMessage(`✅ Cloud state re-synchronized! (${res.stats.users} users, ${res.stats.classes} classes, ${res.stats.records} records updated in ${res.durationMs}ms)`);

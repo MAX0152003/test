@@ -12,6 +12,7 @@ import {
   LabRoom,
   DispatchedWarningEmail
 } from '../types';
+import { calculateStudentStanding } from '../lib/attendanceRules';
 import { 
   Plus, 
   QrCode, 
@@ -79,7 +80,7 @@ interface DashboardFacultyProps {
   announcements?: Announcement[];
   excuseLetters?: any[];
   onUpdateExcuseStatus?: (id: string, status: 'pending' | 'valid' | 'invalid' | 'approved' | 'rejected') => void;
-  onUpdateAttendanceRecord?: (recordId: string, status: 'present' | 'late' | 'absent') => void;
+  onUpdateAttendanceRecord?: (recordId: string, status: 'present' | 'late' | 'absent' | 'excused') => void;
   onAddAttendanceRecord?: (record: Omit<AttendanceRecord, 'id'>) => void;
   labRooms?: LabRoom[];
   onUpdateLabRooms?: (rooms: LabRoom[]) => void;
@@ -254,6 +255,7 @@ export default function DashboardFaculty({
   const [showRoomTable, setShowRoomTable] = React.useState<boolean>(false);
   const [showQuickAttendanceEdit, setShowQuickAttendanceEdit] = React.useState<boolean>(false);
   const [showEditDatePopover, setShowEditDatePopover] = React.useState<boolean>(false);
+  const [showBatchMarkConfirmModal, setShowBatchMarkConfirmModal] = React.useState<boolean>(false);
   const [rosterFilter, setRosterFilter] = React.useState<'all' | 'flagged' | 'borderline'>('all');
   const [dispatchedEmailsModalOpen, setDispatchedEmailsModalOpen] = React.useState<boolean>(false);
   const [selectedRosterDate, setSelectedRosterDate] = React.useState<string>(() => {
@@ -332,13 +334,15 @@ export default function DashboardFaculty({
         r => r.classId === activeMonClass.id && 
         (r.studentId === student.studentId || r.studentName === student.studentName)
       );
-      const pres = studentRecords.filter(r => r.status === 'present').length;
-      const late = studentRecords.filter(r => r.status === 'late').length;
-      const abs = studentRecords.filter(r => r.status === 'absent').length;
-      const total = studentRecords.length;
-      const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 100;
-      if (rate < 75) {
-        atRiskItems.push({ student, rate, abs, total });
+      const standing = calculateStudentStanding(studentRecords);
+      if (standing.isDropped || standing.status === 'warning' || standing.attendanceRate < 75) {
+        atRiskItems.push({ 
+          student, 
+          rate: standing.attendanceRate, 
+          abs: standing.absentCount, 
+          total: standing.totalRecords,
+          standing 
+        });
       }
     });
 
@@ -739,7 +743,8 @@ export default function DashboardFaculty({
   const handleCreateNewQrToken = () => {
     setQrToken('QR_KEY_' + Math.random().toString(36).substring(4, 10).toUpperCase());
     setTimeLeft(300); // Reset countdown timer
-    speakText("New attendance QR key generated", accessibility.readAloud);
+    onChangeFacultyStatus('in-class');
+    speakText("New attendance QR key generated. Status automatically set to In Class.", accessibility.readAloud);
   };
 
   const handleOpenEditForm = (cls: ClassSession) => {
@@ -2089,7 +2094,8 @@ export default function DashboardFaculty({
 
                     setQrToken(generatedKey);
                     setTimeLeft(1800); // 30 minutes countdown (1800 seconds!)
-                    speakText(`Successfully initialized 30 minute QR session code for ${activeMatch.name}`, accessibility.readAloud);
+                    onChangeFacultyStatus('in-class');
+                    speakText(`Successfully initialized 30 minute QR session code for ${activeMatch.name}. Status automatically switched to In Class.`, accessibility.readAloud);
                   }}
                   type="button"
                   className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95 shadow-md shadow-blue-500/10 text-center"
@@ -2401,25 +2407,8 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-8.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          className="h-[calc(100dvh-5.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden pb-0"
         >
-          <div className="flex sm:hidden pb-3 border-b border-zinc-150 dark:border-zinc-855/60 items-start gap-3 shrink-0">
-            <button 
-              onClick={() => setScreen('dashboard')} 
-              type="button"
-              className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
-              title="Back"
-            >
-              <ArrowLeft className="w-4 h-4 text-emerald-500" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
-                <MessageSquare className="w-5.5 h-5.5 text-blue-600 animate-pulse" />
-                Direct Student Messaging Hub
-              </h2>
-              <p className="text-xs text-zinc-400 mt-1">Instantly converse with warning/dropped students or broadcast general class announcements.</p>
-            </div>
-          </div>
           <Messages 
             userProfile={userProfile} 
             classes={classes} 
@@ -2609,28 +2598,30 @@ export default function DashboardFaculty({
                               <button
                                 onClick={() => {
                                   onUpdateExcuseStatus(letter.id, 'valid');
-                                  speakText(`Marked excuse as valid. Storing inside valid records.`, accessibility.readAloud);
+                                  speakText(`Approved excuse letter for ${letter.studentName}. Attendance record converted to Excused.`, accessibility.readAloud);
                                 }}
+                                title="Approves excuse letter and marks attendance record as Excused for the date"
                                 className={`px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all ${
                                   letter.status === 'valid' || letter.status === 'approved'
                                     ? 'bg-emerald-500 text-black shadow-sm scale-95'
-                                    : 'bg-transparent border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                                    : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-black'
                                 }`}
                               >
-                                ✓ Valid
+                                ✓ Approve & Mark Excused
                               </button>
                               <button
                                 onClick={() => {
                                   onUpdateExcuseStatus(letter.id, 'invalid');
-                                  speakText(`Marked excuse as invalid. Storing inside flagged records.`, accessibility.readAloud);
+                                  speakText(`Marked excuse as invalid.`, accessibility.readAloud);
                                 }}
+                                title="Rejects excuse letter"
                                 className={`px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all ${
                                   letter.status === 'invalid' || letter.status === 'rejected'
                                     ? 'bg-red-500 text-white shadow-sm scale-95'
                                     : 'bg-transparent border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
                                 }`}
                               >
-                                ✗ Invalid
+                                ✗ Reject Excuse
                               </button>
                             </>
                           )}
@@ -2848,44 +2839,20 @@ export default function DashboardFaculty({
               {/* List of enrolled students in matched class */}
               <div className="lg:col-span-8 space-y-4">
                 <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 mb-6 border-b border-zinc-150 dark:border-zinc-900">
-                    <div>
-                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight">
-                        Class Enrolled Roster ({monEnrollments.length})
+                  {/* Tier 1: Header Title & Roster Status Indicators */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-zinc-150 dark:border-zinc-900">
+                    <div className="min-w-0">
+                      <h3 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
+                        <span>Class Enrolled Roster</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono">
+                          {monEnrollments.length} {monEnrollments.length === 1 ? 'Student' : 'Students'}
+                        </span>
                       </h3>
-                      <p className="text-[10px] text-zinc-400 mt-0.5">Simple display & real-time roster date correction</p>
+                      <p className="text-[10px] text-zinc-400 mt-0.5 truncate">Real-time attendance logs & per-session verification</p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {/* Batch Attendance Override Button */}
-                      <button
-                        type="button"
-                        onClick={handleBatchMarkAllPresent}
-                        className="px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs active:scale-95"
-                        title="Mark all enrolled students as Present for selected date"
-                      >
-                        <CheckSquare className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                        <span>⚡ Mark All Present Today</span>
-                      </button>
-
-                      {/* Toggle Quick Edit Mode */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = !showQuickAttendanceEdit;
-                          setShowQuickAttendanceEdit(next);
-                          speakText(next ? "Enabled manual roster correction mode" : "Disabled manual roster correction mode", accessibility.readAloud);
-                        }}
-                        className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
-                          showQuickAttendanceEdit
-                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                            : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100'
-                        }`}
-                      >
-                        <Settings className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>{showQuickAttendanceEdit ? 'Edit Mode: ON' : 'Quick Edit Logs'}</span>
-                      </button>
-
+                    {/* Date Selector Pill & Health Filters */}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       {/* Interactive Edit Date Button with Popover */}
                       <div className="relative">
                         <button
@@ -2895,7 +2862,7 @@ export default function DashboardFaculty({
                             setShowEditDatePopover(next);
                             speakText(next ? "Opened roster edit date selector" : "Closed roster edit date selector", accessibility.readAloud);
                           }}
-                          className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100`}
+                          className="px-2.5 py-1.5 rounded-xl text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-mono"
                         >
                           <Calendar className="w-3.5 h-3.5 text-emerald-500" />
                           <span>Date: {selectedRosterDate}</span>
@@ -2903,13 +2870,13 @@ export default function DashboardFaculty({
 
                         {/* Floating Edit Date Panel */}
                         {showEditDatePopover && (
-                          <div className="absolute right-0 mt-2 z-50 bg-white dark:bg-zinc-950 p-3 rounded-xl border border-zinc-200 dark:border-zinc-850 shadow-2xl flex flex-col gap-2.5 min-w-[220px] animate-fade-in text-left">
-                            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-100 dark:border-zinc-900 pb-1.5 flex justify-between items-center">
-                              <span>Select Edit Date</span>
+                          <div className="absolute right-0 mt-2 z-50 bg-white dark:bg-zinc-950 p-3 rounded-xl border border-zinc-200 dark:border-zinc-850 shadow-2xl flex flex-col gap-2 min-w-[210px] animate-fade-in text-left">
+                            <div className="text-[9px] font-black uppercase tracking-widest text-zinc-400 border-b border-zinc-100 dark:border-zinc-900 pb-1 flex justify-between items-center">
+                              <span>Select Roster Session Date</span>
                             </div>
 
-                            <div className="flex flex-col gap-1 bg-zinc-50 dark:bg-zinc-900/60 px-2 py-1.5 rounded-lg border border-zinc-150 dark:border-zinc-800/60">
-                              <span className="text-[8px] uppercase font-black font-mono tracking-wider text-zinc-400">Edit Date:</span>
+                            <div className="flex flex-col gap-1 bg-zinc-50 dark:bg-zinc-900/60 px-2.5 py-1.5 rounded-lg border border-zinc-150 dark:border-zinc-800/60">
+                              <span className="text-[8px] uppercase font-black font-mono tracking-wider text-zinc-400">Session Date:</span>
                               <input 
                                 type="date"
                                 value={selectedRosterDate}
@@ -2919,11 +2886,11 @@ export default function DashboardFaculty({
                                     speakText(`Roster editing on date ${e.target.value}`, accessibility.readAloud);
                                   }
                                 }}
-                                className="bg-transparent border-none text-[10.5px] font-mono focus:outline-none text-zinc-800 dark:text-zinc-200 outline-none p-0 cursor-pointer w-full"
+                                className="bg-transparent border-none text-[11px] font-mono focus:outline-none text-zinc-800 dark:text-zinc-200 outline-none p-0 cursor-pointer w-full"
                               />
                             </div>
 
-                            <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-900">
+                            <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-zinc-100 dark:border-zinc-900">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2939,28 +2906,93 @@ export default function DashboardFaculty({
                         )}
                       </div>
 
-                      {/* Student directory inner search */}
-                      <div className="relative w-full max-w-[180px] shrink-0 select-none">
-                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400 pointer-events-none">
-                          <Search className="w-3 h-3 text-emerald-500" />
-                        </span>
-                        <input
-                          type="text"
-                          className="w-full pl-8 pr-7 py-1.5 text-[11px] bg-zinc-50 dark:bg-zinc-900/65 rounded-xl border border-zinc-202 dark:border-zinc-800 focus:border-emerald-500 outline-none text-zinc-805 dark:text-zinc-200 font-bold"
-                          placeholder="Search candidate..."
-                          value={studentSearchQuery}
-                          onChange={(e) => setStudentSearchQuery(e.target.value)}
-                        />
-                        {studentSearchQuery && (
-                          <button 
-                            onClick={() => setStudentSearchQuery('')}
-                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-450 hover:text-zinc-650 cursor-pointer font-black text-xs"
-                            type="button"
-                          >
-                            ×
-                          </button>
-                        )}
+                      {/* Roster Filter Pills */}
+                      <div className="flex items-center bg-zinc-50 dark:bg-zinc-900 p-0.5 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        <button
+                          type="button"
+                          onClick={() => setRosterFilter('all')}
+                          className={`px-2 py-1 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider transition-colors cursor-pointer ${
+                            rosterFilter === 'all' 
+                              ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs' 
+                              : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                          }`}
+                        >
+                          All ({monEnrollments.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRosterFilter('flagged')}
+                          className={`px-2 py-1 rounded-lg text-[9.5px] font-extrabold uppercase tracking-wider transition-colors cursor-pointer ${
+                            rosterFilter === 'flagged' 
+                              ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
+                              : 'text-zinc-500 hover:text-red-500'
+                          }`}
+                        >
+                          &lt;75% At-Risk
+                        </button>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Tier 2: Dedicated Action & Search Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4 p-2 rounded-xl bg-zinc-50/70 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850">
+                    {/* Left: Fluid Student Directory Search */}
+                    <div className="relative flex-1 min-w-[200px]">
+                      <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-zinc-400 pointer-events-none">
+                        <Search className="w-3.5 h-3.5 text-emerald-500" />
+                      </span>
+                      <input
+                        type="text"
+                        className="w-full pl-8 pr-6 py-1.5 text-xs bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 outline-none text-zinc-800 dark:text-zinc-200 font-medium placeholder:text-zinc-400"
+                        placeholder="Search student by name or ID..."
+                        value={studentSearchQuery}
+                        onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      />
+                      {studentSearchQuery && (
+                        <button 
+                          onClick={() => setStudentSearchQuery('')}
+                          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-zinc-400 hover:text-zinc-600 cursor-pointer font-black text-xs"
+                          type="button"
+                          title="Clear search"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Right: Roster Action Buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Toggle Quick Edit Mode */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !showQuickAttendanceEdit;
+                          setShowQuickAttendanceEdit(next);
+                          speakText(next ? "Enabled manual roster correction mode" : "Disabled manual roster correction mode", accessibility.readAloud);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                          showQuickAttendanceEdit
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-2xs'
+                            : 'bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                        }`}
+                      >
+                        <Settings className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>{showQuickAttendanceEdit ? 'Edit Mode: ON' : 'Quick Edit Logs'}</span>
+                      </button>
+
+                      {/* Batch Attendance Override Button with Confirmation Safety */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowBatchMarkConfirmModal(true);
+                          speakText("Open confirmation to mark all present", accessibility.readAloud);
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs active:scale-95"
+                        title="Mark all enrolled students as Present for selected date"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                        <span>⚡ Mark All Present Today</span>
+                      </button>
                     </div>
                   </div>
 
@@ -3017,7 +3049,7 @@ export default function DashboardFaculty({
 
                     return (
                       <div className="divide-y divide-zinc-100 dark:divide-zinc-900/60">
-                        {filteredStudents.map(student => {
+                        {filteredStudents.map((student, sIdx) => {
                           const studentRecords = attendanceRecords.filter(
                             r => r.classId === activeMonClass.id && 
                             (r.studentId === student.studentId || r.studentName === student.studentName)
@@ -3026,68 +3058,99 @@ export default function DashboardFaculty({
                           // Find attendance record matching EXACTLY selectedRosterDate
                           const dateRecord = studentRecords.find(r => r.date === selectedRosterDate);
                           
-                          const pres = studentRecords.filter(r => r.status === 'present').length;
-                          const late = studentRecords.filter(r => r.status === 'late').length;
-                          const abs = studentRecords.filter(r => r.status === 'absent').length;
-
-                          const total = studentRecords.length;
-                          const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 100;
-                          const rateClamped = rate > 100 ? 100 : rate;
-                          const isUnderMonitoring = rateClamped < 85;
+                          const standing = calculateStudentStanding(studentRecords);
+                          const pres = standing.presentCount;
+                          const late = standing.lateCount;
+                          const exc = standing.excusedCount;
+                          const abs = standing.absentCount;
+                          const rateClamped = standing.attendanceRate;
+                          const isUnderMonitoring = standing.isDropped || standing.status === 'warning';
 
                           return (
-                            <div key={student.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left hover:bg-zinc-50/40 dark:hover:bg-zinc-900/10 px-2 rounded-xl transition-all">
+                            <motion.div
+                              key={student.id || student.studentId || sIdx}
+                              initial={{ opacity: 0, scale: 0.97, y: 6 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              transition={{ 
+                                duration: 0.22, 
+                                ease: [0.16, 1, 0.3, 1],
+                                delay: Math.min(sIdx * 0.025, 0.25)
+                              }}
+                              className="py-2.5 sm:py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left hover:bg-zinc-50/60 dark:hover:bg-zinc-900/20 px-2 sm:px-2.5 rounded-xl transition-all"
+                            >
                               {/* Left side profile */}
-                              <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0">
                                 <img 
                                   src={student.studentAvatar} 
                                   alt={student.studentName} 
-                                  className="w-10 h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-800 shrink-0"
+                                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-zinc-200 dark:border-zinc-800 shrink-0"
+                                  referrerPolicy="no-referrer"
                                 />
-                                <div>
+                                <div className="min-w-0">
                                   <h4 className="font-bold text-xs text-zinc-900 dark:text-zinc-100 flex flex-wrap items-center gap-1.5 leading-snug">
-                                    <span>{student.studentName}</span>
-                                    {isUnderMonitoring ? (
-                                      <span className="px-1 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wide text-red-500 bg-red-500/10 border border-red-500/15">
-                                        At Risk
+                                    <span className="truncate">{student.studentName}</span>
+                                    {standing.isDropped ? (
+                                      <span 
+                                        className="px-1.5 py-0.5 rounded-md text-[7.5px] font-black uppercase tracking-wide text-red-500 bg-red-500/10 border border-red-500/20 shrink-0"
+                                        title={`Dropped: ${standing.dropReasons.join(', ')}`}
+                                      >
+                                        🚫 Dropped
+                                      </span>
+                                    ) : standing.status === 'warning' ? (
+                                      <span 
+                                        className="px-1.5 py-0.5 rounded-md text-[7.5px] font-black uppercase tracking-wide text-amber-500 bg-amber-500/10 border border-amber-500/20 shrink-0"
+                                        title={`Warning: ${standing.warningReasons.join(', ')}`}
+                                      >
+                                        ⚠️ Warning
                                       </span>
                                     ) : (
-                                      <span className="px-1 py-0.5 rounded text-[7.5px] font-black uppercase tracking-wide text-emerald-555 bg-emerald-500/15 border border-emerald-500/15">
+                                      <span className="px-1.5 py-0.5 rounded-md text-[7.5px] font-black uppercase tracking-wide text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 shrink-0">
                                         Good
                                       </span>
                                     )}
                                   </h4>
-                                  <p className="text-[9.5px]/none text-zinc-455 mt-0.5 font-mono">{student.studentId}</p>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <p className="text-[9.5px]/none text-zinc-400 dark:text-zinc-500 font-mono">{student.studentId}</p>
+                                    {standing.isDropped && standing.dropReasons.length > 0 && (
+                                      <span className="text-[8px] text-red-500 font-bold">
+                                        • {standing.dropReasons[0]}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
                               {/* Center stats indicators */}
-                              <div className="flex items-center gap-5 justify-between sm:justify-end grow font-mono text-[10.5px]">
+                              <div className="flex items-center gap-4 sm:gap-5 justify-between sm:justify-end grow font-mono text-[10.5px]">
                                 <div className="text-center">
                                   <span className="block text-[7.5px] text-zinc-400 font-sans font-black uppercase tracking-wider mb-0.5">ATTEND RATE</span>
-                                  <span className={`font-black ${isUnderMonitoring ? 'text-red-500' : 'text-zinc-850 dark:text-zinc-250'}`}>{rateClamped}%</span>
+                                  <span className={`font-black ${standing.isDropped ? 'text-red-500' : standing.status === 'warning' ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-200'}`}>{rateClamped}%</span>
                                 </div>
                                 <div className="text-center font-bold">
-                                  <span className="block text-[7.5px] text-zinc-400 font-sans font-black uppercase tracking-wider mb-0.5">LOGS (P/A)</span>
+                                  <span className="block text-[7.5px] text-zinc-400 font-sans font-black uppercase tracking-wider mb-0.5" title="Present / Late / Excused / Absent">LOGS (P/L/E/A)</span>
                                   <span className="text-zinc-700 dark:text-zinc-300">
-                                    <span className="text-emerald-550 font-black">{pres + late}</span>
-                                    <span className="text-zinc-300 mx-1">/</span>
-                                    <span className="text-red-550 font-black">{abs}</span>
+                                    <span className="text-emerald-500 font-black">{pres}</span>
+                                    <span className="text-zinc-300 dark:text-zinc-700 mx-0.5">/</span>
+                                    <span className="text-amber-500 font-black">{late}</span>
+                                    <span className="text-zinc-300 dark:text-zinc-700 mx-0.5">/</span>
+                                    <span className="text-sky-500 font-black">{exc}</span>
+                                    <span className="text-zinc-300 dark:text-zinc-700 mx-0.5">/</span>
+                                    <span className="text-red-500 font-black">{abs}</span>
                                   </span>
                                 </div>
                               </div>
 
                               {/* Right side single-date editor or quiet status badge */}
                               {showQuickAttendanceEdit ? (
-                                <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0 select-none animate-fade-in">
-                                  <div className="flex items-center gap-1.5">
+                                <div className="flex flex-col items-start sm:items-end gap-1 shrink-0 select-none animate-fade-in">
+                                  <div className="flex items-center gap-1">
                                     <span className="hidden sm:inline w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                    <span className="text-[8.5px] font-black uppercase tracking-widest text-emerald-555 font-mono">
-                                      Date: {selectedRosterDate}
+                                    <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500 font-mono">
+                                      {selectedRosterDate}
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-0.5 bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                                    {(['present', 'late', 'absent'] as const).map(statusOpt => {
+                                    {(['present', 'late', 'absent', 'excused'] as const).map(statusOpt => {
                                       const isActive = dateRecord?.status === statusOpt;
                                       return (
                                         <button
@@ -3111,15 +3174,16 @@ export default function DashboardFaculty({
                                             }
                                             speakText(`${student.studentName} marked ${statusOpt} on ${selectedRosterDate}`, accessibility.readAloud);
                                           }}
-                                          className={`px-2.5 py-1 text-[8.5px] font-black uppercase tracking-wider rounded transition-all duration-150 cursor-pointer ${
+                                          className={`px-1.5 sm:px-2 py-1 text-[8.5px] font-black uppercase tracking-wider rounded-md transition-all duration-150 cursor-pointer ${
                                             isActive
-                                              ? statusOpt === 'present' ? 'bg-emerald-500 text-black font-extrabold shadow-sm scale-[0.97]' :
-                                                statusOpt === 'late' ? 'bg-amber-500 text-black font-extrabold shadow-sm scale-[0.97]' :
-                                                'bg-red-500 text-white font-extrabold shadow-sm scale-[0.97]'
-                                              : 'bg-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-250 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50'
+                                              ? statusOpt === 'present' ? 'bg-emerald-500 text-black font-extrabold shadow-xs scale-[0.98]' :
+                                                statusOpt === 'late' ? 'bg-amber-500 text-black font-extrabold shadow-xs scale-[0.98]' :
+                                                statusOpt === 'excused' ? 'bg-sky-500 text-white font-extrabold shadow-xs scale-[0.98]' :
+                                                'bg-red-500 text-white font-extrabold shadow-xs scale-[0.98]'
+                                              : 'bg-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60'
                                           }`}
                                         >
-                                          {statusOpt}
+                                          {statusOpt === 'excused' ? 'exc' : statusOpt}
                                         </button>
                                       );
                                     })}
@@ -3127,23 +3191,24 @@ export default function DashboardFaculty({
                                 </div>
                               ) : (
                                 /* Quiet indicator for current date status */
-                                <div className="shrink-0 flex items-center justify-end select-none min-w-[80px]">
+                                <div className="shrink-0 flex items-center justify-end select-none min-w-[70px]">
                                   {dateRecord ? (
-                                    <span className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border font-mono ${
+                                    <span className={`px-2 py-0.5 rounded-lg text-[8.5px] font-black uppercase tracking-wider border font-mono ${
                                       dateRecord.status === 'present' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                                      dateRecord.status === 'late' ? 'bg-amber-500/10 text-amber-500 border-amber-550/20' :
+                                      dateRecord.status === 'late' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                      dateRecord.status === 'excused' ? 'bg-sky-500/10 text-sky-500 border-sky-500/20' :
                                       'bg-red-500/10 text-red-500 border-red-500/25'
                                     }`}>
                                       {dateRecord.status}
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] text-zinc-350 dark:text-zinc-600 font-medium font-mono uppercase tracking-wider italic">
+                                    <span className="text-[9.5px] text-zinc-400 dark:text-zinc-600 font-medium font-mono uppercase tracking-wider italic">
                                       no log
                                     </span>
                                   )}
                                 </div>
                               )}
-                            </div>
+                            </motion.div>
                           );
                         })}
                       </div>
@@ -3458,44 +3523,71 @@ export default function DashboardFaculty({
         </div>
       )}
 
-      {/* Custom Conflict Confirmation Modal */}
-      {conflictConfirmData && (
+      {/* Confirmation Dialog for Mark All Present Today */}
+      {showBatchMarkConfirmModal && (
         <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-2xl max-w-md w-full text-left space-y-4 shadow-xl">
-            <div className="flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-900">
-              <span className="text-lg">⚠️</span>
-              <h4 className="font-extrabold text-sm text-red-650 dark:text-red-400 uppercase tracking-wider font-sans">
-                Scheduling Conflicts Detected!
-              </h4>
-            </div>
-            <div className="space-y-2 text-xs text-zinc-500 dark:text-zinc-400">
-              <p>The following conflicts were detected for this schedule:</p>
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1.5 max-h-44 overflow-y-auto">
-                {facultyConflicts.map((c, idx) => (
-                  <p key={idx} className="font-medium text-red-700 dark:text-red-400">
-                    • {c.message} <span className="text-[10px] text-zinc-450">({c.details})</span>
-                  </p>
-                ))}
+          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-3xl max-w-md w-full text-left space-y-4 shadow-2xl animate-scale-up">
+            <div className="flex items-center gap-3 pb-3 border-b border-zinc-150 dark:border-zinc-900">
+              <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <CheckSquare className="w-5 h-5 text-emerald-500 stroke-[2.5]" />
               </div>
-              <p className="pt-2">Do you want to ignore these conflicts and save this schedule anyway?</p>
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
+                  Confirm Mass Attendance Update
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Bulk mark enrolled students as Present
+                </p>
+              </div>
             </div>
-            <div className="flex gap-2.5 pt-2">
+
+            <div className="space-y-3 text-xs text-zinc-600 dark:text-zinc-400">
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Course:</span>
+                  <span className="font-extrabold text-zinc-900 dark:text-zinc-100">
+                    {activeMonClass ? `${activeMonClass.code} - ${activeMonClass.name}` : 'Current Course'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Session Date:</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {selectedRosterDate}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Enrolled Students:</span>
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded-md font-mono">
+                    {monEnrollments.length} {monEnrollments.length === 1 ? 'student' : 'students'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <span>
+                  This action will mark or overwrite attendance records for all <strong>{monEnrollments.length} enrolled students</strong> in this section as <strong>Present</strong> on {selectedRosterDate}.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 pt-2 border-t border-zinc-150 dark:border-zinc-900">
               <button
                 type="button"
-                onClick={() => setConflictConfirmData(null)}
-                className="flex-1 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-350 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer text-center"
+                onClick={() => setShowBatchMarkConfirmModal(false)}
+                className="flex-1 py-2.5 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer text-center transition-colors"
               >
-                No, Go Back
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  conflictConfirmData.action();
-                  setConflictConfirmData(null);
+                  setShowBatchMarkConfirmModal(false);
+                  handleBatchMarkAllPresent();
                 }}
-                className="flex-1 py-2 bg-emerald-500 text-black rounded-xl text-xs font-extrabold hover:bg-emerald-400 cursor-pointer text-center"
+                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer text-center transition-all shadow-sm active:scale-95"
               >
-                Yes, Save Anyway
+                Yes, Mark All Present
               </button>
             </div>
           </div>
