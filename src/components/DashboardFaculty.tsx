@@ -58,6 +58,7 @@ import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
 import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
+import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
 
 interface DashboardFacultyProps {
   activeScreen: string;
@@ -1849,6 +1850,10 @@ export default function DashboardFaculty({
                 </div>
               );
             };
+
+            if (classes.length === 0) {
+              return <ScheduleListSkeleton count={3} />;
+            }
 
             return (
               <div className="space-y-6">

@@ -22,6 +22,12 @@ import {
   saveAttendanceToFirestore,
   saveUserProfileToFirestore,
   syncAllAccountsFromFirestore,
+  syncFacultyStatusesFromFirestore,
+  saveFacultyStatusToFirestore,
+  listenToFacultyStatuses,
+  syncExcuseLettersFromFirestore,
+  saveExcuseLetterToFirestore,
+  listenToExcuseLetters,
   listenToClasses,
   listenToAttendance,
   listenToRegisteredUsers,
@@ -643,6 +649,14 @@ export default function App() {
       setAttendanceRecords(fetchedRecords);
       safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
     });
+    syncFacultyStatusesFromFirestore(false, (fetchedStatuses) => {
+      setFacultyStatuses(fetchedStatuses);
+      safeStorage.setItem('cp_faculty_statuses', JSON.stringify(fetchedStatuses));
+    });
+    syncExcuseLettersFromFirestore(false, (fetchedLetters) => {
+      setExcuseLetters(fetchedLetters);
+      safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
+    });
     syncAllAccountsFromFirestore(false);
 
     const unsubClasses = listenToClasses(false, (fetchedClasses) => {
@@ -653,6 +667,14 @@ export default function App() {
       setAttendanceRecords(fetchedRecords);
       safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
     });
+    const unsubFaculty = listenToFacultyStatuses(false, (fetchedStatuses) => {
+      setFacultyStatuses(fetchedStatuses);
+      safeStorage.setItem('cp_faculty_statuses', JSON.stringify(fetchedStatuses));
+    });
+    const unsubExcuses = listenToExcuseLetters(false, (fetchedLetters) => {
+      setExcuseLetters(fetchedLetters);
+      safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
+    });
     const unsubUsers = listenToRegisteredUsers(false);
     const unsubCreds = listenToCredentials(false);
     const unsubResets = listenToPasswordResets(false);
@@ -660,6 +682,8 @@ export default function App() {
     return () => {
       unsubClasses();
       unsubAttendance();
+      unsubFaculty();
+      unsubExcuses();
       unsubUsers();
       unsubCreds();
       unsubResets();
@@ -680,6 +704,14 @@ export default function App() {
         syncAttendanceFromFirestore(false, (fetchedRecords) => {
           setAttendanceRecords(fetchedRecords);
           safeStorage.setItem('cp_records', JSON.stringify(fetchedRecords));
+        }),
+        syncFacultyStatusesFromFirestore(false, (fetchedStatuses) => {
+          setFacultyStatuses(fetchedStatuses);
+          safeStorage.setItem('cp_faculty_statuses', JSON.stringify(fetchedStatuses));
+        }),
+        syncExcuseLettersFromFirestore(false, (fetchedLetters) => {
+          setExcuseLetters(fetchedLetters);
+          safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
         }),
         saveUserProfileToFirestore(false, user)
       ])
@@ -1562,25 +1594,27 @@ export default function App() {
   const handleChangeFacultyStatus = (status: 'available' | 'in-class' | 'unavailable') => {
     if (!user) return;
     
+    const targetId = user.facultyId || user.id || 'fac-01';
+    const updatedStatusObj: FacultyStatus = {
+      id: targetId,
+      name: user.name,
+      avatar: user.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+      status: status,
+      room: 'Consultation Office 303'
+    };
+
     // Update local statuses array (so students see this changed status in real-time!)
     setFacultyStatuses(prev => {
-      const targetId = user.facultyId || user.id || 'fac-01';
       const exists = prev.some(f => f.name === user.name || f.id === targetId || f.id === 'fac-1' || f.id === 'fac-01');
       if (exists) {
         return prev.map(f => (f.name === user.name || f.id === targetId || f.id === 'fac-1' || f.id === 'fac-01') ? { ...f, status, name: user.name, avatar: user.avatar || f.avatar } : f);
       } else {
-        return [
-          {
-            id: targetId,
-            name: user.name,
-            avatar: user.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
-            status: status,
-            room: 'Consultation Office 303'
-          },
-          ...prev
-        ];
+        return [updatedStatusObj, ...prev];
       }
     });
+
+    // Save to Firestore so student dashboard and all devices receive it in real-time
+    saveFacultyStatusToFirestore(isOffline, updatedStatusObj).catch(err => console.error("Firestore save faculty status error:", err));
 
     const statusLabels = {
       available: 'Available',
@@ -1636,13 +1670,41 @@ export default function App() {
     saveAttendanceToFirestore(false, record).catch(err => console.error("Firestore add attendance error:", err));
   };
 
-  // Shared Excuse Status validation Action
+  // Shared Excuse Application Action (Filed by student)
+  const handleAddExcuseLetter = (newReq: LeaveRequest) => {
+    setExcuseLetters(prev => [newReq, ...prev.filter(l => l.id !== newReq.id)]);
+    safeStorage.setItem('classpulse_student_leaves', JSON.stringify([newReq, ...excuseLetters.filter(l => l.id !== newReq.id)]));
+    saveExcuseLetterToFirestore(isOffline, newReq).catch(err => console.error("Firestore save excuse error:", err));
+
+    const newNotif: AppNotification = {
+      id: 'notif-exc-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+      title: 'Excuse Letter Filed',
+      message: `Excuse application (${newReq.id}) for ${newReq.className || 'Class'} was submitted for faculty review.`,
+      timestamp: 'Just Now',
+      type: 'info',
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  // Shared Excuse Status validation Action (Reviewed by faculty)
   const handleUpdateExcuseStatus = (id: string, status: 'pending' | 'valid' | 'invalid' | 'approved' | 'rejected') => {
     const finalStatus = status === 'approved' || status === 'valid' ? 'valid' : status === 'rejected' || status === 'invalid' ? 'invalid' : 'pending';
-    setExcuseLetters(prev => prev.map(ex => ex.id === id ? { ...ex, status: finalStatus as any } : ex));
-    
-    const target = excuseLetters.find(e => e.id === id);
+    let updatedExcuseObj: LeaveRequest | undefined;
+
+    setExcuseLetters(prev => prev.map(ex => {
+      if (ex.id === id) {
+        updatedExcuseObj = { ...ex, status: finalStatus as any };
+        return updatedExcuseObj;
+      }
+      return ex;
+    }));
+
+    const target = updatedExcuseObj || excuseLetters.find(e => e.id === id);
     if (target) {
+      const persistedExcuse: LeaveRequest = { ...target, status: finalStatus as any };
+      saveExcuseLetterToFirestore(isOffline, persistedExcuse).catch(err => console.error("Firestore save updated excuse error:", err));
+
       // If approved/valid, auto-update the student's attendance records to 'excused'
       if (finalStatus === 'valid') {
         const targetStartDate = target.startDate || (target.createdAt ? target.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -2228,7 +2290,7 @@ export default function App() {
                           el.studentName === user.name ||
                           el.studentId === user.id
                         )}
-                        onAddExcuseLetter={(newReq: any) => setExcuseLetters(prev => [newReq, ...prev])}
+                        onAddExcuseLetter={handleAddExcuseLetter}
                         onDropSubject={handleDropSubject}
                         onEnrollSubject={handleEnrollSubject}
                       />
@@ -2264,12 +2326,18 @@ export default function App() {
                         onClearAllNotifications={handleClearAllNotifications}
                         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
                         announcements={announcements}
-                        excuseLetters={excuseLetters.filter(el => 
-                          classes.some(c => 
-                            c.id === el.classId && 
-                            (c.facultyId === user.id || c.facultyId === user.facultyId || (c.facultyName && user.name && c.facultyName.toLowerCase() === user.name.toLowerCase()))
-                          )
-                        )}
+                        excuseLetters={excuseLetters.filter(el => {
+                          if (el.facultyId && (el.facultyId === user.id || el.facultyId === user.facultyId || el.facultyId === 'fac-1' || el.facultyId === 'fac-01')) return true;
+                          if (el.facultyName && user.name && (el.facultyName.toLowerCase() === user.name.toLowerCase() || el.facultyName.toLowerCase().includes(user.name.toLowerCase()))) return true;
+                          const facultyClasses = classes.filter(c => 
+                            c.facultyId === user.id || 
+                            c.facultyId === user.facultyId || 
+                            (c.facultyName && user.name && c.facultyName.toLowerCase() === user.name.toLowerCase())
+                          );
+                          if (facultyClasses.some(c => c.id === el.classId || c.code === el.classCode || c.name === el.className)) return true;
+                          if (facultyClasses.length > 0 && (!el.classId || !el.facultyId)) return true;
+                          return false;
+                        })}
                         onUpdateExcuseStatus={handleUpdateExcuseStatus}
                         onUpdateAttendanceRecord={handleUpdateAttendanceRecord}
                         onAddAttendanceRecord={handleAddAttendanceRecord}

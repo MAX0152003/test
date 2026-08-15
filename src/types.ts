@@ -98,6 +98,7 @@ export interface ChatMessage {
   receiverName: string;
   message: string;
   timestamp: string;
+  read?: boolean;
 }
 
 export interface LeaveRequest {

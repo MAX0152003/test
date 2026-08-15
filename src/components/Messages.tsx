@@ -809,15 +809,37 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     return () => {};
   }, [activeContactId, channels, userProfile.name]);
 
+  // Universal identity matching functions for bulletproof chat routing
+  const isMsgFromMe = (m: EnrichedChatMessage): boolean => {
+    if (!m) return false;
+    if (m.senderId && (
+      m.senderId === myId ||
+      (userProfile.id && m.senderId === userProfile.id) ||
+      (userProfile.studentId && m.senderId === userProfile.studentId) ||
+      (userProfile.facultyId && m.senderId === userProfile.facultyId) ||
+      (userProfile.email && m.senderId.toLowerCase() === userProfile.email.toLowerCase())
+    )) return true;
+    if (m.senderName && userProfile.name && m.senderName.trim().toLowerCase() === userProfile.name.trim().toLowerCase() && m.senderRole === userProfile.role) return true;
+    return false;
+  };
+
+  const isMsgToMe = (m: EnrichedChatMessage): boolean => {
+    if (!m) return false;
+    if (m.receiverId && (
+      m.receiverId === myId ||
+      (userProfile.id && m.receiverId === userProfile.id) ||
+      (userProfile.studentId && m.receiverId === userProfile.studentId) ||
+      (userProfile.facultyId && m.receiverId === userProfile.facultyId) ||
+      (userProfile.email && m.receiverId.toLowerCase() === userProfile.email.toLowerCase())
+    )) return true;
+    if (m.receiverName && userProfile.name && m.receiverName.trim().toLowerCase() === userProfile.name.trim().toLowerCase()) return true;
+    return false;
+  };
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if ((!inputText.trim() && !pendingImg && !pendingLink && !pendingFile) || !activeContactId) return;
 
-    const myId = userProfile.role === 'student' 
-      ? (userProfile.studentId || '2023-10492') 
-      : userProfile.role === 'faculty' 
-        ? (userProfile.facultyId || 'fac-1') 
-        : (userProfile.id || 'admin-01');
     const isActiveChannel = channels.some(ch => ch.id === activeContactId);
     const destObj = !isActiveChannel 
       ? contacts.find(c => c.id === activeContactId) 
@@ -834,9 +856,10 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       receiverName: destObj?.name || activeMeta?.name || 'Academic Group',
       message: inputText.trim() || (pendingImg ? "Shared an image" : pendingFile ? "Shared a file" : "Shared a link"),
       timestamp: nowStr,
-      attachmentImg: pendingImg || undefined,
-      attachmentLink: pendingLink || undefined,
-      attachmentFile: pendingFile || undefined
+      ...(pendingImg ? { attachmentImg: pendingImg } : {}),
+      ...(pendingLink ? { attachmentLink: pendingLink } : {}),
+      ...(pendingFile ? { attachmentFile: pendingFile } : {}),
+      read: true
     };
 
     setMessages(prev => [...prev, newMsg]);
@@ -849,6 +872,11 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     setPendingLink(null);
     setPendingFile(null);
     setShowAttachmentMenu(false);
+
+    // Immediate scroll to bottom
+    setTimeout(() => {
+      scrollToBottom(true);
+    }, 50);
 
     speakText("Message transmitted.", accessibility.readAloud);
   };
@@ -947,13 +975,34 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   const isActiveChannel = channels.some(ch => ch.id === activeContactId);
   
   const currentMessages = messages.filter(m => {
-    if (!isActiveChannel) {
-      const isTargetSender = m.senderId === activeContactId || (activeMeta?.id && m.senderId === activeMeta.id) || (activeMeta?.name && m.senderName === activeMeta.name);
-      const isTargetReceiver = m.receiverId === activeContactId || (activeMeta?.id && m.receiverId === activeMeta.id) || (activeMeta?.name && m.receiverName === activeMeta.name);
-      return (m.senderId === myId && isTargetReceiver) || (isTargetSender && m.receiverId === myId);
-    } else {
-      return m.receiverId === activeContactId;
+    if (!m) return false;
+    if (isActiveChannel) {
+      return (
+        m.receiverId === activeContactId ||
+        (activeMeta?.id && m.receiverId === activeMeta.id) ||
+        (activeMeta?.code && m.receiverId === activeMeta.code)
+      );
     }
+    
+    // Check if message is related to active direct chat contact
+    const matchesContactAsSender = 
+      m.senderId === activeContactId ||
+      (activeMeta?.id && m.senderId === activeMeta.id) ||
+      (activeMeta?.name && m.senderName && m.senderName.trim().toLowerCase() === activeMeta.name.trim().toLowerCase());
+
+    const matchesContactAsReceiver = 
+      m.receiverId === activeContactId ||
+      (activeMeta?.id && m.receiverId === activeMeta.id) ||
+      (activeMeta?.name && m.receiverName && m.receiverName.trim().toLowerCase() === activeMeta.name.trim().toLowerCase());
+
+    const sentByMeToContact = isMsgFromMe(m) && matchesContactAsReceiver;
+    const sentByContactToMe = matchesContactAsSender && (isMsgToMe(m) || !m.receiverId || m.receiverId === myId);
+
+    // Also support fallback when testing/demoing self chat
+    const isSelfContact = activeContactId === myId || (activeMeta?.name && userProfile.name && activeMeta.name.trim().toLowerCase() === userProfile.name.trim().toLowerCase());
+    if (isSelfContact && isMsgFromMe(m)) return true;
+
+    return sentByMeToContact || sentByContactToMe;
   });
 
   const displayMessages = currentMessages;
@@ -1109,12 +1158,12 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       {isUserOffline(c) ? (
                         <span 
                           title="Offline"
-                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/25 dark:bg-emerald-500/20 border-2 border-white dark:border-zinc-950 opacity-60" 
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/30 dark:bg-emerald-500/25 border-2 border-white dark:border-zinc-950 opacity-60" 
                         />
                       ) : (
                         <span 
                           title="Online"
-                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-2xs" 
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-xs ring-1 ring-emerald-500/40" 
                         />
                       )}
                     </div>
@@ -1182,12 +1231,12 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       {isUserOffline(person) ? (
                         <span 
                           title="Offline"
-                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/25 dark:bg-emerald-500/20 border-2 border-white dark:border-zinc-950 opacity-60" 
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/30 dark:bg-emerald-500/25 border-2 border-white dark:border-zinc-950 opacity-60" 
                         />
                       ) : (
                         <span 
                           title="Online"
-                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-2xs" 
+                          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-xs ring-1 ring-emerald-500/40" 
                         />
                       )}
                     </div>
@@ -1288,12 +1337,12 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                     {isUserOffline(activeMeta) ? (
                       <span 
                         title="Offline"
-                        className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500/25 dark:bg-emerald-500/20 border border-white dark:border-zinc-950 opacity-60" 
+                        className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/30 dark:bg-emerald-500/25 border-2 border-white dark:border-zinc-950 opacity-60" 
                       />
                     ) : (
                       <span 
                         title="Online"
-                        className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-zinc-950" 
+                        className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-xs ring-1 ring-emerald-500/40" 
                       />
                     )}
                   </div>
@@ -1315,10 +1364,22 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       </span>
                     )}
                   </h3>
-                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-semibold truncate">
-                    {!(activeMeta as any).isChannel 
-                      ? `Direct Chat` 
-                      : `Class Room`}
+                  <p className="text-[9px] font-semibold truncate flex items-center gap-1.5">
+                    {!(activeMeta as any).isChannel ? (
+                      isUserOffline(activeMeta) ? (
+                        <span className="text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/35 border border-emerald-500/40" />
+                          Offline • Direct Chat
+                        </span>
+                      ) : (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-xs ring-1 ring-emerald-500/50" />
+                          Online • Active
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-zinc-400 dark:text-zinc-500">Class Room Channel</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -1344,7 +1405,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
               ) : (
                 <AnimatePresence initial={false}>
                   {displayMessages.map(m => {
-                    const isMe = (m as any).isMeOverride !== undefined ? (m as any).isMeOverride : m.senderId === myId;
+                    const isMe = (m as any).isMeOverride !== undefined ? (m as any).isMeOverride : isMsgFromMe(m);
                     return (
                       <motion.div 
                         key={m.id} 

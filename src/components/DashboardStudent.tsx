@@ -61,6 +61,7 @@ import Messages from './Messages';
 import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import StudentWeeklyAttendanceChart from './StudentWeeklyAttendanceChart';
+import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
 import { 
   BarChart, 
   Bar, 
@@ -508,7 +509,7 @@ export default function DashboardStudent({
     speakText(`Attendance recorded successfully. Checked as ${status}`, accessibility.readAloud);
   };
 
-  // Real Web Camera implementation
+  // Real Web Camera implementation with iOS, macOS, and multi-platform resilience
   const startLiveCamera = async () => {
     setCameraError(null);
     setScanResult(null);
@@ -516,7 +517,7 @@ export default function DashboardStudent({
     
     const elementId = "live-qr-reader";
     // Short deferment to ensure viewport is mounted in the DOM
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 120));
     const element = document.getElementById(elementId);
     if (!element) {
       setIsCameraLoading(false);
@@ -526,20 +527,17 @@ export default function DashboardStudent({
     try {
       const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent) || 
                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isMac = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(navigator.userAgent) && !isIOS;
       const isMobileDevice = isIOS || /Android|webOS|BlackBerry|IEMobile|Opera Mini|Tablet|PlayBook|Silk/i.test(navigator.userAgent);
 
-      if (!isMobileDevice) {
-        console.log("Testing on laptop/PC web browser: enabling webcam compatibility for simulation.");
-      }
-
-      // Force recreation of Html5Qrcode to bind to the currently mounted DOM element
+      // Force cleanup of any previous scanner instance
       if (html5QrCodeRef.current) {
         try {
           if (html5QrCodeRef.current.isScanning) {
             await html5QrCodeRef.current.stop();
           }
         } catch (e) {
-          console.warn("Ongoing scanner stop non-blocking error", e);
+          console.warn("Previous scanner stop non-blocking error", e);
         }
         html5QrCodeRef.current = null;
       }
@@ -549,117 +547,88 @@ export default function DashboardStudent({
       setIsScanning(true);
       speakText("Starting real-time camera feed. Please point your lens at the QR code.", accessibility.readAloud);
 
-      // 1. Fetch available physical cameras
-      let devices: Array<{ id: string, label: string }> = [];
-      try {
-        devices = await Html5Qrcode.getCameras();
-      } catch (e) {
-        console.warn("Could not retrieve camera list prior to start, using standard criteria", e);
-      }
-
-      // Check client platform descriptors
-      const isWindows = /Windows/i.test(navigator.userAgent);
-
-      let cameraConstraint: any;
-
+      // Construct primary camera constraint
+      let primaryConstraint: any;
       if (isIOS) {
-        // Rule: For iOS use main back camera for QR Scanner
-        cameraConstraint = { facingMode: "environment" };
-      } else if (devices && devices.length > 0) {
-        if (isMobileDevice) {
-          // Rule: Only use main back/rear camera for mobiles and Tablets
-          const backCams = devices.filter(d => {
-            const label = (d.label || '').toLowerCase();
-            return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('facing 1') || label.includes('main') || label.includes('outward');
-          });
-          if (backCams.length > 0) {
-            cameraConstraint = { deviceId: { exact: backCams[0].id } };
-          } else {
-            cameraConstraint = { facingMode: "environment" };
-          }
-        } else if (isWindows) {
-          // Rule: For Windows, use webcam if one is plugged in (preferring external/USB webcams)
-          const externalWebcams = devices.filter(d => {
-            const label = (d.label || '').toLowerCase();
-            return label.includes('webcam') || label.includes('usb') || label.includes('external') || label.includes('plug') || label.includes('cam link');
-          });
-          if (externalWebcams.length > 0) {
-            cameraConstraint = { deviceId: { exact: externalWebcams[0].id } };
-          } else if (selectedCameraId && devices.some(c => c.id === selectedCameraId)) {
-            cameraConstraint = { deviceId: { exact: selectedCameraId } };
-          } else {
-            cameraConstraint = { deviceId: { exact: devices[0].id } };
-          }
+        // iOS Safari performs best with standard facingMode environment
+        primaryConstraint = { facingMode: "environment" };
+      } else if (isMac) {
+        // macOS WebKit / Safari standard user-facing webcam
+        if (selectedCameraId) {
+          primaryConstraint = { deviceId: { exact: selectedCameraId } };
         } else {
-          // Standard other desktops
-          if (selectedCameraId && devices.some(c => c.id === selectedCameraId)) {
-            cameraConstraint = { deviceId: { exact: selectedCameraId } };
-          } else {
-            cameraConstraint = { deviceId: { exact: devices[0].id } };
-          }
+          primaryConstraint = { facingMode: "user" };
         }
+      } else if (isMobileDevice) {
+        primaryConstraint = { facingMode: "environment" };
       } else {
-        // Safe defaults when devices cannot be listed beforehand
-        if (isMobileDevice) {
-          cameraConstraint = { facingMode: "environment" };
+        if (selectedCameraId) {
+          primaryConstraint = { deviceId: { exact: selectedCameraId } };
         } else {
-          cameraConstraint = { facingMode: "user" };
+          primaryConstraint = { facingMode: "user" };
         }
       }
 
-      await html5QrCodeRef.current.start(
-        cameraConstraint,
-        {
-          fps: 15,
-          qrbox: (width, height) => {
-            const minSize = Math.min(width, height);
-            const boxSize = Math.max(160, Math.round(minSize * 0.7));
-            return { width: boxSize, height: boxSize };
-          }
-        },
-        async (decodedText) => {
-          await handleDecodedText(decodedText);
-        },
-        () => {
-          // Silent scan error logging
+      const qrCodeConfig = {
+        fps: 15,
+        qrbox: (width: number, height: number) => {
+          const minSize = Math.min(width, height);
+          const boxSize = Math.max(160, Math.round(minSize * 0.72));
+          return { width: boxSize, height: boxSize };
         }
-      );
+      };
+
+      // Multi-tier attempt: try specific constraint, fallback to facingMode, fallback to basic video
+      let started = false;
+      const constraintTiers = [
+        primaryConstraint,
+        isMobileDevice ? { facingMode: "environment" } : { facingMode: "user" },
+        { facingMode: "user" },
+        true
+      ];
+
+      let lastError: any = null;
+      for (const constraint of constraintTiers) {
+        if (started) break;
+        try {
+          await html5QrCodeRef.current.start(
+            constraint,
+            qrCodeConfig,
+            async (decodedText) => {
+              await handleDecodedText(decodedText);
+            },
+            () => {
+              // Silent per-frame non-match
+            }
+          );
+          started = true;
+          break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn("Camera start constraint tier failed, trying next fallback...", constraint, err);
+        }
+      }
+
+      if (!started) {
+        throw lastError || new Error("Unable to start video stream with available camera constraints.");
+      }
 
       setIsCameraLoading(false);
 
-      // Now query cameras again or populate selection list
+      // Safely enumerate cameras in background for the switch dropdown
       try {
         const freshDevices = await Html5Qrcode.getCameras();
         if (freshDevices && freshDevices.length > 0) {
-          if (isMobileDevice) {
-            const backCams = freshDevices.filter(d => {
-              const label = (d.label || '').toLowerCase();
-              return label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('facing 1') || label.includes('main') || label.includes('outward');
-            });
-            if (backCams.length > 0) {
-              setAvailableCameras(backCams.map(d => ({ id: d.id, label: d.label || `Back Camera` })));
-              if (cameraConstraint.deviceId && cameraConstraint.deviceId.exact) {
-                setSelectedCameraId(cameraConstraint.deviceId.exact);
-              } else {
-                setSelectedCameraId(backCams[0].id);
-              }
-            } else {
-              setAvailableCameras(freshDevices.map(d => ({ id: d.id, label: d.label || `Camera ${freshDevices.indexOf(d) + 1}` })));
-              if (!selectedCameraId) {
-                setSelectedCameraId(freshDevices[0].id);
-              }
-            }
-          } else {
-            setAvailableCameras(freshDevices.map(d => ({ id: d.id, label: d.label || `Webcam ${freshDevices.indexOf(d) + 1}` })));
-            if (cameraConstraint.deviceId && cameraConstraint.deviceId.exact) {
-              setSelectedCameraId(cameraConstraint.deviceId.exact);
-            } else if (!selectedCameraId) {
-              setSelectedCameraId(freshDevices[0].id);
-            }
+          setAvailableCameras(freshDevices.map((d, i) => ({
+            id: d.id,
+            label: d.label || (isMobileDevice ? `Camera ${i + 1}` : `Webcam ${i + 1}`)
+          })));
+          if (!selectedCameraId) {
+            setSelectedCameraId(freshDevices[0].id);
           }
         }
       } catch (err) {
-        // Fallback
+        // Non-blocking device list lookup
       }
     } catch (err: any) {
       console.warn("Camera start failure parsed gracefully", err);
@@ -668,12 +637,14 @@ export default function DashboardStudent({
       
       const errMsg = String(err?.message || err || '');
       if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission denied') || errMsg.includes('permission')) {
-        setCameraError("Webcam permissions request was denied by the browser (NotAllowedError: Permission denied). Please enable camera privileges in your browser options or use our safe sandbox emulator below.");
+        setCameraError("Camera permission was denied or restricted in browser settings. Please allow camera access, or use the instant code verification option below.");
+      } else if (errMsg.includes('OverconstrainedError') || errMsg.includes('NotFoundError')) {
+        setCameraError("Camera hardware unavailable or overconstrained. You can use the instant verification key or simulated scanner below.");
       } else {
-        setCameraError(errMsg || "Failed to initiate web camera. Please ensure permissions are granted in browser settings.");
+        setCameraError(errMsg || "Failed to initiate camera. Please ensure permissions are granted in browser settings.");
       }
       
-      speakText("Camera initiation failed. Safe sandbox bypass has been loaded below.", accessibility.readAloud);
+      speakText("Camera initiation failed. Quick verification option is ready below.", accessibility.readAloud);
     }
   };
 
@@ -1062,8 +1033,11 @@ export default function DashboardStudent({
                         id: `EX-${Math.floor(100 + Math.random() * 900)}`,
                         studentId: userProfile.studentId || 'STU-102',
                         studentName: userProfile.name,
-                        classId: activeCls.id,
-                        className: activeCls.name,
+                        classId: activeCls ? activeCls.id : (leaveClassId || 'CS-101'),
+                        classCode: activeCls ? activeCls.code : 'CRS',
+                        className: activeCls ? activeCls.name : 'Class Subject',
+                        facultyId: activeCls?.facultyId || 'fac-1',
+                        facultyName: activeCls?.facultyName || 'Faculty Instructor',
                         startDate: leaveStartDate,
                         endDate: leaveEndDate,
                         reason: leaveReason,
@@ -1083,7 +1057,7 @@ export default function DashboardStudent({
                       setLeaveReason('');
                       setLeaveAttachment(null);
                       setLeaveAttachmentName('');
-                      speakText(`Success! Excuse letter submitted to Professor ${activeCls.facultyName} for evaluation.`, accessibility.readAloud);
+                      speakText(`Success! Excuse letter submitted to Professor ${activeCls?.facultyName || 'Faculty'} for evaluation.`, accessibility.readAloud);
                     }}
                     className="space-y-4"
                   >

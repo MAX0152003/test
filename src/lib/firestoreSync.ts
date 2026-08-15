@@ -10,8 +10,31 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from './googleAuth';
-import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry } from '../types';
+import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry, FacultyStatus, LeaveRequest } from '../types';
 import { normalizeUserIdentity, normalizeUid, normalizeEmail, generateSessionToken } from './authUtils';
+
+/**
+ * Recursively removes undefined fields from an object or array before passing to Firestore setDoc/updateDoc.
+ * Firestore will throw "Unsupported field value: undefined" if any object key is undefined.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleanObj: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleanObj[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleanObj as T;
+  }
+  return data;
+}
 
 /**
  * Sync classes: pulls classes from Firestore.
@@ -46,7 +69,7 @@ export async function saveClassToFirestore(
   if (isOffline) return;
   const colPath = 'classes';
   try {
-    await setDoc(doc(db, colPath, classObj.id), classObj, { merge: true });
+    await setDoc(doc(db, colPath, classObj.id), sanitizeForFirestore(classObj), { merge: true });
     console.log(`Class ${classObj.code} saved to Firestore successfully.`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colPath}/${classObj.id}`);
@@ -169,7 +192,7 @@ export async function saveAttendanceToFirestore(
   if (isOffline) return;
   const colPath = 'records';
   try {
-    await setDoc(doc(db, colPath, recordObj.id), recordObj, { merge: true });
+    await setDoc(doc(db, colPath, recordObj.id), sanitizeForFirestore(recordObj), { merge: true });
     console.log(`Attendance record ${recordObj.id} saved to Firestore successfully.`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colPath}/${recordObj.id}`);
@@ -187,13 +210,18 @@ export function listenToMessages(
   if (isOffline) return () => {};
   const colPath = 'messages';
   try {
-    const q = query(collection(db, colPath), orderBy('timestamp', 'asc'));
     const unsubscribe = onSnapshot(
-      q,
+      collection(db, colPath),
       (snapshot) => {
         const msgs: ChatMessage[] = [];
         snapshot.forEach((docSnap) => {
           msgs.push(docSnap.data() as ChatMessage);
+        });
+        // Sort in memory by ID or timestamp safely
+        msgs.sort((a, b) => {
+          const aId = parseInt(a.id.replace('msg-', '')) || 0;
+          const bId = parseInt(b.id.replace('msg-', '')) || 0;
+          return aId - bId;
         });
         onMessagesUpdate(msgs);
       },
@@ -223,7 +251,7 @@ export async function saveMessageToFirestore(
   if (isOffline) return;
   const colPath = 'messages';
   try {
-    await setDoc(doc(db, colPath, messageObj.id), messageObj, { merge: true });
+    await setDoc(doc(db, colPath, messageObj.id), sanitizeForFirestore(messageObj), { merge: true });
     console.log(`Message ${messageObj.id} sent and committed to Firestore.`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colPath}/${messageObj.id}`);
@@ -240,7 +268,7 @@ export async function saveUserProfileToFirestore(
   if (isOffline) return;
   const colPath = 'users';
   try {
-    await setDoc(doc(db, colPath, profile.id), profile, { merge: true });
+    await setDoc(doc(db, colPath, profile.id), sanitizeForFirestore(profile), { merge: true });
     console.log(`User profile for ${profile.name} updated in Firestore.`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colPath}/${profile.id}`);
@@ -257,9 +285,10 @@ export async function saveRegisteredUserToFirestore(
   if (isOffline || !userObj || !userObj.id) return;
   const colPath = 'registered_users';
   try {
-    await setDoc(doc(db, colPath, userObj.id), userObj, { merge: true });
+    const cleanObj = sanitizeForFirestore(userObj);
+    await setDoc(doc(db, colPath, userObj.id), cleanObj, { merge: true });
     // Also mirror to users collection
-    await setDoc(doc(db, 'users', userObj.id), userObj, { merge: true });
+    await setDoc(doc(db, 'users', userObj.id), cleanObj, { merge: true });
     console.log(`Registered user ${userObj.email || userObj.name} saved to Firestore.`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colPath}/${userObj.id}`);
@@ -299,7 +328,7 @@ export async function saveUserCredentialToFirestore(
   try {
     await setDoc(
       doc(db, colPath, docId),
-      { key: sanitizedKey, password: password.trim(), updatedAt: new Date().toISOString() },
+      sanitizeForFirestore({ key: sanitizedKey, password: password.trim(), updatedAt: new Date().toISOString() }),
       { merge: true }
     );
     console.log(`Credential for ${sanitizedKey} saved to Firestore.`);
@@ -318,7 +347,7 @@ export async function savePasswordResetToFirestore(
   if (isOffline || !resetReq || !resetReq.id) return;
   const colPath = 'password_resets';
   try {
-    await setDoc(doc(db, colPath, resetReq.id), resetReq, { merge: true });
+    await setDoc(doc(db, colPath, resetReq.id), sanitizeForFirestore(resetReq), { merge: true });
     console.log(`Password reset request ${resetReq.id} saved to Firestore.`);
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colPath}/${resetReq.id}`);
@@ -581,14 +610,14 @@ export async function createSessionLinkInFirestore(
   const colPath = 'session_links';
 
   try {
-    await setDoc(doc(db, colPath, tokenData.tokenId), {
+    await setDoc(doc(db, colPath, tokenData.tokenId), sanitizeForFirestore({
       tokenId: tokenData.tokenId,
       userProfile: normalizeUserIdentity(userProfile),
       status: 'pending',
       createdAt: tokenData.payload.createdAt,
       expiresAt: tokenData.payload.expiresAt,
       claimedByDevice: null
-    });
+    }));
     console.log(`Session link ${tokenData.tokenId} generated in Firestore.`);
     return tokenData;
   } catch (error) {
@@ -668,7 +697,7 @@ export async function saveAuditLogToFirestore(
   if (isOffline) return;
   const colPath = 'audit_logs';
   try {
-    await setDoc(doc(db, colPath, auditLog.id), auditLog, { merge: true });
+    await setDoc(doc(db, colPath, auditLog.id), sanitizeForFirestore(auditLog), { merge: true });
   } catch (error) {
     console.warn("[Firestore] Could not save audit log:", error);
   }
@@ -764,5 +793,152 @@ export async function forceResyncAllFromFirestore(
     return { success: false, durationMs: Date.now() - startTime, stats: { users: 0, classes: 0, records: 0 } };
   }
 }
+
+/**
+ * Sync faculty statuses: pulls statuses from Firestore.
+ */
+export async function syncFacultyStatusesFromFirestore(
+  isOffline: boolean,
+  onSync: (statuses: FacultyStatus[]) => void
+): Promise<void> {
+  if (isOffline) return;
+  const colPath = 'faculty_statuses';
+  try {
+    const querySnapshot = await getDocs(collection(db, colPath));
+    const statuses: FacultyStatus[] = [];
+    querySnapshot.forEach((docSnap) => {
+      statuses.push(docSnap.data() as FacultyStatus);
+    });
+    if (statuses.length > 0) {
+      onSync(statuses);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, colPath);
+  }
+}
+
+/**
+ * Saves or updates a FacultyStatus in Firestore.
+ */
+export async function saveFacultyStatusToFirestore(
+  isOffline: boolean,
+  statusObj: FacultyStatus
+): Promise<void> {
+  if (isOffline || !statusObj || !statusObj.id) return;
+  const colPath = 'faculty_statuses';
+  try {
+    await setDoc(doc(db, colPath, statusObj.id), sanitizeForFirestore(statusObj), { merge: true });
+    console.log(`Faculty status for ${statusObj.name} (${statusObj.status}) saved to Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${colPath}/${statusObj.id}`);
+  }
+}
+
+/**
+ * Real-time listener for faculty statuses from Firestore.
+ * Ensures students and faculty across devices immediately see active campus consultation status changes.
+ */
+export function listenToFacultyStatuses(
+  isOffline: boolean,
+  onSync: (statuses: FacultyStatus[]) => void
+): () => void {
+  if (isOffline) return () => {};
+  const colPath = 'faculty_statuses';
+  try {
+    const unsubscribe = onSnapshot(
+      collection(db, colPath),
+      (snapshot) => {
+        const statuses: FacultyStatus[] = [];
+        snapshot.forEach((docSnap) => {
+          statuses.push(docSnap.data() as FacultyStatus);
+        });
+        if (statuses.length > 0) {
+          onSync(statuses);
+        }
+      },
+      (error) => {
+        console.warn("[Firestore] listenToFacultyStatuses error caught:", error);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    console.warn("[Firestore] listenToFacultyStatuses setup error:", error);
+    return () => {};
+  }
+}
+
+/**
+ * Sync excuse letters: pulls filed student excuse letters from Firestore.
+ */
+export async function syncExcuseLettersFromFirestore(
+  isOffline: boolean,
+  onSync: (letters: LeaveRequest[]) => void
+): Promise<void> {
+  if (isOffline) return;
+  const colPath = 'excuse_letters';
+  try {
+    const querySnapshot = await getDocs(collection(db, colPath));
+    const letters: LeaveRequest[] = [];
+    querySnapshot.forEach((docSnap) => {
+      letters.push(docSnap.data() as LeaveRequest);
+    });
+    if (letters.length > 0) {
+      onSync(letters);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, colPath);
+  }
+}
+
+/**
+ * Saves or updates an excuse letter in Firestore.
+ */
+export async function saveExcuseLetterToFirestore(
+  isOffline: boolean,
+  letterObj: LeaveRequest
+): Promise<void> {
+  if (isOffline || !letterObj || !letterObj.id) return;
+  const colPath = 'excuse_letters';
+  try {
+    await setDoc(doc(db, colPath, letterObj.id), sanitizeForFirestore(letterObj), { merge: true });
+    console.log(`Excuse letter ${letterObj.id} (${letterObj.studentName}) committed to Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${colPath}/${letterObj.id}`);
+  }
+}
+
+/**
+ * Real-time listener for excuse letters from Firestore.
+ * Ensures faculty and students across sessions receive excuse letters instantly.
+ */
+export function listenToExcuseLetters(
+  isOffline: boolean,
+  onSync: (letters: LeaveRequest[]) => void
+): () => void {
+  if (isOffline) return () => {};
+  const colPath = 'excuse_letters';
+  try {
+    const unsubscribe = onSnapshot(
+      collection(db, colPath),
+      (snapshot) => {
+        const letters: LeaveRequest[] = [];
+        snapshot.forEach((docSnap) => {
+          letters.push(docSnap.data() as LeaveRequest);
+        });
+        if (letters.length > 0) {
+          onSync(letters);
+        }
+      },
+      (error) => {
+        console.warn("[Firestore] listenToExcuseLetters error caught:", error);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    console.warn("[Firestore] listenToExcuseLetters setup error:", error);
+    return () => {};
+  }
+}
+
 
 
