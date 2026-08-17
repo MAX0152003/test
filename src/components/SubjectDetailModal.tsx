@@ -48,8 +48,8 @@ export default function SubjectDetailModal({
          !e.deletedByStudent
   );
 
-  // Find enrolled students for this class
-  const classEnrollments = enrollments.filter(e => e.classId === cls.id);
+  // Find enrolled students for this class (excluding students who unenrolled/dropped)
+  const classEnrollments = enrollments.filter(e => e.classId === cls.id && !e.deletedByStudent);
 
   // Filter roster students by fast search query
   const filteredRoster = classEnrollments.filter(student =>
@@ -183,52 +183,63 @@ export default function SubjectDetailModal({
           <div className="space-y-3">
             <h4 className="text-xs font-extrabold uppercase text-zinc-500 tracking-wider flex items-center gap-1.5">
               <Activity className="w-3.5 h-3.5 text-emerald-500" />
-              Detailed Subject Information
+              Detailed Subject Information & MSU Campus Logistics
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {/* Instructor Name Card */}
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-emerald-500" />
-                  INSTRUCTOR NAME
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+                  <User className="w-3 h-3 text-emerald-500" />
+                  INSTRUCTOR
                 </p>
-                <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 mt-1">
+                <p className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 mt-1 truncate">
                   {cls.facultyName}
                 </p>
-                <p className="text-[10px] text-zinc-500">
-                  Primary course supervisor
+                <p className="text-[9px] text-zinc-500 truncate">
+                  {cls.academicTerm || 'Current Term'}
                 </p>
               </div>
 
               {/* Room Location Card */}
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                  ROOM LOCATION
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-emerald-500" />
+                  CAMPUS COMPLEX
                 </p>
-                <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 mt-1">
+                <p className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 mt-1 truncate">
                   {cls.room || 'TBA'}
                 </p>
-                <p className="text-[10px] text-zinc-500">
-                  Campus facility assignment
+                <p className="text-[9px] text-zinc-500 truncate">
+                  {cls.buildingCluster ? cls.buildingCluster.split('(')[0].trim() : 'MSU Main Campus'}
+                </p>
+              </div>
+
+              {/* Grace Period Card */}
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-emerald-500" />
+                  TRANSIT GRACE
+                </p>
+                <p className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
+                  {cls.gracePeriodMinutes ?? 15} Mins Leeway
+                </p>
+                <p className="text-[9px] text-zinc-500 truncate">
+                  Inter-building walk
                 </p>
               </div>
 
               {/* Total Attendance Count Card */}
-              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                  TOTAL ATTENDANCE
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-1">
+                <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-emerald-500" />
+                  MY ATTENDANCE
                 </p>
-                <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 mt-1">
-                  {myTotalSessions > 0 ? `${myPresentCount + myLateCount} / ${myTotalSessions} Days` : '0 Days Attended'}
+                <p className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 mt-1">
+                  {myTotalSessions > 0 ? `${myPresentCount + myLateCount} / ${myTotalSessions}` : '0 Records'}
                 </p>
-                <div className="text-[10px] text-zinc-500 space-y-0.5">
-                  <p>Overall Class Check-ins: <span className="font-bold text-emerald-500">{totalClassAttendances}</span></p>
-                  {myTotalSessions > 0 && (
-                    <p>My Rate: <span className="font-bold text-emerald-500">{Math.round(((myPresentCount + myLateCount) / myTotalSessions) * 100)}%</span></p>
-                  )}
-                </div>
+                <p className="text-[9px] text-zinc-500 truncate">
+                  {myTotalSessions > 0 ? `${Math.round(((myPresentCount + myLateCount) / myTotalSessions) * 100)}% Rate` : `${totalClassAttendances} class check-ins`}
+                </p>
               </div>
             </div>
           </div>

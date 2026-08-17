@@ -58,7 +58,16 @@ import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
 import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
+import FacultyAttendanceTrendsChart from './FacultyAttendanceTrendsChart';
 import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
+import { 
+  BUILDING_CLUSTERS, 
+  ACADEMIC_TERMS, 
+  GRACE_PERIOD_OPTIONS, 
+  DEFAULT_GRACE_PERIOD_MINUTES, 
+  EXCUSE_PRESET_TYPES, 
+  isFridayPrayerWindow 
+} from '../lib/msuUtils';
 
 interface DashboardFacultyProps {
   activeScreen: string;
@@ -257,6 +266,8 @@ export default function DashboardFaculty({
   const [showQuickAttendanceEdit, setShowQuickAttendanceEdit] = React.useState<boolean>(false);
   const [showEditDatePopover, setShowEditDatePopover] = React.useState<boolean>(false);
   const [showBatchMarkConfirmModal, setShowBatchMarkConfirmModal] = React.useState<boolean>(false);
+  const [batchActionType, setBatchActionType] = React.useState<'present' | 'excused'>('present');
+  const [batchExcusedReason, setBatchExcusedReason] = React.useState<string>('Official MSU University Holiday / Suspension');
   const [rosterFilter, setRosterFilter] = React.useState<'all' | 'flagged' | 'borderline'>('all');
   const [dispatchedEmailsModalOpen, setDispatchedEmailsModalOpen] = React.useState<boolean>(false);
   const [selectedRosterDate, setSelectedRosterDate] = React.useState<string>(() => {
@@ -267,15 +278,15 @@ export default function DashboardFaculty({
     return adjusted.toISOString().split('T')[0];
   });
 
-  // Batch Attendance Override: Marks all enrolled students as 'present' for selectedRosterDate
-  const handleBatchMarkAllPresent = () => {
+  // Batch Attendance Override: Marks all enrolled students as 'present' or 'excused' for selectedRosterDate
+  const handleBatchAttendanceOverride = (targetStatus: 'present' | 'excused' = batchActionType) => {
     const activeMonClass = classes.find(c => c.id === selectedMonitoringClassId) || classes[0];
     if (!activeMonClass) return;
 
     const monEnrs = enrollments.filter(e => e.classId === activeMonClass.id && !e.deletedByStudent);
     if (monEnrs.length === 0) {
       if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast("No active enrolled students found to mark present.", "warning");
+        (window as any).showToast(`No active enrolled students found to mark ${targetStatus}.`, "warning");
       }
       return;
     }
@@ -291,9 +302,9 @@ export default function DashboardFaculty({
       const existingDateRec = studentRecords.find(r => r.date === selectedRosterDate);
 
       if (existingDateRec) {
-        if (existingDateRec.status !== 'present') {
+        if (existingDateRec.status !== targetStatus) {
           if (onUpdateAttendanceRecord) {
-            onUpdateAttendanceRecord(existingDateRec.id, 'present');
+            onUpdateAttendanceRecord(existingDateRec.id, targetStatus);
             count++;
           }
         }
@@ -305,7 +316,7 @@ export default function DashboardFaculty({
             classCode: activeMonClass.code,
             date: selectedRosterDate,
             time: nowTime,
-            status: 'present',
+            status: targetStatus,
             role: 'student',
             studentName: student.studentName,
             studentId: student.studentId
@@ -315,7 +326,8 @@ export default function DashboardFaculty({
       }
     });
 
-    const msg = `⚡ Batch Attendance Override: Marked ${monEnrs.length} enrolled students as PRESENT for ${selectedRosterDate}.`;
+    const statusLabel = targetStatus === 'excused' ? 'EXCUSED / OFFICIAL HOLIDAY' : 'PRESENT';
+    const msg = `⚡ Batch Attendance Override: Marked ${monEnrs.length} enrolled students as ${statusLabel} for ${selectedRosterDate}.`;
     speakText(msg, accessibility.readAloud);
     if (typeof window !== 'undefined' && (window as any).showToast) {
       (window as any).showToast(msg, "success");
@@ -336,11 +348,30 @@ export default function DashboardFaculty({
         (r.studentId === student.studentId || r.studentName === student.studentName)
       );
       const standing = calculateStudentStanding(studentRecords);
-      if (standing.isDropped || standing.status === 'warning' || standing.attendanceRate < 75) {
+
+      // Check consecutive unexcused absences
+      const sortedRecords = [...studentRecords].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      let consecutiveAbs = 0;
+      for (const r of sortedRecords) {
+        if (r.status === 'absent') {
+          consecutiveAbs++;
+        } else if (r.status === 'excused') {
+          continue;
+        } else {
+          break;
+        }
+      }
+
+      const hasConsecutiveAbs = consecutiveAbs >= 3;
+      const isBelowRate = standing.attendanceRate < 75;
+
+      if (standing.isDropped || standing.status === 'warning' || isBelowRate || hasConsecutiveAbs) {
         atRiskItems.push({ 
           student, 
           rate: standing.attendanceRate, 
           abs: standing.absentCount, 
+          consecutiveAbs,
+          isConsecutive: hasConsecutiveAbs,
           total: standing.totalRecords,
           standing 
         });
@@ -349,7 +380,7 @@ export default function DashboardFaculty({
 
     if (atRiskItems.length === 0) {
       if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast("All enrolled students are above the 75% threshold in this class!", "success");
+        (window as any).showToast("All enrolled students are in good standing with zero critical absence warnings!", "success");
       }
       return;
     }
@@ -359,6 +390,10 @@ export default function DashboardFaculty({
 
     atRiskItems.forEach(item => {
       const stuEmail = item.student.studentEmail || (item.student.studentId ? `${item.student.studentId.toLowerCase()}@msu.edu.ph` : 'student@msu.edu.ph');
+      const triggerReason = item.isConsecutive 
+        ? `Incurred ${item.consecutiveAbs} consecutive unexcused absences (MSU 3-absence early warning policy)`
+        : `Attendance rate dropped to ${item.rate}%, below the 75% threshold`;
+
       const emailObj: DispatchedWarningEmail = {
         id: 'email-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
         studentId: item.student.studentId || 'STU-OFFICIAL',
@@ -370,15 +405,15 @@ export default function DashboardFaculty({
         advisorEmail: 'academic.advisor@msu.edu.ph',
         dispatchedAt: new Date().toLocaleString(),
         status: 'Delivered',
-        subject: `⚠️ OFFICIAL ACADEMIC WARNING: Attendance Dropped to ${item.rate}% in ${activeMonClass.code}`,
-        body: `Dear ${item.student.studentName},\n\nYour attendance rate in ${activeMonClass.code} (${activeMonClass.name}) has dropped to ${item.rate}%, which is below the mandatory 75% academic threshold.\n\nTotal Recorded Absences: ${item.abs}.\n\nPlease contact Professor ${userProfile?.name || 'Faculty'} and your Academic Advisor immediately to prevent an official FA (Failure due to Absences) mark on your transcript.\n\nOffice of Academic Records & Attendance Management System`
+        subject: `⚠️ OFFICIAL ACADEMIC WARNING: ${activeMonClass.code} Attendance Alert (${item.isConsecutive ? '3+ Consecutive Absences' : `${item.rate}% Rate`})`,
+        body: `Dear ${item.student.studentName},\n\nThis is an official academic notice regarding your standing in ${activeMonClass.code} (${activeMonClass.name}).\n\nWarning Trigger: ${triggerReason}.\nTotal Recorded Absences: ${item.abs} (Current Rate: ${item.rate}%).\n\nPlease contact Professor ${userProfile?.name || 'Faculty'} and your Department Academic Adviser immediately. If these absences were due to illness, please file an official MSU Infirmary Slip through the portal.\n\nMSU Main Campus Office of Academic Affairs & Attendance Management`
       };
       freshDispatches.push(emailObj);
     });
 
     localStorage.setItem('classpulse_dispatched_emails', JSON.stringify([...freshDispatches, ...existingDispatches]));
 
-    const toastMsg = `📧 Dispatched official warning emails to ${atRiskItems.length} at-risk student(s) & advisors!`;
+    const toastMsg = `📧 Dispatched official warning notices to ${atRiskItems.length} at-risk student(s), advisers, and department chairs!`;
     speakText(toastMsg, accessibility.readAloud);
     if (typeof window !== 'undefined' && (window as any).showToast) {
       (window as any).showToast(toastMsg, "warning");
@@ -599,6 +634,9 @@ export default function DashboardFaculty({
   const [formEnd, setFormEnd] = React.useState('10:30 AM');
   const [formRoom, setFormRoom] = React.useState('');
   const [formDays, setFormDays] = React.useState<string[]>(['MW']);
+  const [formGracePeriod, setFormGracePeriod] = React.useState<number>(DEFAULT_GRACE_PERIOD_MINUTES);
+  const [formAcademicTerm, setFormAcademicTerm] = React.useState<string>(ACADEMIC_TERMS[0]);
+  const [formBuildingCluster, setFormBuildingCluster] = React.useState<string>(BUILDING_CLUSTERS[0]);
 
   // Profiles edit states
   const [profileName, setProfileName] = React.useState(userProfile.name);
@@ -756,6 +794,9 @@ export default function DashboardFaculty({
     setFormEnd(cls.endTime);
     setFormRoom(cls.room);
     setFormDays(cls.days);
+    setFormGracePeriod(cls.gracePeriodMinutes ?? DEFAULT_GRACE_PERIOD_MINUTES);
+    setFormAcademicTerm(cls.academicTerm ?? ACADEMIC_TERMS[0]);
+    setFormBuildingCluster(cls.buildingCluster ?? BUILDING_CLUSTERS[0]);
     setIsFormOpen(true);
     speakText(`Editing class form for ${cls.name}`, accessibility.readAloud);
 
@@ -776,6 +817,9 @@ export default function DashboardFaculty({
     setFormEnd('10:30 AM');
     setFormRoom('');
     setFormDays(['MW']);
+    setFormGracePeriod(DEFAULT_GRACE_PERIOD_MINUTES);
+    setFormAcademicTerm(ACADEMIC_TERMS[0]);
+    setFormBuildingCluster(BUILDING_CLUSTERS[0]);
     setIsFormOpen(true);
     speakText("Opening add class schedule form", accessibility.readAloud);
 
@@ -801,7 +845,10 @@ export default function DashboardFaculty({
           startTime: formStart,
           endTime: formEnd,
           room: formRoom,
-          days: formDays
+          days: formDays,
+          gracePeriodMinutes: formGracePeriod,
+          academicTerm: formAcademicTerm,
+          buildingCluster: formBuildingCluster
         });
         speakText("Class details updated successfully", accessibility.readAloud);
       } else {
@@ -812,6 +859,9 @@ export default function DashboardFaculty({
           endTime: formEnd,
           room: formRoom,
           days: formDays,
+          gracePeriodMinutes: formGracePeriod,
+          academicTerm: formAcademicTerm,
+          buildingCluster: formBuildingCluster,
           facultyName: userProfile.name,
           facultyId: userProfile.facultyId || 'fac-1'
         });
@@ -1224,6 +1274,13 @@ export default function DashboardFaculty({
                 })()}
               </div>
 
+              {/* Real-time Faculty Attendance & Punctuality Trends Chart */}
+              <FacultyAttendanceTrendsChart
+                classes={classes}
+                records={attendanceRecords}
+                isDark={accessibility.theme === 'dark'}
+              />
+
               {/* Merged Pre-Class Clock & Status Broadcast card */}
               <div className="p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm text-left">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-zinc-150 dark:border-zinc-900">
@@ -1415,30 +1472,56 @@ export default function DashboardFaculty({
                   }
 
                   const percent = Math.min(100, Math.round((activeRoom.currentOccupancy / activeRoom.capacity) * 100)) || 0;
+                  
+                  // Color coding level
+                  const occupancyLevel = 
+                    activeRoom.status === 'maintenance' ? 'maintenance' :
+                    percent >= 85 ? 'high' :
+                    percent >= 60 ? 'moderate' : 'low';
+
+                  const badgeConfig = {
+                    low: { label: '🟢 Optimal / Low Occupancy', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30', barColor: 'bg-emerald-500' },
+                    moderate: { label: '🟠 Moderate Occupancy', color: 'text-amber-500 bg-amber-500/10 border-amber-500/30', barColor: 'bg-amber-500' },
+                    high: { label: '🔴 High Occupancy / Near Full', color: 'text-red-500 bg-red-500/10 border-red-500/30', barColor: 'bg-red-500' },
+                    maintenance: { label: '⚠️ Under Maintenance', color: 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30', barColor: 'bg-amber-500' }
+                  }[occupancyLevel];
 
                   return (
                     <div className="space-y-3 animate-scale-up">
+                      {/* Real-time Color-Coded Status Badge */}
+                      <div className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-between shadow-2xs ${badgeConfig.color}`}>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${badgeConfig.barColor} animate-ping`} />
+                          <span className="font-mono uppercase tracking-wider text-[10px]">{badgeConfig.label}</span>
+                        </div>
+                        <span className="font-mono font-black text-xs">{percent}%</span>
+                      </div>
+
                       {/* Stats details */}
                       <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-150 dark:border-zinc-850 space-y-2">
-                        <div className="flex items-center justify-between text-[10px]">
-                          <span className="text-zinc-400 uppercase font-mono">Occ Rate:</span>
-                          <span className={`font-black font-mono ${percent >= 90 ? 'text-red-500' : percent > 0 ? 'text-emerald-500' : 'text-zinc-400'}`}>{percent}% Capacity</span>
+                        {/* 3-Tier Quick Scale Indicator */}
+                        <div className="grid grid-cols-3 gap-1 text-[8px] font-mono text-center font-bold">
+                          <div className={`py-0.5 rounded ${occupancyLevel === 'low' ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400'}`}>
+                            &lt; 60% Low
+                          </div>
+                          <div className={`py-0.5 rounded ${occupancyLevel === 'moderate' ? 'bg-amber-500 text-black font-black' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400'}`}>
+                            60-84% Mod
+                          </div>
+                          <div className={`py-0.5 rounded ${occupancyLevel === 'high' ? 'bg-red-500 text-white font-black' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400'}`}>
+                            ≥ 85% Full
+                          </div>
                         </div>
 
                         {/* Progress Bar */}
-                        <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
                           <div 
-                            className={`h-full transition-all duration-300 ${
-                              percent >= 90 ? 'bg-red-500' :
-                              percent >= 50 ? 'bg-amber-500' :
-                              'bg-emerald-500'
-                            }`}
-                            style={{ width: `${percent}%` }}
+                            className={`h-full transition-all duration-300 ${badgeConfig.barColor}`}
+                            style={{ width: `${activeRoom.status === 'maintenance' ? 100 : percent}%` }}
                           />
                         </div>
 
                         <div className="flex items-center justify-between text-[10px] pt-1 font-mono">
-                          <span className="text-zinc-400">Occupancy:</span>
+                          <span className="text-zinc-400">Live Occupancy:</span>
                           <span className="text-zinc-700 dark:text-zinc-300 font-extrabold">{activeRoom.currentOccupancy} / {activeRoom.capacity} Pax</span>
                         </div>
                         <div className="flex items-center justify-between text-[10px] font-mono">
@@ -1458,9 +1541,9 @@ export default function DashboardFaculty({
                         <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-zinc-100 dark:border-zinc-900">
                           <span className="text-zinc-400">Laboratory status:</span>
                           <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider font-mono ${
-                            activeRoom.status === 'occupied' ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/10' :
-                            activeRoom.status === 'maintenance' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/10 font-bold animate-pulse' :
-                            'bg-emerald-500/10 text-emerald-500 border border-emerald-500/10'
+                            activeRoom.status === 'occupied' || occupancyLevel === 'high' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                            activeRoom.status === 'maintenance' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20 font-bold animate-pulse' :
+                            'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                           }`}>
                             {activeRoom.status === 'maintenance' ? '⚠️ maintenance' : activeRoom.status}
                           </span>
@@ -1707,10 +1790,51 @@ export default function DashboardFaculty({
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Academic Term / Semester</label>
+                        <select
+                          value={formAcademicTerm}
+                          onChange={(e) => setFormAcademicTerm(e.target.value)}
+                          className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-bold"
+                        >
+                          {ACADEMIC_TERMS.map(term => (
+                            <option key={term} value={term}>{term}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Building Cluster</label>
+                        <select
+                          value={formBuildingCluster}
+                          onChange={(e) => setFormBuildingCluster(e.target.value)}
+                          className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-medium"
+                        >
+                          {BUILDING_CLUSTERS.map(cluster => (
+                            <option key={cluster} value={cluster}>{cluster}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Custom Lateness Grace Period (Distance Transit Allowance)</label>
+                      <select
+                        value={formGracePeriod}
+                        onChange={(e) => setFormGracePeriod(Number(e.target.value))}
+                        className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-bold"
+                      >
+                        {GRACE_PERIOD_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-zinc-400">Allows automatic leeway for students walking from distant campus complexes (e.g. King Faisal or Science Complex to CICS).</p>
+                    </div>
+
                     <div className="space-y-2">
                       <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Scheduled Recurrence Days</label>
                       <div className="flex flex-wrap gap-2">
-                        {['MW', 'TTh', 'S', 'A'].map(day => {
+                        {['MW', 'TTh', 'S', 'A', 'F'].map(day => {
                           const selected = formDays.includes(day);
                           return (
                             <button
@@ -1728,6 +1852,11 @@ export default function DashboardFaculty({
                           );
                         })}
                       </div>
+                      {formDays.includes('F') && (
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-1">
+                          <span>🕌 Friday Schedule: Aware of 11:30 AM - 1:30 PM Jum’ah Prayer break window</span>
+                        </p>
+                      )}
                     </div>
 
                     <div className="pt-3 flex justify-end gap-2 border-t border-zinc-100 dark:border-zinc-900">
@@ -1810,7 +1939,7 @@ export default function DashboardFaculty({
                       <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 hover:underline">{cls.name}</h3>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400 mt-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-zinc-400 mt-2.5">
                       <span className="flex items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-300">
                         <Clock className="w-3.5 h-3.5 text-zinc-400" />
                         {cls.startTime} - {cls.endTime}
@@ -1825,6 +1954,19 @@ export default function DashboardFaculty({
                       <span className="text-[10px] bg-indigo-100/50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 rounded font-black uppercase">
                         {studentRegisteredCount} enrolled
                       </span>
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                        <span>⏱️ {cls.gracePeriodMinutes ?? DEFAULT_GRACE_PERIOD_MINUTES}m Grace Period</span>
+                      </span>
+                      {isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime) && (
+                        <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                          <span>🕌 Jum’ah Aware</span>
+                        </span>
+                      )}
+                      {cls.buildingCluster && (
+                        <span className="text-[10px] bg-zinc-100 dark:bg-zinc-900 text-zinc-500 px-2 py-0.5 rounded-md font-medium border border-zinc-200 dark:border-zinc-800">
+                          {cls.buildingCluster.split('(')[0].trim()}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -2428,6 +2570,16 @@ export default function DashboardFaculty({
 
       {/* 5B. EXCUSE LETTERS INBOX VIEW */}
       {activeScreen === 'excuse-inbox' && (() => {
+        const totalCount = excuseLetters.length;
+        const pendingCount = excuseLetters.filter(l => l.status === 'pending').length;
+        const validCount = excuseLetters.filter(l => l.status === 'valid' || l.status === 'approved').length;
+        const invalidCount = excuseLetters.filter(l => l.status === 'invalid' || l.status === 'rejected').length;
+        
+        const pendingPct = totalCount > 0 ? Math.round((pendingCount / totalCount) * 100) : 0;
+        const validPct = totalCount > 0 ? Math.round((validCount / totalCount) * 100) : 0;
+        const invalidPct = totalCount > 0 ? Math.round((invalidCount / totalCount) * 100) : 0;
+        const resolvedPct = totalCount > 0 ? Math.round(((validCount + invalidCount) / totalCount) * 100) : 100;
+
         const filteredExcuses = excuseLetters.filter(letter => {
           if (excuseFilter === 'pending') {
             return letter.status === 'pending';
@@ -2448,19 +2600,76 @@ export default function DashboardFaculty({
             className="space-y-6 text-left"
           >
             <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2 text-xl">
                       <Inbox className="w-5.5 h-5.5 text-emerald-500" />
-                      Excuse letters Inbox
+                      Excuse Letters Inbox & Review
                     </h2>
                     <div className="mt-0.5">
-                      <p className="text-xs text-zinc-400">Review filed excuse applications and declare decisions of validity on students' records.</p>
+                      <p className="text-xs text-zinc-400">Review filed excuse applications and execute quick-action approvals to update student attendance records.</p>
                     </div>
+                  </div>
+
+                  {pendingCount > 0 && onUpdateExcuseStatus && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pendingLetters = excuseLetters.filter(l => l.status === 'pending');
+                        pendingLetters.forEach(l => onUpdateExcuseStatus(l.id, 'valid'));
+                        speakText(`Approved all ${pendingLetters.length} pending excuse letters in batch.`, accessibility.readAloud);
+                      }}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-95 flex items-center gap-2 shadow-sm self-start sm:self-auto"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Quick Approve All Pending ({pendingCount})
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Summary Bar Card */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-mono">
+                        Review Status Distribution
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300">
+                        {totalCount} Total Requests
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 font-mono text-[10px]">
+                      <span className="text-amber-500 font-bold">● {pendingPct}% Pending</span>
+                      <span className="text-emerald-500 font-bold">● {validPct}% Valid</span>
+                      <span className="text-red-500 font-bold">● {invalidPct}% Invalid</span>
+                      <span className="text-zinc-400 font-semibold border-l border-zinc-200 dark:border-zinc-800 pl-2">
+                        {resolvedPct}% Resolved
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Multi-Segment Status Progress Bar */}
+                  <div className="w-full h-3 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden flex">
+                    <div 
+                      style={{ width: `${validPct}%` }} 
+                      className="h-full bg-emerald-500 transition-all duration-500" 
+                      title={`Declared Valid: ${validCount} (${validPct}%)`} 
+                    />
+                    <div 
+                      style={{ width: `${pendingPct}%` }} 
+                      className="h-full bg-amber-500 transition-all duration-500" 
+                      title={`Pending Review: ${pendingCount} (${pendingPct}%)`} 
+                    />
+                    <div 
+                      style={{ width: `${invalidPct}%` }} 
+                      className="h-full bg-red-500 transition-all duration-500" 
+                      title={`Declared Invalid: ${invalidCount} (${invalidPct}%)`} 
+                    />
                   </div>
                 </div>
 
+                {/* Filter Selector Tabs */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <button
                     type="button"
@@ -2476,12 +2685,12 @@ export default function DashboardFaculty({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">Pending Review</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
                     </div>
-                    <p className="text-xl font-black text-amber-500 mt-1">
-                      {excuseLetters.filter(l => l.status === 'pending').length}
+                    <p className="text-xl font-black text-amber-500 mt-1 font-mono">
+                      {pendingCount}
                     </p>
-                    <p className="text-[9px] text-zinc-400 mt-1">Awaiting verification</p>
+                    <p className="text-[9px] text-zinc-400 mt-1">Awaiting quick-action review</p>
                   </button>
 
                   <button
@@ -2498,12 +2707,12 @@ export default function DashboardFaculty({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">Declared Valid</span>
-                      <span className="text-[10px]">🗄️</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     </div>
-                    <p className="text-xl font-black text-emerald-500 mt-1">
-                      {excuseLetters.filter(l => l.status === 'valid' || l.status === 'approved').length}
+                    <p className="text-xl font-black text-emerald-500 mt-1 font-mono">
+                      {validCount}
                     </p>
-                    <p className="text-[9px] text-zinc-400 mt-1">Stored to active records</p>
+                    <p className="text-[9px] text-zinc-400 mt-1">Auto-excused in attendance records</p>
                   </button>
 
                   <button
@@ -2520,12 +2729,12 @@ export default function DashboardFaculty({
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black tracking-widest text-zinc-400 uppercase">Declared Invalid</span>
-                      <span className="text-[10px]">🗑️</span>
+                      <span className="w-2 h-2 rounded-full bg-red-500"></span>
                     </div>
-                    <p className="text-xl font-black text-red-500 mt-1">
-                      {excuseLetters.filter(l => l.status === 'invalid' || l.status === 'rejected').length}
+                    <p className="text-xl font-black text-red-500 mt-1 font-mono">
+                      {invalidCount}
                     </p>
-                    <p className="text-[9px] text-zinc-400 mt-1">Flagged / archived</p>
+                    <p className="text-[9px] text-zinc-400 mt-1">Flagged / rejected requests</p>
                   </button>
                 </div>
               </div>
@@ -2554,86 +2763,129 @@ export default function DashboardFaculty({
               ) : (
                 <div className="grid grid-cols-1 gap-4">
                   <AnimatePresence initial={false}>
-                    {filteredExcuses.map(letter => (
-                      <motion.div
-                        key={letter.id}
-                        layout
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-4 transition-all w-full"
-                      >
-                        
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-black text-zinc-900 dark:text-zinc-100">{letter.studentName}</span>
-                              <span className="text-[9px] font-mono text-zinc-400 py-0.5 px-2 bg-zinc-100 dark:bg-zinc-900 rounded-full">{letter.studentId || 'STU-OFFICIAL'}</span>
-                              <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/10 px-2 py-0.5 rounded-full">{letter.className}</span>
+                    {filteredExcuses.map(letter => {
+                      const isPending = letter.status === 'pending';
+                      const isValid = letter.status === 'valid' || letter.status === 'approved';
+                      const isInvalid = letter.status === 'invalid' || letter.status === 'rejected';
+
+                      return (
+                        <motion.div
+                          key={letter.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.2 }}
+                          className={`p-6 rounded-3xl bg-white dark:bg-zinc-950 border shadow-sm space-y-4 transition-all w-full text-left relative overflow-hidden ${
+                            isPending ? 'border-amber-500/30 dark:border-amber-500/30 ring-1 ring-amber-500/10' :
+                            isValid ? 'border-emerald-500/20 dark:border-emerald-500/20' :
+                            'border-zinc-200 dark:border-zinc-850'
+                          }`}
+                        >
+                          {/* Left Accent Ribbon */}
+                          <div className={`absolute top-0 left-0 w-1.5 h-full ${
+                            isPending ? 'bg-amber-500' :
+                            isValid ? 'bg-emerald-500' :
+                            'bg-red-500'
+                          }`} />
+
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pl-1">
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black text-zinc-900 dark:text-zinc-100">{letter.studentName}</span>
+                                <span className="text-[9px] font-mono text-zinc-400 py-0.5 px-2 bg-zinc-100 dark:bg-zinc-900 rounded-full">{letter.studentId || 'STU-OFFICIAL'}</span>
+                                <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/10 px-2 py-0.5 rounded-full">{letter.className}</span>
+                                {letter.excuseType && (
+                                  <span className="text-[9px] font-extrabold uppercase bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded-full">
+                                    🏷️ {letter.excuseType}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-zinc-500 mt-1">Duration: <span className="font-semibold text-zinc-850 dark:text-zinc-200">{letter.startDate}</span> to <span className="font-semibold text-zinc-850 dark:text-zinc-200">{letter.endDate}</span></p>
                             </div>
-                            <p className="text-[11px] text-zinc-500 mt-1">Duration: <span className="font-semibold text-zinc-850 dark:text-zinc-200">{letter.startDate}</span> to <span className="font-semibold text-zinc-850 dark:text-zinc-200">{letter.endDate}</span></p>
+
+                            <div className="flex items-center gap-1.5 self-start">
+                              <span className="text-[9px] font-bold text-zinc-400 uppercase">Decision Status:</span>
+                              <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${
+                                isValid ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                                isInvalid ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
+                                'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                              }`}>
+                                {isValid ? 'valid (approved)' : isInvalid ? 'invalid (rejected)' : 'pending review'}
+                              </span>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 self-start">
-                            <span className="text-[9px] font-bold text-zinc-400 uppercase">Decision Status:</span>
-                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full ${
-                              letter.status === 'approved' || letter.status === 'valid' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
-                              letter.status === 'rejected' || letter.status === 'invalid' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
-                              'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                            }`}>
-                              {letter.status === 'approved' || letter.status === 'valid' ? 'valid' : letter.status === 'rejected' || letter.status === 'invalid' ? 'invalid' : letter.status}
-                            </span>
+                          <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 pl-4">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Filed Reason & Explanations</p>
+                            <p className="text-xs text-zinc-700 dark:text-zinc-300 italic mt-1.5 font-sans leading-relaxed">"{letter.reason}"</p>
+                            {letter.attachmentName && (
+                              <div className="flex items-center gap-2 mt-3 p-2 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 rounded-xl w-fit cursor-pointer">
+                                <span className="text-[10px] text-emerald-500 font-mono">📎 {letter.attachmentName}</span>
+                              </div>
+                            )}
                           </div>
-                        </div>
 
-                        <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Filed Reason & Explanations</p>
-                          <p className="text-xs text-zinc-700 dark:text-zinc-300 italic mt-1.5 font-sans leading-relaxed">"{letter.reason}"</p>
-                          {letter.attachmentName && (
-                            <div className="flex items-center gap-2 mt-3 p-2 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 rounded-xl w-fit cursor-pointer">
-                              <span className="text-[10px] text-emerald-500 font-mono">📎 {letter.attachmentName}</span>
+                          {/* Quick Action Buttons for Approve / Reject */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-zinc-100 dark:border-zinc-900">
+                            <div className="text-[10px] text-zinc-400 flex items-center gap-1 font-mono">
+                              {isPending ? (
+                                <span className="text-amber-500 font-bold flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                                  Action Required: Verify student excuse claim
+                                </span>
+                              ) : isValid ? (
+                                <span className="text-emerald-500 font-bold flex items-center gap-1">
+                                  <CheckCircle className="w-3.5 h-3.5" /> Approved & attendance marked Excused
+                                </span>
+                              ) : (
+                                <span className="text-red-500 font-bold flex items-center gap-1">
+                                  <AlertCircle className="w-3.5 h-3.5" /> Marked Invalid & Archived
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </div>
 
-                        <div className="flex items-center justify-end gap-2.5 pt-1">
-                          {onUpdateExcuseStatus && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  onUpdateExcuseStatus(letter.id, 'valid');
-                                  speakText(`Approved excuse letter for ${letter.studentName}. Attendance record converted to Excused.`, accessibility.readAloud);
-                                }}
-                                title="Approves excuse letter and marks attendance record as Excused for the date"
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all ${
-                                  letter.status === 'valid' || letter.status === 'approved'
-                                    ? 'bg-emerald-500 text-black shadow-sm scale-95'
-                                    : 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-black'
-                                }`}
-                              >
-                                ✓ Approve & Mark Excused
-                              </button>
-                              <button
-                                onClick={() => {
-                                  onUpdateExcuseStatus(letter.id, 'invalid');
-                                  speakText(`Marked excuse as invalid.`, accessibility.readAloud);
-                                }}
-                                title="Rejects excuse letter"
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all ${
-                                  letter.status === 'invalid' || letter.status === 'rejected'
-                                    ? 'bg-red-500 text-white shadow-sm scale-95'
-                                    : 'bg-transparent border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                                }`}
-                              >
-                                ✗ Reject Excuse
-                              </button>
-                            </>
-                          )}
-                        </div>
+                            {onUpdateExcuseStatus && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onUpdateExcuseStatus(letter.id, 'valid');
+                                    speakText(`Approved excuse letter for ${letter.studentName}. Attendance converted to Excused.`, accessibility.readAloud);
+                                  }}
+                                  title="Approve request and immediately convert attendance to Excused"
+                                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 ${
+                                    isValid
+                                      ? 'bg-emerald-500 text-black shadow-sm font-black'
+                                      : 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                                  }`}
+                                >
+                                  <Check className="w-4 h-4 stroke-[3]" />
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onUpdateExcuseStatus(letter.id, 'invalid');
+                                    speakText(`Rejected excuse letter for ${letter.studentName}.`, accessibility.readAloud);
+                                  }}
+                                  title="Reject request"
+                                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 ${
+                                    isInvalid
+                                      ? 'bg-red-500 text-white shadow-sm font-black'
+                                      : 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20'
+                                  }`}
+                                >
+                                  <X className="w-4 h-4 stroke-[3]" />
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
-                      </motion.div>
-                    ))}
+                        </motion.div>
+                      );
+                    })}
                   </AnimatePresence>
                 </div>
               )}
@@ -2982,13 +3234,28 @@ export default function DashboardFaculty({
                         }`}
                       >
                         <Settings className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>{showQuickAttendanceEdit ? 'Edit Mode: ON' : 'Quick Edit Logs'}</span>
+                        <span>{showQuickAttendanceEdit ? 'Edit Mode: ON' : 'Quick Edit'}</span>
+                      </button>
+
+                      {/* Batch Attendance Override: Mark All Excused (University Suspension / Holiday) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBatchActionType('excused');
+                          setShowBatchMarkConfirmModal(true);
+                          speakText("Open confirmation to mark entire session excused or university holiday", accessibility.readAloud);
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 active:scale-95"
+                        title="Mark entire class session as Excused / Official University Suspension or Holiday"
+                      >
+                        <span>🏛️ Mark All Excused / Holiday</span>
                       </button>
 
                       {/* Batch Attendance Override Button with Confirmation Safety */}
                       <button
                         type="button"
                         onClick={() => {
+                          setBatchActionType('present');
                           setShowBatchMarkConfirmModal(true);
                           speakText("Open confirmation to mark all present", accessibility.readAloud);
                         }}
@@ -2996,7 +3263,7 @@ export default function DashboardFaculty({
                         title="Mark all enrolled students as Present for selected date"
                       >
                         <CheckSquare className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                        <span>⚡ Mark All Present Today</span>
+                        <span>⚡ Mark All Present</span>
                       </button>
                     </div>
                   </div>
@@ -3528,25 +3795,57 @@ export default function DashboardFaculty({
         </div>
       )}
 
-      {/* Confirmation Dialog for Mark All Present Today */}
+      {/* Confirmation Dialog for Batch Mass Attendance Update */}
       {showBatchMarkConfirmModal && (
         <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-3xl max-w-md w-full text-left space-y-4 shadow-2xl animate-scale-up">
             <div className="flex items-center gap-3 pb-3 border-b border-zinc-150 dark:border-zinc-900">
-              <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                <CheckSquare className="w-5 h-5 text-emerald-500 stroke-[2.5]" />
+              <div className={`p-2.5 rounded-2xl border ${
+                batchActionType === 'excused' 
+                  ? 'bg-sky-500/10 text-sky-500 border-sky-500/20' 
+                  : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+              }`}>
+                <CheckSquare className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
                 <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
-                  Confirm Mass Attendance Update
+                  {batchActionType === 'excused' ? '🏛️ Batch Excuse / University Suspension' : '⚡ Confirm Mass Attendance (Present)'}
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Bulk mark enrolled students as Present
+                  {batchActionType === 'excused' 
+                    ? 'Mark whole class session as Excused due to official suspension or university event' 
+                    : 'Bulk mark enrolled students as Present for this date'}
                 </p>
               </div>
             </div>
 
             <div className="space-y-3 text-xs text-zinc-600 dark:text-zinc-400">
+              {/* Mode Toggle */}
+              <div className="flex rounded-xl bg-zinc-100 dark:bg-zinc-900 p-1 border border-zinc-200 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setBatchActionType('present')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    batchActionType === 'present'
+                      ? 'bg-emerald-500 text-black shadow-xs'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  ⚡ Mark All Present
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBatchActionType('excused')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    batchActionType === 'excused'
+                      ? 'bg-sky-500 text-black shadow-xs'
+                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
+                  }`}
+                >
+                  🏛️ Mark All Excused
+                </button>
+              </div>
+
               <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Course:</span>
@@ -3568,10 +3867,34 @@ export default function DashboardFaculty({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              {batchActionType === 'excused' && (
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                    Official Suspension / Excused Reason:
+                  </label>
+                  <select
+                    value={batchExcusedReason}
+                    onChange={(e) => setBatchExcusedReason(e.target.value)}
+                    className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-sky-500 outline-none text-zinc-900 dark:text-zinc-100 font-semibold"
+                  >
+                    <option value="Official MSU University Holiday / Suspension">Official MSU University Holiday / Suspension</option>
+                    <option value="Severe Weather / Marawi Rainstorm & Flooding Suspension">Severe Weather / Marawi Rainstorm & Flooding Suspension</option>
+                    <option value="University Convocations / General Assembly">University Convocations / General Assembly</option>
+                    <option value="MSU System Athletic & Cultural Meet">MSU System Athletic & Cultural Meet</option>
+                    <option value="Campus-wide Transportation / 4th St Disruption">Campus-wide Transportation / 4th St Disruption</option>
+                    <option value="College Academic Day / Faculty Colloquium">College Academic Day / Faculty Colloquium</option>
+                  </select>
+                </div>
+              )}
+
+              <div className={`p-3 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
+                batchActionType === 'excused'
+                  ? 'bg-sky-500/10 border-sky-500/20 text-sky-700 dark:text-sky-300'
+                  : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
+              }`}>
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
-                  This action will mark or overwrite attendance records for all <strong>{monEnrollments.length} enrolled students</strong> in this section as <strong>Present</strong> on {selectedRosterDate}.
+                  This action will mark attendance records for all <strong>{monEnrollments.length} enrolled students</strong> in this section as <strong>{batchActionType === 'excused' ? 'Excused (Official Suspension)' : 'Present'}</strong> on {selectedRosterDate}.
                 </span>
               </div>
             </div>
@@ -3588,11 +3911,15 @@ export default function DashboardFaculty({
                 type="button"
                 onClick={() => {
                   setShowBatchMarkConfirmModal(false);
-                  handleBatchMarkAllPresent();
+                  handleBatchAttendanceOverride(batchActionType);
                 }}
-                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer text-center transition-all shadow-sm active:scale-95"
+                className={`flex-1 py-2.5 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer text-center transition-all shadow-sm active:scale-95 ${
+                  batchActionType === 'excused'
+                    ? 'bg-sky-400 hover:bg-sky-300'
+                    : 'bg-emerald-500 hover:bg-emerald-400'
+                }`}
               >
-                Yes, Mark All Present
+                {batchActionType === 'excused' ? 'Confirm Batch Excuse' : 'Yes, Mark All Present'}
               </button>
             </div>
           </div>

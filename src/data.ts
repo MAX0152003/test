@@ -2,15 +2,7 @@ import { ClassSession, AppNotification, FacultyStatus, AttendanceRecord, UserPro
 
 export const INITIAL_CLASSES: ClassSession[] = [];
 
-export const INITIAL_FACULTY_STATUSES: FacultyStatus[] = [
-  {
-    id: 'fac-01',
-    name: 'Dr. Ahmad Khan',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
-    status: 'available',
-    room: 'Consultation Office 303'
-  }
-];
+export const INITIAL_FACULTY_STATUSES: FacultyStatus[] = [];
 
 export const INITIAL_NOTIFICATIONS: AppNotification[] = [];
 

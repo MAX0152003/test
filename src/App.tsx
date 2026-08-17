@@ -116,7 +116,7 @@ const safeStorage = {
 
 export default function App() {
   // Synchronously purge old cache/demo data to guarantee a fresh zero-record start
-  if (typeof window !== 'undefined' && !safeStorage.getItem('cp_purged_v5')) {
+  if (typeof window !== 'undefined' && !safeStorage.getItem('cp_purged_v7')) {
     safeStorage.removeItem('cp_classes');
     safeStorage.removeItem('cp_records');
     safeStorage.removeItem('cp_notifications');
@@ -126,7 +126,21 @@ export default function App() {
     safeStorage.removeItem('cp_announcements');
     safeStorage.removeItem('classpulse_registered_users');
     safeStorage.removeItem('classpulse_registered_admins');
-    safeStorage.setItem('cp_purged_v5', 'true');
+    safeStorage.removeItem('classpulse_custom_passwords');
+    safeStorage.removeItem('classpulse_password_reset_requests');
+    safeStorage.removeItem('cp_lab_rooms');
+    safeStorage.removeItem('cp_offline_queue_count');
+    safeStorage.removeItem('cp_user');
+    safeStorage.removeItem('cp_screen');
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('cp_support_tickets_') || k.startsWith('cp_chat_') || k.startsWith('cp_'))) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch (_) {}
+    safeStorage.setItem('cp_purged_v7', 'true');
   }
 
   // Global App-level Toast System
@@ -532,53 +546,134 @@ export default function App() {
     const cached = safeStorage.getItem('cp_lab_rooms');
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((r: LabRoom) => ({
+            ...r,
+            buildingCluster: r.buildingCluster || r.building || (r.name.includes('Sci') ? 'Science & Mathematics Complex' : r.name.includes('Eng') ? 'College of Engineering Wing' : 'CICS Complex (Information & Computing Sciences)')
+          }));
+        }
       } catch (e) {
         console.error("Error parsing cp_lab_rooms:", e);
       }
     }
     return [
       {
-        id: 'lab-1',
-        name: 'Room 201 - Advanced Web Lab',
-        capacity: 40,
-        status: 'occupied',
-        currentOccupancy: 24,
-        activeClass: 'ITE183 - Web Systems',
-        devicesCount: 40,
+        id: 'lab-cics-1',
+        name: 'CICS Multimedia Lab 1 (Room 201)',
+        capacity: 45,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 45,
         scannersActive: true,
-        activeScannerLogs: [
-          { id: 'log-1', timestamp: '09:04:15 AM', studentId: '2023-14923', studentName: 'John Doe', action: 'Scan IN', status: 'Present' },
-          { id: 'log-2', timestamp: '09:04:45 AM', studentId: '2023-99124', studentName: 'Bob Carter', action: 'Scan IN', status: 'Present' },
-          { id: 'log-3', timestamp: '09:05:01 AM', studentId: '2023-10492', studentName: 'Farhan Makil', action: 'Scan IN', status: 'Present' }
-        ],
-        floor: '2nd Floor'
+        activeScannerLogs: [],
+        floor: '2nd Floor',
+        buildingCluster: 'CICS Complex (Information & Computing Sciences)'
       },
       {
-        id: 'lab-2',
-        name: 'Room 205 - Microprocessor Lab',
+        id: 'lab-cics-2',
+        name: 'CICS Software Eng. Lab 2 (Room 204)',
+        capacity: 40,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 40,
+        scannersActive: true,
+        activeScannerLogs: [],
+        floor: '2nd Floor',
+        buildingCluster: 'CICS Complex (Information & Computing Sciences)'
+      },
+      {
+        id: 'lab-cics-3',
+        name: 'CICS Cyber Lecture Hall 101',
+        capacity: 60,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 20,
+        scannersActive: true,
+        activeScannerLogs: [],
+        floor: '1st Floor',
+        buildingCluster: 'CICS Complex (Information & Computing Sciences)'
+      },
+      {
+        id: 'lab-sci-1',
+        name: 'Science Complex Physics Lab A',
         capacity: 35,
         status: 'available',
         currentOccupancy: 0,
         activeClass: '',
-        devicesCount: 35,
+        devicesCount: 30,
         scannersActive: true,
-        activeScannerLogs: [
-          { id: 'log-4', timestamp: '08:50:12 AM', studentId: '2023-10492', studentName: 'James Dean', action: 'Scan OUT', status: 'Present' }
-        ],
-        floor: '2nd Floor'
+        activeScannerLogs: [],
+        floor: '3rd Floor',
+        buildingCluster: 'Science & Mathematics Complex'
       },
       {
-        id: 'lab-3',
-        name: 'Room 302 - Network Engineering Lab',
-        capacity: 45,
-        status: 'maintenance',
+        id: 'lab-sci-2',
+        name: 'Chemistry Analytical Lab 302',
+        capacity: 30,
+        status: 'available',
         currentOccupancy: 0,
         activeClass: '',
-        devicesCount: 45,
-        scannersActive: false,
+        devicesCount: 15,
+        scannersActive: true,
         activeScannerLogs: [],
-        floor: '3rd Floor'
+        floor: '3rd Floor',
+        buildingCluster: 'Science & Mathematics Complex'
+      },
+      {
+        id: 'lab-eng-1',
+        name: 'Engineering Wing CAD/CAM Studio',
+        capacity: 50,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 50,
+        scannersActive: true,
+        activeScannerLogs: [],
+        floor: '1st Floor',
+        buildingCluster: 'College of Engineering Wing'
+      },
+      {
+        id: 'lab-eng-2',
+        name: 'Robotics & Electronics Workshop 105',
+        capacity: 30,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 25,
+        scannersActive: true,
+        activeScannerLogs: [],
+        floor: '1st Floor',
+        buildingCluster: 'College of Engineering Wing'
+      },
+      {
+        id: 'lab-kf-1',
+        name: 'King Faisal Islamic Studies Amphitheater',
+        capacity: 80,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 10,
+        scannersActive: true,
+        activeScannerLogs: [],
+        floor: '1st Floor',
+        buildingCluster: 'King Faisal Center for Islamic Studies'
+      },
+      {
+        id: 'lab-lib-1',
+        name: 'University Library IT Training Center',
+        capacity: 50,
+        status: 'available',
+        currentOccupancy: 0,
+        activeClass: '',
+        devicesCount: 50,
+        scannersActive: true,
+        activeScannerLogs: [],
+        floor: '2nd Floor',
+        buildingCluster: 'University Library & IT Center'
       }
     ];
   });
@@ -589,7 +684,7 @@ export default function App() {
 
   const [offlineQueueCount, setOfflineQueueCount] = React.useState<number>(() => {
     const cached = safeStorage.getItem('cp_offline_queue_count');
-    return cached ? parseInt(cached, 10) : 3;
+    return cached ? parseInt(cached, 10) : 0;
   });
 
   // Action/simulation trackers
@@ -767,6 +862,96 @@ export default function App() {
   React.useEffect(() => {
     safeStorage.setItem('cp_announcements', JSON.stringify(announcements));
   }, [announcements]);
+
+  // Automated Absence Alert Monitor: Flags students with 3+ consecutive unexcused absences in major subjects
+  // and dispatches alert pings to assigned department chair and academic adviser
+  React.useEffect(() => {
+    if (classes.length === 0 || enrollments.length === 0 || attendanceRecords.length === 0) return;
+
+    try {
+      const alertedMap: Record<string, number> = JSON.parse(safeStorage.getItem('cp_consecutive_absence_alerts') || '{}');
+      const now = Date.now();
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      const newAlerts: AppNotification[] = [];
+      const newDispatches: any[] = [];
+
+      enrollments.forEach(enr => {
+        if (enr.deletedByStudent) return;
+        const matchedClass = classes.find(c => c.id === enr.classId);
+        if (!matchedClass) return;
+
+        // Filter attendance records for this student and class
+        const studentRecords = attendanceRecords.filter(
+          r => r.classId === enr.classId && 
+          (r.studentId === enr.studentId || r.studentName === enr.studentName || (enr.studentEmail && r.studentEmail === enr.studentEmail))
+        );
+
+        // Sort descending by date
+        const sorted = [...studentRecords].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        let consecutiveAbs = 0;
+        for (const r of sorted) {
+          if (r.status === 'absent') {
+            consecutiveAbs++;
+          } else if (r.status === 'excused') {
+            continue;
+          } else {
+            break;
+          }
+        }
+
+        if (consecutiveAbs >= 3) {
+          const alertKey = `${enr.studentId || enr.studentName}_${matchedClass.id}_3abs`;
+          const lastAlerted = alertedMap[alertKey] || 0;
+
+          // Check if alerted within last 24 hours
+          if (now - lastAlerted > ONE_DAY_MS) {
+            alertedMap[alertKey] = now;
+
+            const notif: AppNotification = {
+              id: 'notif-3abs-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+              title: `⚠️ 3 Consecutive Absences: ${enr.studentName || 'Student'}`,
+              message: `Early Warning Policy: ${enr.studentName || 'Student'} has accumulated ${consecutiveAbs} consecutive unexcused absences in ${matchedClass.code} (${matchedClass.name}). Alert dispatched to Academic Adviser & Department Chair.`,
+              timestamp: 'Just Now',
+              type: 'alert',
+              read: false
+            };
+            newAlerts.push(notif);
+
+            const emailDispatch = {
+              id: 'email-auto-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+              studentId: enr.studentId || 'STU-OFFICIAL',
+              studentName: enr.studentName || 'Student Candidate',
+              studentEmail: enr.studentEmail || `${enr.studentId || 'student'}@msumain.edu.ph`,
+              classCode: matchedClass.code,
+              className: matchedClass.name,
+              attendanceRate: Math.round(((sorted.filter(r => r.status === 'present' || r.status === 'late').length) / (sorted.length || 1)) * 100),
+              advisorEmail: 'cics.academic.adviser@msumain.edu.ph',
+              departmentChairEmail: 'cics.deptchair@msumain.edu.ph',
+              dispatchedAt: new Date().toLocaleString(),
+              status: 'Delivered',
+              subject: `⚠️ AUTOMATED ATTENDANCE ALERT: 3 Consecutive Absences - ${enr.studentName} in ${matchedClass.code}`,
+              body: `OFFICIAL MSU EARLY INTERVENTION NOTICE\n\nStudent: ${enr.studentName} (${enr.studentId || 'ID Pending'})\nSubject: ${matchedClass.code} - ${matchedClass.name}\nConsecutive Unexcused Absences: ${consecutiveAbs}\n\nNotice has been automatically routed to the Academic Adviser and Department Chair for immediate student counseling and intervention under MSU Academic Attendance Guidelines.`
+            };
+            newDispatches.push(emailDispatch);
+          }
+        }
+      });
+
+      if (newAlerts.length > 0) {
+        safeStorage.setItem('cp_consecutive_absence_alerts', JSON.stringify(alertedMap));
+        setNotifications(prev => [...newAlerts, ...prev]);
+
+        const existingDispatches = JSON.parse(safeStorage.getItem('classpulse_dispatched_emails') || '[]');
+        safeStorage.setItem('classpulse_dispatched_emails', JSON.stringify([...newDispatches, ...existingDispatches]));
+
+        if (typeof window !== 'undefined' && (window as any).showToast) {
+          (window as any).showToast(`⚠️ Automated Absence Monitor: ${newAlerts.length} student(s) flagged with 3+ consecutive absences. Alerts dispatched.`, "warning");
+        }
+      }
+    } catch (e) {
+      console.error("Error running automated absence monitor:", e);
+    }
+  }, [attendanceRecords, enrollments, classes]);
 
   // Automatically analyze and detect if non-maintenance rooms are occupied or available
   React.useEffect(() => {

@@ -1,7 +1,8 @@
 import React from 'react';
 import { ClassSession, Enrollment, UserProfile } from '../types';
-import { Clock, MapPin, User, Calendar, LayoutGrid, Columns, ListFilter, ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Clock, MapPin, User, Calendar, LayoutGrid, Columns, ListFilter, ChevronRight, CheckCircle2, AlertCircle, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
+import { isFridayPrayerWindow } from '../lib/msuUtils';
 
 interface WeeklyScheduleGridProps {
   classes: ClassSession[];
@@ -179,7 +180,25 @@ export default function WeeklyScheduleGrid({
   }, [filteredClasses, activeDays]);
 
   return (
-    <div className="w-full text-left animate-fade-in">
+    <div className="w-full text-left space-y-4 animate-fade-in">
+      {/* Jum'ah Friday Banner Alert */}
+      <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-300">
+        <div className="flex items-center gap-2.5">
+          <span className="text-base shrink-0">🕌</span>
+          <div>
+            <strong className="font-extrabold uppercase tracking-wide text-[11px] block">
+              MSU Marawi Friday Jum’ah Prayer Schedule Awareness (11:30 AM – 1:30 PM)
+            </strong>
+            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+              Classes scheduled during Friday midday include automatic transit grace and prayer accommodation markers across student & faculty timetables.
+            </p>
+          </div>
+        </div>
+        <span className="hidden md:inline-flex text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+          Campus Policy
+        </span>
+      </div>
+
       {/* -------------------------------------------------------------------------- */}
       {/* WEEKLY CALENDAR TIMETABLE MATRIX GRID MODE */}
       {/* -------------------------------------------------------------------------- */}
@@ -193,22 +212,32 @@ export default function WeeklyScheduleGrid({
                 </th>
                 {activeDays.map(day => {
                   const isToday = day.key === currentDayKey;
+                  const isFriday = day.key === 'fri';
                   return (
                     <th
                       key={day.key}
                       className={`p-3 text-center border-r last:border-r-0 border-zinc-200/60 dark:border-zinc-850 ${
                         isToday
                           ? 'bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          : isFriday
+                          ? 'bg-amber-500/[0.04] dark:bg-amber-500/[0.06] text-zinc-800 dark:text-zinc-200'
                           : 'text-zinc-800 dark:text-zinc-200'
                       }`}
                     >
                       <div className="flex flex-col items-center justify-center gap-0.5">
-                        <span className="text-xs font-black uppercase tracking-wider font-mono">{day.label}</span>
-                        {isToday && (
+                        <span className="text-xs font-black uppercase tracking-wider font-mono flex items-center gap-1">
+                          {day.label}
+                          {isFriday && <span title="MSU Marawi Friday Jum'ah Prayer Window" className="text-[10px]">🕌</span>}
+                        </span>
+                        {isToday ? (
                           <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-emerald-500 text-black">
                             Today
                           </span>
-                        )}
+                        ) : isFriday ? (
+                          <span className="text-[7.5px] font-bold text-amber-600 dark:text-amber-400 font-mono tracking-tight flex items-center gap-0.5">
+                            <span>Jum'ah 11:30–1:30</span>
+                          </span>
+                        ) : null}
                       </div>
                     </th>
                   );
@@ -216,98 +245,126 @@ export default function WeeklyScheduleGrid({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200/60 dark:divide-zinc-850/80">
-              {activeTimeSlots.map(slot => (
-                <tr key={slot.label} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
-                  {/* Time Header Cell */}
-                  <td className="p-2.5 text-center text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 border-r border-zinc-200/60 dark:border-zinc-850 bg-zinc-50/60 dark:bg-zinc-900/40 align-top">
-                    {slot.label}
-                  </td>
+              {activeTimeSlots.map(slot => {
+                const isJumahSlot = slot.startMin >= 660 && slot.startMin <= 780; // 11:00 AM - 1:00 PM
 
-                  {/* Day Cells */}
-                  {activeDays.map(day => {
-                    const isToday = day.key === currentDayKey;
+                return (
+                  <tr key={slot.label} className="group hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors">
+                    {/* Time Header Cell */}
+                    <td className="p-2.5 text-center text-[10px] font-mono font-bold text-zinc-500 dark:text-zinc-400 border-r border-zinc-200/60 dark:border-zinc-850 bg-zinc-50/60 dark:bg-zinc-900/40 align-top">
+                      {slot.label}
+                    </td>
 
-                    // Match classes that start during this slot or span into it
-                    const matchingClasses = filteredClasses.filter(cls => {
-                      const expanded = expandDaysToSpecificOnesVal(cls.days);
-                      if (!expanded.includes(day.key)) return false;
+                    {/* Day Cells */}
+                    {activeDays.map(day => {
+                      const isToday = day.key === currentDayKey;
+                      const isFriday = day.key === 'fri';
+                      const isFridayPrayerCell = isFriday && isJumahSlot;
 
-                      const startMins = parseTimeToMinutes(cls.startTime);
-                      // Match class if it starts within this hour slot
-                      if (startMins >= slot.startMin && startMins < slot.endMin) {
-                        return true;
-                      }
-                      // Fallback if class started earlier and no slot caught it
-                      if (slot.startMin === 420 && startMins < 420) {
-                        return true;
-                      }
-                      return false;
-                    });
+                      // Match classes that start during this slot or span into it
+                      const matchingClasses = filteredClasses.filter(cls => {
+                        const expanded = expandDaysToSpecificOnesVal(cls.days);
+                        if (!expanded.includes(day.key)) return false;
 
-                    return (
-                      <td
-                        key={`${day.key}-${slot.label}`}
-                        className={`p-1.5 border-r last:border-r-0 border-zinc-200/60 dark:border-zinc-850 align-top h-24 ${
-                          isToday ? 'bg-emerald-500/[0.02] dark:bg-emerald-500/[0.03]' : ''
-                        }`}
-                      >
-                        <div className="space-y-1.5 h-full">
-                          {matchingClasses.map(cls => {
-                            const isEnrolled = enrollments.some(
-                              e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
-                            );
-                            const theme = getColorThemeForCode(cls.code);
+                        const startMins = parseTimeToMinutes(cls.startTime);
+                        // Match class if it starts within this hour slot
+                        if (startMins >= slot.startMin && startMins < slot.endMin) {
+                          return true;
+                        }
+                        // Fallback if class started earlier and no slot caught it
+                        if (slot.startMin === 420 && startMins < 420) {
+                          return true;
+                        }
+                        return false;
+                      });
 
-                            return (
-                              <motion.div
-                                key={cls.id}
-                                whileHover={{ scale: 1.02 }}
-                                transition={{ duration: 0.15 }}
-                                onClick={() => onOpenSubjectDetails?.(cls)}
-                                className={`p-2 rounded-xl border ${theme.bg} ${theme.border} transition-all cursor-pointer shadow-2xs hover:shadow-md text-left space-y-1.5`}
-                              >
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md font-mono ${theme.badge}`}>
-                                    {cls.code}
-                                  </span>
-                                  {userRole === 'student' && (
-                                    <span className={`text-[7.5px] font-black px-1 py-0.5 rounded-full ${
-                                      isEnrolled ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'
-                                    }`}>
-                                      {isEnrolled ? 'Joined' : 'Open'}
+                      return (
+                        <td
+                          key={`${day.key}-${slot.label}`}
+                          className={`p-1.5 border-r last:border-r-0 border-zinc-200/60 dark:border-zinc-850 align-top h-24 relative ${
+                            isToday ? 'bg-emerald-500/[0.02] dark:bg-emerald-500/[0.03]' : ''
+                          } ${
+                            isFridayPrayerCell ? 'bg-amber-500/[0.03] dark:bg-amber-500/[0.05]' : ''
+                          }`}
+                        >
+                          {isFridayPrayerCell && matchingClasses.length === 0 && (
+                            <div className="absolute inset-1 rounded-xl border border-dashed border-amber-500/20 bg-amber-500/[0.02] flex flex-col items-center justify-center p-1 pointer-events-none opacity-60">
+                              <span className="text-[10px]">🕌</span>
+                              <span className="text-[7.5px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider font-mono">
+                                Jum'ah Window
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="space-y-1.5 h-full relative z-1">
+                            {matchingClasses.map(cls => {
+                              const isEnrolled = enrollments.some(
+                                e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
+                              );
+                              const theme = getColorThemeForCode(cls.code);
+                              const hasJumah = isFriday && isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime);
+
+                              return (
+                                <motion.div
+                                  key={cls.id}
+                                  whileHover={{ scale: 1.02 }}
+                                  transition={{ duration: 0.15 }}
+                                  onClick={() => onOpenSubjectDetails?.(cls)}
+                                  className={`p-2 rounded-xl border ${theme.bg} ${theme.border} transition-all cursor-pointer shadow-2xs hover:shadow-md text-left space-y-1.5`}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md font-mono ${theme.badge}`}>
+                                      {cls.code}
                                     </span>
-                                  )}
-                                </div>
-
-                                <p className={`text-[10.5px] font-black leading-snug line-clamp-2 ${theme.text}`}>
-                                  {cls.name}
-                                </p>
-
-                                <div className="space-y-0.5 text-[9px] font-bold text-zinc-600 dark:text-zinc-400 border-t border-zinc-200/40 dark:border-zinc-800/60 pt-1">
-                                  <div className="flex items-center gap-1 font-mono">
-                                    <Clock className="w-2.5 h-2.5 text-emerald-500 shrink-0" />
-                                    <span>{cls.startTime} - {cls.endTime}</span>
+                                    {hasJumah && (
+                                      <span title="MSU Friday Prayer Window (11:30 AM - 1:30 PM)" className="text-[7.5px] font-black px-1 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-0.5">
+                                        🕌 Jum’ah
+                                      </span>
+                                    )}
+                                    {userRole === 'student' && (
+                                      <span className={`text-[7.5px] font-black px-1 py-0.5 rounded-full ${
+                                        isEnrolled ? 'bg-blue-600 text-white' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'
+                                      }`}>
+                                        {isEnrolled ? 'Joined' : 'Open'}
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                                    <span className="truncate">{cls.room || 'TBA'}</span>
-                                  </div>
-                                  {cls.facultyName && (
-                                    <div className="flex items-center gap-1 opacity-80">
-                                      <User className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
-                                      <span className="truncate">{cls.facultyName}</span>
+
+                                  <p className={`text-[10.5px] font-black leading-snug line-clamp-2 ${theme.text}`}>
+                                    {cls.name}
+                                  </p>
+
+                                  <div className="space-y-0.5 text-[9px] font-bold text-zinc-600 dark:text-zinc-400 border-t border-zinc-200/40 dark:border-zinc-800/60 pt-1">
+                                    <div className="flex items-center gap-1 font-mono">
+                                      <Clock className="w-2.5 h-2.5 text-emerald-500 shrink-0" />
+                                      <span>{cls.startTime} - {cls.endTime}</span>
                                     </div>
-                                  )}
-                                </div>
-                              </motion.div>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                      <span className="truncate">{cls.room || 'TBA'}</span>
+                                    </div>
+                                    {cls.buildingCluster && (
+                                      <div className="text-[8px] text-zinc-500 truncate font-sans">
+                                        🏢 {cls.buildingCluster.split('(')[0].trim()}
+                                      </div>
+                                    )}
+                                    {cls.facultyName && (
+                                      <div className="flex items-center gap-1 opacity-80">
+                                        <User className="w-2.5 h-2.5 text-indigo-400 shrink-0" />
+                                        <span className="truncate">{cls.facultyName}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -320,6 +377,7 @@ export default function WeeklyScheduleGrid({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 w-full">
           {activeDays.map(day => {
             const isToday = day.key === currentDayKey;
+            const isFriday = day.key === 'fri';
 
             const dayClasses = filteredClasses
               .filter(cls => {
@@ -334,6 +392,8 @@ export default function WeeklyScheduleGrid({
                 className={`flex flex-col rounded-2xl border transition-all overflow-hidden ${
                   isToday
                     ? 'bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05] border-emerald-500/40 shadow-sm'
+                    : isFriday
+                    ? 'bg-amber-500/[0.02] dark:bg-amber-500/[0.04] border-amber-500/30'
                     : 'bg-white dark:bg-zinc-950 border-zinc-200/90 dark:border-zinc-855'
                 }`}
               >
@@ -342,13 +402,22 @@ export default function WeeklyScheduleGrid({
                   className={`p-3 border-b flex items-center justify-between ${
                     isToday
                       ? 'bg-emerald-500 text-black font-black'
+                      : isFriday
+                      ? 'bg-amber-500/15 dark:bg-amber-500/20 border-amber-500/30 text-amber-900 dark:text-amber-200 font-extrabold'
                       : 'bg-zinc-100/80 dark:bg-zinc-900/80 border-zinc-200/80 dark:border-zinc-850 text-zinc-900 dark:text-zinc-100 font-extrabold'
                   }`}
                 >
-                  <span className="text-xs uppercase tracking-wider font-mono">{day.label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs uppercase tracking-wider font-mono">{day.label}</span>
+                    {day.key === 'fri' && <span title="MSU Marawi Jum'ah Prayer Period" className="text-xs">🕌</span>}
+                  </div>
                   {isToday ? (
                     <span className="text-[9px] font-black uppercase tracking-widest bg-black text-emerald-400 px-2 py-0.5 rounded-md shadow-xs">
                       Today
+                    </span>
+                  ) : day.key === 'fri' ? (
+                    <span className="text-[8px] font-mono font-black text-amber-700 dark:text-amber-300">
+                      Jum'ah 11:30–1:30
                     </span>
                   ) : (
                     <span className="text-[10px] font-mono font-bold text-zinc-400 dark:text-zinc-500">
@@ -364,6 +433,7 @@ export default function WeeklyScheduleGrid({
                       const isEnrolled = enrollments.some(
                         e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
                       );
+                      const hasJumah = isFriday && isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime);
 
                       return (
                         <motion.div
@@ -371,23 +441,34 @@ export default function WeeklyScheduleGrid({
                           whileHover={{ scale: 1.01, y: -1 }}
                           transition={{ duration: 0.15 }}
                           onClick={() => onOpenSubjectDetails?.(cls)}
-                          className="group p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 hover:border-emerald-500/40 transition-all cursor-pointer shadow-xs hover:shadow-md space-y-2 text-left"
+                          className={`group p-3 rounded-xl border transition-all cursor-pointer shadow-xs hover:shadow-md space-y-2 text-left ${
+                            hasJumah 
+                              ? 'bg-amber-500/[0.04] dark:bg-amber-500/[0.07] border-amber-500/40 hover:border-amber-500' 
+                              : 'bg-zinc-50 dark:bg-zinc-900/90 border-zinc-200/80 dark:border-zinc-800 hover:border-emerald-500/40'
+                          }`}
                         >
                           <div className="flex items-start justify-between gap-1.5">
                             <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-md border border-emerald-500/10 uppercase tracking-wide font-mono shrink-0">
                               {cls.code}
                             </span>
-                            {userRole === 'student' && (
-                              <span
-                                className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
-                                  isEnrolled
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
-                                }`}
-                              >
-                                {isEnrolled ? 'Enrolled' : 'Open'}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {hasJumah && (
+                                <span title="MSU Friday Prayer Window (11:30 AM - 1:30 PM)" className="text-[7.5px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                  🕌 Jum’ah
+                                </span>
+                              )}
+                              {userRole === 'student' && (
+                                <span
+                                  className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                    isEnrolled
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                                  }`}
+                                >
+                                  {isEnrolled ? 'Enrolled' : 'Open'}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100 line-clamp-2 leading-snug group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
@@ -403,6 +484,11 @@ export default function WeeklyScheduleGrid({
                               <MapPin className="w-3 h-3 text-amber-500 shrink-0" />
                               <span className="truncate">{cls.room || 'TBA'}</span>
                             </div>
+                            {cls.buildingCluster && (
+                              <div className="text-[8.5px] text-zinc-500 truncate font-medium">
+                                🏢 {cls.buildingCluster.split('(')[0].trim()}
+                              </div>
+                            )}
                             {cls.facultyName && (
                               <div className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-450 text-[9.5px]">
                                 <User className="w-3 h-3 text-indigo-400 shrink-0" />
@@ -439,20 +525,32 @@ export default function WeeklyScheduleGrid({
                 e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
               );
               const theme = getColorThemeForCode(cls.code);
+              const hasJumah = isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime);
 
               return (
                 <div
                   key={cls.id}
                   onClick={() => onOpenSubjectDetails?.(cls)}
-                  className="p-4 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 hover:border-emerald-500/50 transition-all shadow-xs hover:shadow-md cursor-pointer space-y-3 text-left"
+                  className={`p-4 rounded-2xl border hover:border-emerald-500/50 transition-all shadow-xs hover:shadow-md cursor-pointer space-y-3 text-left ${
+                    hasJumah
+                      ? 'bg-amber-500/[0.02] dark:bg-amber-500/[0.04] border-amber-500/30'
+                      : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-mono ${theme.badge}`}>
                       {cls.code}
                     </span>
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800">
-                      {(cls.days || []).join(', ')}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {hasJumah && (
+                        <span title="MSU Friday Prayer Window (11:30 AM - 1:30 PM)" className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                          🕌 Jum’ah Aware
+                        </span>
+                      )}
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800">
+                        {(cls.days || []).join(', ')}
+                      </span>
+                    </div>
                   </div>
 
                   <div>
@@ -470,13 +568,19 @@ export default function WeeklyScheduleGrid({
                   <div className="grid grid-cols-2 gap-2 text-xs font-bold pt-2 border-t border-zinc-100 dark:border-zinc-900">
                     <div className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300 font-mono">
                       <Clock className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                      <span>{cls.startTime} - {cls.endTime}</span>
+                      <span className="truncate">{cls.startTime} - {cls.endTime}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400">
                       <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                       <span className="truncate">{cls.room || 'TBA'}</span>
                     </div>
                   </div>
+
+                  {cls.buildingCluster && (
+                    <div className="text-[9px] text-zinc-400 font-semibold truncate pt-1 border-t border-zinc-100 dark:border-zinc-900">
+                      🏢 Cluster: {cls.buildingCluster}
+                    </div>
+                  )}
                 </div>
               );
             })

@@ -34,6 +34,7 @@ import {
 import { UserProfile, AccessibilityConfig, ClassSession, ViewDensity } from '../types';
 import { speakText } from './AccessibilitySettings';
 import { saveUserCredentialToFirestore, saveUserProfileToFirestore } from '../lib/firestoreSync';
+import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
 
 interface SettingsProps {
   userProfile: UserProfile;
@@ -68,6 +69,7 @@ export default function Settings({
   // 2. Account Profile Form states (requires manual save)
   const [name, setName] = React.useState(userProfile.name);
   const [email, setEmail] = React.useState(userProfile.email);
+  const [studentId, setStudentId] = React.useState(userProfile.studentId || '');
   const [department, setDepartment] = React.useState(userProfile.department || '');
   const [phone, setPhone] = React.useState(userProfile.phone || '');
   const [bio, setBio] = React.useState(userProfile.bio || '');
@@ -117,6 +119,7 @@ export default function Settings({
   const isProfileDirty = 
     name !== userProfile.name ||
     email !== userProfile.email ||
+    studentId !== (userProfile.studentId || '') ||
     department !== (userProfile.department || '') ||
     phone !== (userProfile.phone || '') ||
     bio !== (userProfile.bio || '') ||
@@ -157,16 +160,23 @@ export default function Settings({
       return;
     }
 
+    if (userProfile.role === 'student' && studentId.trim() && !isValidMsuId(studentId.trim())) {
+      setErrorMsg("MSU Student ID must follow standard format (YYYY-XXXXX, e.g., 2023-10492).");
+      speakText("Error: Invalid MSU Student ID format.", accessibility.readAloud);
+      return;
+    }
+
     setIsSaving(true);
     speakText("Recording updated account credentials to directory nodes. Please standby.", accessibility.readAloud);
 
     // Simulate database network write latency
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const updatedProfile = {
+    const updatedProfile: UserProfile = {
       ...userProfile,
       name: name.trim(),
       email: email.trim(),
+      studentId: studentId.trim() ? formatMsuId(studentId.trim()) : userProfile.studentId,
       department: department.trim(),
       phone: phone.trim(),
       bio: bio.trim(),
@@ -609,6 +619,25 @@ export default function Settings({
                       placeholder="e.g. name@msu.edu.ph"
                     />
                   </div>
+
+                  {userProfile.role === 'student' && (
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">
+                          MSU Student ID Number
+                        </label>
+                        <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">YYYY-XXXXX</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={studentId}
+                        onChange={(e) => setStudentId(formatMsuId(e.target.value))}
+                        maxLength={10}
+                        className="w-full text-xs font-bold px-3.5 py-2.5 rounded-xl border bg-zinc-50/50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none focus:border-emerald-500 transition-all font-mono"
+                        placeholder="e.g. 2023-10492"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">

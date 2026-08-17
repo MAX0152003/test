@@ -17,6 +17,7 @@ import {
   Scan, 
   Calendar, 
   CheckCircle, 
+  CheckCircle2,
   AlertTriangle, 
   Clock, 
   MapPin, 
@@ -38,6 +39,7 @@ import {
   Award,
   UploadCloud,
   X,
+  XCircle,
   MessageSquare,
   Eye,
   EyeOff,
@@ -52,7 +54,9 @@ import {
   Check,
   LayoutGrid,
   List,
-  HelpCircle
+  HelpCircle,
+  Vibrate,
+  ShieldAlert
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock, { triggerNativeChime } from './AlarmClock';
@@ -77,6 +81,7 @@ import {
   Area,
   ReferenceLine
 } from 'recharts';
+import { EXCUSE_PRESET_TYPES, isFridayPrayerWindow } from '../lib/msuUtils';
 
 const expandDaysToSpecificOnesVal = (days: string[]): string[] => {
   const expanded: string[] = [];
@@ -165,7 +170,6 @@ export default function DashboardStudent({
   // State for search query inside My Schedule & Registered Courses
   const [scheduleSearch, setScheduleSearch] = React.useState('');
   const [registeredCourseSearch, setRegisteredCourseSearch] = React.useState('');
-  const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
   const [selectedFacultyForChat, setSelectedFacultyForChat] = React.useState<{ id: string; name?: string; ts: number } | undefined>(undefined);
 
   // Automatically reset selectedFacultyForChat when leaving messages screen
@@ -206,6 +210,49 @@ export default function DashboardStudent({
   const [scanningProgress, setScanningProgress] = React.useState(0);
   const [scanResult, setScanResult] = React.useState<{ success: boolean; message: string } | null>(null);
   const [showScanRipple, setShowScanRipple] = React.useState(false);
+
+  // Visual Haptic Feedback State (flashes green for success, red for error)
+  const [visualHaptic, setVisualHaptic] = React.useState<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    code?: string;
+    status?: string;
+    timestamp: number;
+  } | null>(null);
+
+  // Trigger visual and auditory/physical haptic feedback indicator
+  const triggerVisualHaptic = (
+    type: 'success' | 'error',
+    title: string,
+    message: string,
+    details?: { code?: string; status?: string }
+  ) => {
+    const ts = Date.now();
+    setVisualHaptic({
+      type,
+      title,
+      message,
+      code: details?.code,
+      status: details?.status,
+      timestamp: ts
+    });
+
+    if (type === 'success') {
+      playSuccessChime();
+      triggerHapticFeedback([60, 30, 90]);
+      setShowScanRipple(true);
+      setTimeout(() => setShowScanRipple(false), 2400);
+    } else {
+      playWarningChime();
+      triggerHapticFeedback([120, 60, 120, 60, 150]);
+    }
+
+    // Auto dismiss haptic flash after 2800ms
+    setTimeout(() => {
+      setVisualHaptic(prev => (prev?.timestamp === ts ? null : prev));
+    }, 2800);
+  };
 
   // Anti-Screenshot and Attendance Fraud Prevention state
   const [showScreenshotWarning, setShowScreenshotWarning] = React.useState(false);
@@ -407,6 +454,7 @@ export default function DashboardStudent({
   // Submit form states
   const [isLeaveFormOpen, setIsLeaveFormOpen] = React.useState(false);
   const [leaveClassId, setLeaveClassId] = React.useState(classes[0]?.id || '');
+  const [leaveExcuseType, setLeaveExcuseType] = React.useState(EXCUSE_PRESET_TYPES[0]);
   const [leaveStartDate, setLeaveStartDate] = React.useState('');
   const [leaveEndDate, setLeaveEndDate] = React.useState('');
   const [leaveReason, setLeaveReason] = React.useState('');
@@ -483,8 +531,11 @@ export default function DashboardStudent({
     if (!matchedClass) {
       setIsScanning(false);
       setScanResult({ success: false, message: "No active class registered in current curriculums." });
-      playWarningChime();
-      triggerHapticFeedback([100, 50, 100]);
+      triggerVisualHaptic(
+        'error',
+        'No Class Recognized',
+        'No active class registered in current curriculums.'
+      );
       speakText("Scan failed. No active class recognized.", accessibility.readAloud);
       return;
     }
@@ -493,13 +544,14 @@ export default function DashboardStudent({
     const status = Math.random() > 0.8 ? 'late' : 'present';
     onRecordAttendance(matchedClass.id, status);
 
-    // Provide immediate haptic and audio confirmation
-    playSuccessChime();
-    triggerHapticFeedback([60, 30, 90]);
-
     setIsScanning(false);
-    setShowScanRipple(true);
-    setTimeout(() => setShowScanRipple(false), 2400);
+
+    triggerVisualHaptic(
+      'success',
+      'Attendance Verified',
+      `Checked into ${matchedClass.name} (Room ${matchedClass.room})`,
+      { code: matchedClass.code, status: status.toUpperCase() }
+    );
 
     setScanResult({
       success: true,
@@ -705,8 +757,12 @@ export default function DashboardStudent({
       }
 
       if (!matchedClass) {
-        playWarningChime();
-        triggerHapticFeedback([100, 50, 100]);
+        triggerVisualHaptic(
+          'error',
+          'Unrecognized QR Code',
+          `Token "${decodedText.substring(0, 32)}${decodedText.length > 32 ? '...' : ''}" does not match active class rotation.`,
+          { code: 'INVALID' }
+        );
         setScanResult({
           success: false,
           message: `Unrecognized token: "${decodedText.substring(0, 40)}${decodedText.length > 40 ? '...' : ''}". Match the active rotation keys from your professor.`
@@ -718,11 +774,12 @@ export default function DashboardStudent({
       const status = Math.random() > 0.85 ? 'late' : 'present';
       onRecordAttendance(matchedClass.id, status);
 
-      playSuccessChime();
-      triggerHapticFeedback([60, 30, 90]);
-
-      setShowScanRipple(true);
-      setTimeout(() => setShowScanRipple(false), 2400);
+      triggerVisualHaptic(
+        'success',
+        'Attendance Verified',
+        `Live camera confirmed for ${matchedClass.name} in Room ${matchedClass.room}`,
+        { code: matchedClass.code, status: status.toUpperCase() }
+      );
 
       setScanResult({
         success: true,
@@ -730,6 +787,11 @@ export default function DashboardStudent({
       });
       speakText(`Scanned present successfully to ${matchedClass.name}`, accessibility.readAloud);
     } catch (err: any) {
+      triggerVisualHaptic(
+        'error',
+        'Camera Processing Error',
+        err?.message || 'Failed to process QR token signature.'
+      );
       setScanResult({
         success: false,
         message: `Scanning error: ${err?.message || 'Unknown processing error'}`
@@ -770,18 +832,35 @@ export default function DashboardStudent({
     }
   };
 
-  const handleDownloadReport = () => {
-    const studentRecs = attendanceRecords.filter(
-      r => r.studentId === userProfile.studentId || r.studentName === userProfile.name
+  // Compute enrolled class IDs for this student (excluding unenrolled/dropped/deleted subjects)
+  const studentEnrolledClassIds = React.useMemo(() => {
+    return new Set(
+      enrollments
+        .filter(e => (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) && !e.deletedByStudent)
+        .map(e => e.classId)
     );
+  }, [enrollments, userProfile]);
+
+  // Filter attendance records to ONLY those belonging to currently enrolled classes
+  const enrolledStudentRecords = React.useMemo(() => {
+    return attendanceRecords.filter(r => {
+      const isStudentMatch = r.studentId === userProfile.studentId || 
+                             r.studentName === userProfile.name ||
+                             (userProfile.email && r.studentId === userProfile.email);
+      return isStudentMatch && studentEnrolledClassIds.has(r.classId);
+    });
+  }, [attendanceRecords, userProfile, studentEnrolledClassIds]);
+
+  const handleDownloadReport = () => {
+    const studentRecs = enrolledStudentRecords;
 
     if (studentRecs.length === 0) {
       if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast("No attendance logs found to export of this student.", "warning");
+        (window as any).showToast("No attendance logs found for your enrolled subjects.", "warning");
       } else {
-        alert("No attendance records found to export.");
+        alert("No attendance records found to export for enrolled subjects.");
       }
-      speakText("No attendance records found to export.", accessibility.readAloud);
+      speakText("No attendance records found to export for enrolled subjects.", accessibility.readAloud);
       return;
     }
 
@@ -792,7 +871,7 @@ export default function DashboardStudent({
     csvContent += `Student Name: ${userProfile.name}\r\n`;
     csvContent += `Student ID: ${userProfile.studentId || 'N/A'}\r\n`;
     csvContent += `Email: ${userProfile.email}\r\n`;
-    csvContent += `Academic Status: ${attendanceRate >= 80 ? 'GOOD STANDING' : 'NEEDS ATTENTION'} (${attendanceRate}% overall rate)\r\n`;
+    csvContent += `Academic Status: ${attendanceRate >= 80 ? 'GOOD STANDING' : 'NEEDS ATTENTION'} (${attendanceRate}% overall rate across enrolled courses)\r\n`;
     csvContent += `Report Generated: ${new Date().toLocaleString()}\r\n`;
     csvContent += `\r\n`;
     csvContent += headers.join(",") + "\r\n";
@@ -834,11 +913,11 @@ export default function DashboardStudent({
     speakText("Highly-detailed localized attendance transcript downloaded successfully.", accessibility.readAloud);
   };
 
-  // Compute stats metrics dynamically
-  const totalChecked = attendanceRecords.filter(r => r.studentId === userProfile.studentId || r.studentName === userProfile.name).length;
-  const presentsCount = attendanceRecords.filter(r => r.status === 'present' && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)).length;
-  const latesCount = attendanceRecords.filter(r => r.status === 'late' && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)).length;
-  const absentsCount = attendanceRecords.filter(r => r.status === 'absent' && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)).length;
+  // Compute stats metrics dynamically based ONLY on enrolled subjects
+  const totalChecked = enrolledStudentRecords.length;
+  const presentsCount = enrolledStudentRecords.filter(r => r.status === 'present').length;
+  const latesCount = enrolledStudentRecords.filter(r => r.status === 'late').length;
+  const absentsCount = enrolledStudentRecords.filter(r => r.status === 'absent').length;
   
   const attendanceRate = totalChecked > 0 ? Math.round(((presentsCount + latesCount * 0.7) / totalChecked) * 100) : 100;
 
@@ -1038,6 +1117,7 @@ export default function DashboardStudent({
                         className: activeCls ? activeCls.name : 'Class Subject',
                         facultyId: activeCls?.facultyId || 'fac-1',
                         facultyName: activeCls?.facultyName || 'Faculty Instructor',
+                        excuseType: leaveExcuseType,
                         startDate: leaveStartDate,
                         endDate: leaveEndDate,
                         reason: leaveReason,
@@ -1070,6 +1150,19 @@ export default function DashboardStudent({
                       >
                         {classes.map(c => (
                           <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Official Excuse Category / Type</label>
+                      <select
+                        value={leaveExcuseType}
+                        onChange={(e) => setLeaveExcuseType(e.target.value)}
+                        className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 outline-none font-bold"
+                      >
+                        {EXCUSE_PRESET_TYPES.map(type => (
+                          <option key={type} value={type}>{type}</option>
                         ))}
                       </select>
                     </div>
@@ -1158,20 +1251,25 @@ export default function DashboardStudent({
             {leaveRequests.length > 0 && (
               <div className="pt-3 border-t border-zinc-100 dark:border-zinc-900 text-left">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Submitted Excuse Letters ({leaveRequests.length})</span>
-                <div className="space-y-2 mt-2 max-h-36 overflow-y-auto scrollbar-thin">
+                <div className="space-y-2 mt-2 max-h-48 overflow-y-auto scrollbar-thin">
                   {leaveRequests.map(req => (
                     <div key={req.id} className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs">
-                      <div>
-                        <div className="flex items-center gap-1.5 font-bold">
-                           <span className="font-extrabold text-xs text-zinc-800 dark:text-zinc-200">{req.className}</span>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 font-bold flex-wrap">
+                          <span className="font-extrabold text-xs text-zinc-800 dark:text-zinc-200">{req.className}</span>
                           <span className="text-[9px] font-mono font-black text-zinc-400">({req.id})</span>
+                          {req.excuseType && (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              {req.excuseType}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[10px] text-zinc-450 leading-normal mt-0.5">Duration: {req.startDate} to {req.endDate} • {req.reason}</p>
                         {req.attachmentName && (
                           <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded mt-1 inline-block">📎 {req.attachmentName}</span>
                         )}
                       </div>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ml-2 ${
                         req.status === 'approved' || req.status === 'valid' ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
                         req.status === 'rejected' || req.status === 'invalid' ? 'bg-red-100 dark:bg-red-500/15 text-red-500' :
                         'bg-zinc-200 dark:bg-zinc-850 text-zinc-550'
@@ -1645,36 +1743,9 @@ export default function DashboardStudent({
               </div>
             </div>
 
-            {/* Search inputs & View Toggle */}
+            {/* Search input */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setScheduleViewMode('grid')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                    scheduleViewMode === 'grid'
-                      ? 'bg-emerald-500 text-black shadow-xs'
-                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                  }`}
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span>Weekly Grid</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScheduleViewMode('cards')}
-                  className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                    scheduleViewMode === 'cards'
-                      ? 'bg-emerald-500 text-black shadow-xs'
-                      : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                  }`}
-                >
-                  <List className="w-3.5 h-3.5" />
-                  <span>Card List</span>
-                </button>
-              </div>
-
-              <div className="relative flex-1 sm:w-60">
+              <div className="relative flex-1 sm:w-64">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400 pointer-events-none">
                   <Search className="w-4 h-4 text-emerald-500" />
                 </span>
@@ -1721,246 +1792,17 @@ export default function DashboardStudent({
               );
             }
 
-            if (scheduleViewMode === 'grid') {
-              return (
-                <WeeklyScheduleGrid
-                  classes={targetClasses}
-                  userRole="student"
-                  enrollments={enrollments}
-                  userProfile={userProfile}
-                  searchQuery={scheduleSearch}
-                  onOpenSubjectDetails={handleOpenSubjectDetails}
-                  onEnrollSubject={onEnrollSubject}
-                  onDropSubject={onDropSubject}
-                />
-              );
-            }
-
-            const filtered = targetClasses;
-
-            const todayIndex = new Date().getDay();
-            const dayMap: Record<number, string> = {
-              1: 'Mon',
-              2: 'Tue',
-              3: 'Wed',
-              4: 'Thu',
-              5: 'Fri',
-              6: 'Sat',
-              0: 'Sun'
-            };
-            const todayLabel = dayMap[todayIndex] || 'Mon';
-
-            const todayClasses = filtered.filter(cls => {
-              const expandedClassDays = expandDaysToSpecificOnesVal(cls.days);
-              const expandedToday = expandDaysToSpecificOnesVal([todayLabel]);
-              return expandedClassDays.some(d => expandedToday.includes(d));
-            });
-            const otherClasses = filtered.filter(cls => {
-              const expandedClassDays = expandDaysToSpecificOnesVal(cls.days);
-              const expandedToday = expandDaysToSpecificOnesVal([todayLabel]);
-              return !expandedClassDays.some(d => expandedToday.includes(d));
-            });
-
-            const renderClassCard = (cls: typeof classes[0]) => {
-              const isEnrolled = enrollments.some(
-                e => e.classId === cls.id && (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) && !e.deletedByStudent
-              );
-
-              // Compute student class standings inside active rosters
-              const studentRecordsForClass = attendanceRecords.filter(
-                r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
-              );
-              const standing = calculateStudentStanding(studentRecordsForClass);
-              const standingLabel = standing.label;
-              const standingColor = standing.badgeColor;
-
-              const isExpanded = !!expandedCardIds[cls.id];
-              const toggleExpand = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                setExpandedCardIds(prev => ({
-                  ...prev,
-                  [cls.id]: !prev[cls.id]
-                }));
-              };
-
-              return (
-                <div 
-                  key={cls.id}
-                  onClick={() => handleOpenSubjectDetails(cls)}
-                  className="p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 shadow-xs hover:border-emerald-500/20 transition-all text-left cursor-pointer hover:shadow-md"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="px-2.5 py-1 text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-500/10">
-                        {cls.code}
-                      </span>
-                      <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 mt-2.5">{cls.name}</h3>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase ${
-                        isEnrolled 
-                          ? 'bg-blue-600 text-white font-extrabold' 
-                          : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400'
-                      }`}>
-                        {isEnrolled ? 'Enrolled' : 'Not Joined'}
-                      </span>
-                      {isEnrolled && (
-                        <span className={`text-[9.5px] font-black px-2 py-0.5 rounded-md ${standingColor}`}>
-                          {standingLabel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-900">
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">TIMING</p>
-                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 mt-1">
-                        <Clock className="w-3.5 h-3.5 text-zinc-405" />
-                        {cls.startTime} - {cls.endTime}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">TIMETABLE DAYS</p>
-                      <p className="text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5 mt-1">
-                        <Calendar className="w-3.5 h-3.5 text-zinc-405" />
-                        {cls.days.join(', ')} ({cls.room})
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Toggle button for custom details */}
-                  <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-900/60">
-                    <button
-                      id={`btn-details-${cls.id}`}
-                      type="button"
-                      onClick={toggleExpand}
-                      className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400 transition-colors py-1 px-2.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                    >
-                      {isExpanded ? (
-                        <>
-                          Hide Details <ChevronUp className="w-3.5 h-3.5" />
-                        </>
-                      ) : (
-                        <>
-                          Details <ChevronDown className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
-                    
-                    <div className="flex items-center gap-2">
-                      {isEnrolled && onDropSubject && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStudentDeleteConfirm({ id: cls.id, code: cls.code, name: cls.name });
-                          }}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white dark:text-red-400 dark:hover:text-white transition-all cursor-pointer border border-red-500/15"
-                          title="Unenroll from this class"
-                        >
-                          Unenroll
-                        </button>
-                      )}
-
-                      {!isEnrolled && onEnrollSubject && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEnrollSubject(cls.id);
-                          }}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg bg-emerald-500 text-black hover:bg-emerald-400 transition-all cursor-pointer shadow-xs active:scale-95"
-                          title="Enroll or resume class"
-                        >
-                          Enroll / Resume
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanded Section with Room Location, Instructor Name, and Credit details */}
-                  <AnimatePresence initial={false}>
-                    {isExpanded && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden mt-4 pt-4 border-t border-dashed border-zinc-100 dark:border-zinc-900 space-y-3"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-100 dark:border-zinc-900/60">
-                            <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-emerald-500" />
-                              ROOM LOCATION
-                            </p>
-                            <p className="text-xs font-extrabold text-zinc-850 dark:text-zinc-200 mt-1">
-                              {cls.room || 'Not Assigned'}
-                            </p>
-                          </div>
-
-                          <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-100 dark:border-zinc-900/60">
-                            <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest flex items-center gap-1">
-                              <User className="w-3 h-3 text-emerald-500" />
-                              INSTRUCTOR
-                            </p>
-                            <p className="text-xs font-extrabold text-zinc-855 dark:text-zinc-200 mt-1 truncate" title={cls.facultyName}>
-                              {cls.facultyName || 'No Assigned Mentor'}
-                            </p>
-                          </div>
-
-                          <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-100 dark:border-zinc-900/60">
-                            <p className="text-[9px] font-bold text-emerald-600 dark:text-emerald-450 uppercase tracking-widest flex items-center gap-1">
-                              <BookOpen className="w-3 h-3 text-emerald-500" />
-                              COURSE CREDIT
-                            </p>
-                            <p className="text-xs font-extrabold text-zinc-855 dark:text-zinc-200 mt-1">
-                              {cls.credits || 3} Credits
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            };
-
             return (
-              <div className="space-y-6">
-                {/* Today's Schedule */}
-                {todayClasses.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Current Classes ({todayLabel})
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {todayClasses.map(cls => renderClassCard(cls))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Future/Other Schedules */}
-                <div className="space-y-3">
-                  {otherClasses.length > 0 && (
-                    <h4 className="text-xs font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest pt-2">
-                      Future Schedule
-                    </h4>
-                  )}
-                  {otherClasses.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {otherClasses.map(cls => renderClassCard(cls))}
-                    </div>
-                  ) : (
-                    todayClasses.length === 0 && (
-                      <p className="text-xs text-zinc-500 italic">No classes scheduled.</p>
-                    )
-                  )}
-                </div>
-              </div>
+              <WeeklyScheduleGrid
+                classes={targetClasses}
+                userRole="student"
+                enrollments={enrollments}
+                userProfile={userProfile}
+                searchQuery={scheduleSearch}
+                onOpenSubjectDetails={handleOpenSubjectDetails}
+                onEnrollSubject={onEnrollSubject}
+                onDropSubject={onDropSubject}
+              />
             );
           })()}
         </motion.div>
@@ -1997,14 +1839,136 @@ export default function DashboardStudent({
 
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4 max-w-sm mx-auto">
               <div className="space-y-4 animate-fade-in">
-                {/* Real Camera Viewport */}
-                <div className="relative rounded-2xl bg-zinc-950 w-full h-[280px] sm:h-[300px] overflow-hidden border border-zinc-250 dark:border-zinc-800 flex flex-col justify-between shadow-md">
+                {/* Real Camera Viewport with Visual Haptic Feedback Border & Glow */}
+                <motion.div 
+                  animate={
+                    visualHaptic?.type === 'error'
+                      ? { x: [-10, 10, -8, 8, -4, 4, 0], scale: [1, 0.985, 1] }
+                      : visualHaptic?.type === 'success'
+                      ? { scale: [1, 1.025, 0.99, 1], y: [0, -3, 0] }
+                      : {}
+                  }
+                  transition={{ duration: 0.45 }}
+                  className={`relative rounded-2xl bg-zinc-950 w-full h-[290px] sm:h-[310px] overflow-hidden border transition-all duration-300 flex flex-col justify-between shadow-xl ${
+                    visualHaptic?.type === 'success'
+                      ? 'border-emerald-400 ring-4 ring-emerald-500/80 shadow-[0_0_50px_rgba(16,185,129,0.7)]'
+                      : visualHaptic?.type === 'error'
+                      ? 'border-red-500 ring-4 ring-red-500/80 shadow-[0_0_50px_rgba(239,68,68,0.7)]'
+                      : 'border-zinc-250 dark:border-zinc-800'
+                  }`}
+                >
                   {/* Camera Feed Target Container */}
-                  <div id="live-qr-reader" className="w-full h-[280px] sm:h-[300px] bg-zinc-950 overflow-hidden relative"></div>
+                  <div id="live-qr-reader" className="w-full h-[290px] sm:h-[310px] bg-zinc-950 overflow-hidden relative"></div>
+
+                  {/* Visual Haptic Flash Indicator Overlay (Flashes Green for Success or Red for Error) */}
+                  <AnimatePresence>
+                    {visualHaptic && (
+                      <motion.div
+                        key={`haptic-strobe-${visualHaptic.timestamp}`}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className={`absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center p-4 text-center backdrop-blur-[2px] overflow-hidden ${
+                          visualHaptic.type === 'success'
+                            ? 'bg-emerald-950/75 border-2 border-emerald-400'
+                            : 'bg-red-950/80 border-2 border-red-500'
+                        }`}
+                      >
+                        {/* Concentric Expanding Strobe Waves */}
+                        <motion.div
+                          initial={{ scale: 0.2, opacity: 0.95 }}
+                          animate={{ scale: 3.0, opacity: 0 }}
+                          transition={{ duration: 1.3, ease: [0.16, 1, 0.3, 1] }}
+                          className={`absolute w-48 h-48 rounded-full ${
+                            visualHaptic.type === 'success'
+                              ? 'border-2 border-emerald-400 bg-emerald-500/20 shadow-[0_0_60px_#10b981]'
+                              : 'border-2 border-red-500 bg-red-500/25 shadow-[0_0_60px_#ef4444]'
+                          }`}
+                        />
+                        <motion.div
+                          initial={{ scale: 0.2, opacity: 0.85 }}
+                          animate={{ scale: 2.2, opacity: 0 }}
+                          transition={{ duration: 1.1, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+                          className={`absolute w-48 h-48 rounded-full ${
+                            visualHaptic.type === 'success'
+                              ? 'border border-emerald-300 bg-emerald-400/20 shadow-[0_0_50px_#34d399]'
+                              : 'border border-red-400 bg-red-500/30 shadow-[0_0_50px_#f87171]'
+                          }`}
+                        />
+
+                        {/* Visual Haptic Floating Response Badge */}
+                        <motion.div
+                          initial={{ scale: 0.5, y: 15, opacity: 0 }}
+                          animate={
+                            visualHaptic.type === 'success'
+                              ? { scale: [0.5, 1.1, 1], y: 0, opacity: 1 }
+                              : { scale: [0.5, 1.05, 1], x: [-12, 12, -8, 8, -4, 4, 0], y: 0, opacity: 1 }
+                          }
+                          transition={{ duration: 0.4, ease: 'easeOut' }}
+                          className={`relative z-10 max-w-[280px] p-4 rounded-2xl border shadow-2xl flex flex-col items-center gap-2 ${
+                            visualHaptic.type === 'success'
+                              ? 'bg-zinc-950/95 border-emerald-500 text-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.6)]'
+                              : 'bg-zinc-950/95 border-red-500 text-red-400 shadow-[0_0_40px_rgba(239,68,68,0.6)]'
+                          }`}
+                        >
+                          <div
+                            className={`w-12 h-12 rounded-full flex items-center justify-center border shadow-lg ${
+                              visualHaptic.type === 'success'
+                                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-400 shadow-[0_0_15px_#10b981]'
+                                : 'bg-red-500/20 border-red-400 text-red-400 shadow-[0_0_15px_#ef4444] animate-pulse'
+                            }`}
+                          >
+                            {visualHaptic.type === 'success' ? (
+                              <CheckCircle2 className="w-7 h-7 stroke-[2.5] text-emerald-400 animate-bounce" />
+                            ) : (
+                              <XCircle className="w-7 h-7 stroke-[2.5] text-red-400" />
+                            )}
+                          </div>
+
+                          <div className="space-y-1 text-center">
+                            <span
+                              className={`text-[9px] font-mono font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                                visualHaptic.type === 'success'
+                                  ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/50'
+                                  : 'bg-red-500 text-white shadow-sm shadow-red-500/50'
+                              }`}
+                            >
+                              <Vibrate className="w-3 h-3" />
+                              {visualHaptic.type === 'success' ? 'HAPTIC: VERIFIED' : 'HAPTIC: ERROR'}
+                            </span>
+                            <h4 className="font-black text-sm text-white tracking-tight mt-1">
+                              {visualHaptic.title}
+                            </h4>
+                            <p className="text-[11px] text-zinc-300 font-medium leading-tight">
+                              {visualHaptic.message}
+                            </p>
+                          </div>
+
+                          {visualHaptic.code && (
+                            <div className="mt-1 flex items-center gap-1.5 text-[9px] font-mono font-bold px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300">
+                              <span>SESSION: {visualHaptic.code}</span>
+                              {visualHaptic.status && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                    visualHaptic.status.toLowerCase() === 'late'
+                                      ? 'bg-amber-500 text-black'
+                                      : 'bg-emerald-500 text-black'
+                                  }`}
+                                >
+                                  {visualHaptic.status}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Ripple Animation Overlay on Valid QR Detection */}
                   <AnimatePresence>
-                    {showScanRipple && (
+                    {showScanRipple && !visualHaptic && (
                       <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -2082,32 +2046,103 @@ export default function DashboardStudent({
                     </div>
 
                     <div className="flex justify-between items-start z-10">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-black text-[9px] font-black tracking-widest uppercase shadow flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
-                        {isScanning ? 'LIVE CAMERA ACTIVE' : 'CAMERA STANDBY'}
-                      </span>
+                      {visualHaptic ? (
+                        <span className={`px-2.5 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase shadow flex items-center gap-1.5 animate-pulse ${
+                          visualHaptic.type === 'success' ? 'bg-emerald-500 text-black' : 'bg-red-500 text-white'
+                        }`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
+                          {visualHaptic.type === 'success' ? 'SCAN SUCCESS' : 'SCAN REJECTED'}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-black text-[9px] font-black tracking-widest uppercase shadow flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
+                          {isScanning ? 'LIVE CAMERA ACTIVE' : 'CAMERA STANDBY'}
+                        </span>
+                      )}
                       <div className="flex items-center gap-1.5">
                         <span className="px-2 py-0.5 rounded bg-red-500/80 text-white text-[8px] font-mono font-bold tracking-wider">
                           SCREENSHOT PROHIBITED
                         </span>
-                        <div className={`w-2.5 h-2.5 rounded-full ${isScanning ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-500'}`}></div>
+                        <div className={`w-2.5 h-2.5 rounded-full ${
+                          visualHaptic?.type === 'error'
+                            ? 'bg-red-500 animate-ping'
+                            : isScanning
+                            ? 'bg-emerald-500 animate-pulse'
+                            : 'bg-zinc-500'
+                        }`}></div>
                       </div>
                     </div>
                     
                     {/* Interactive frame sights */}
-                    <div className="mx-auto my-auto w-44 h-44 border-2 border-dashed border-emerald-500/50 rounded-2xl relative flex items-center justify-center z-10">
-                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-emerald-400"></div>
-                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-emerald-400"></div>
-                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-emerald-400"></div>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-emerald-400"></div>
-                      {isScanning && (
+                    <div className={`mx-auto my-auto w-44 h-44 border-2 border-dashed rounded-2xl relative flex items-center justify-center z-10 transition-colors ${
+                      visualHaptic?.type === 'success'
+                        ? 'border-emerald-400 shadow-[0_0_20px_#10b981]'
+                        : visualHaptic?.type === 'error'
+                        ? 'border-red-500 shadow-[0_0_20px_#ef4444]'
+                        : 'border-emerald-500/50'
+                    }`}>
+                      <div className={`absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 ${visualHaptic?.type === 'error' ? 'border-red-400' : 'border-emerald-400'}`}></div>
+                      <div className={`absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 ${visualHaptic?.type === 'error' ? 'border-red-400' : 'border-emerald-400'}`}></div>
+                      <div className={`absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 ${visualHaptic?.type === 'error' ? 'border-red-400' : 'border-emerald-400'}`}></div>
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 ${visualHaptic?.type === 'error' ? 'border-red-400' : 'border-emerald-400'}`}></div>
+                      {isScanning && !visualHaptic && (
                         <div className="w-full h-0.5 bg-emerald-500 shadow-md absolute shadow-emerald-500/80 animate-[bounce_2.5s_infinite]" />
                       )}
                     </div>
 
-                    <p className="text-center text-[10px] font-mono tracking-widest text-emerald-400 bg-zinc-900/80 py-1 rounded backdrop-blur-xs z-10">
-                      CENTER CLASS QR CODE IN FRAME
+                    <p className={`text-center text-[10px] font-mono tracking-widest py-1 rounded backdrop-blur-xs z-10 transition-colors ${
+                      visualHaptic?.type === 'success'
+                        ? 'text-emerald-300 bg-emerald-950/80'
+                        : visualHaptic?.type === 'error'
+                        ? 'text-red-300 bg-red-950/80'
+                        : 'text-emerald-400 bg-zinc-900/80'
+                    }`}>
+                      {visualHaptic?.type === 'error' ? '⚠️ SCAN ERROR • CHECK DETAILS BELOW' : 'CENTER CLASS QR CODE IN FRAME'}
                     </p>
+                  </div>
+                </motion.div>
+
+                {/* Instant Visual Haptic Feedback Tester */}
+                <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    <span className="flex items-center gap-1.5">
+                      <Vibrate className="w-3.5 h-3.5 text-emerald-500" />
+                      Visual Haptic Feedback
+                    </span>
+                    <span className="text-[9px] font-mono text-zinc-400">Green = Success • Red = Error</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const testClass = classes[0] || { code: 'CS-101', name: 'Computer Science', room: 'Lab 3' };
+                        triggerVisualHaptic(
+                          'success',
+                          'Attendance Verified',
+                          `Checked into ${testClass.name} (Room ${testClass.room})`,
+                          { code: testClass.code, status: 'PRESENT' }
+                        );
+                      }}
+                      className="px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-xl border border-emerald-500/30 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                      <span>Test Green Flash</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerVisualHaptic(
+                          'error',
+                          'Unrecognized QR Code',
+                          'Token does not match active rotation keys from faculty.',
+                          { code: 'INVALID' }
+                        );
+                      }}
+                      className="px-2.5 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-xl border border-red-500/30 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                    >
+                      <XCircle className="w-3 h-3 text-red-500" />
+                      <span>Test Red Flash</span>
+                    </button>
                   </div>
                 </div>
 
@@ -2187,6 +2222,11 @@ export default function DashboardStudent({
                         if (input && input.value.trim()) {
                           handleDecodedText(input.value.trim());
                         } else {
+                          triggerVisualHaptic(
+                            'error',
+                            'Passcode Missing',
+                            'Please enter a session passcode before verifying.'
+                          );
                           if (typeof window !== 'undefined' && (window as any).showToast) {
                             (window as any).showToast("Please enter a valid session key.", "warning");
                           }
@@ -2427,8 +2467,8 @@ export default function DashboardStudent({
             {/* Right Column: Recent Scans Ledger (5 Cols) */}
             <div className="md:col-span-5 space-y-4">
               {(() => {
-                const studentScans = attendanceRecords
-                  .filter(r => r.studentId === userProfile.studentId || r.studentName === userProfile.name)
+                const studentScans = enrolledStudentRecords
+                  .slice()
                   .sort((a, b) => {
                     const parseDateTime = (rec: AttendanceRecord) => {
                       try {

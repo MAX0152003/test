@@ -7,15 +7,18 @@ export interface ClassSession {
   startTime: string;
   endTime: string;
   room: string;
+  buildingCluster?: string;
   days: string[]; // e.g. ['MW', 'TTh', 'FS', 'A']
   facultyName: string;
   facultyId: string;
   credits?: number;
+  gracePeriodMinutes?: number; // Custom lateness grace period (e.g. 5, 10, 15, 20, 30 mins)
   facultyStatusUpdate?: 'none' | 'attend' | 'cancel' | 'late';
   tempRoom?: string;
   lastUpdateTimestamp?: number;
   qrToken?: string;
   qrGeneratedAt?: number;
+  academicTerm?: string;
 }
 
 export interface AttendanceRecord {
@@ -107,6 +110,7 @@ export interface LeaveRequest {
   studentName: string;
   classId: string;
   className: string;
+  excuseType?: string; // e.g. 'MSU University Infirmary Medical Slip', 'Official University Athletic/Cultural Event', etc.
   startDate: string;
   endDate: string;
   reason: string;
@@ -137,6 +141,8 @@ export interface LabRoom {
   scannersActive: boolean;
   activeScannerLogs: ScannerLog[];
   floor?: string;
+  building?: string; // Building cluster: CICS Complex, Science Complex, Engineering Wing, King Faisal Center, College of Education, University Library
+  buildingCluster?: string;
 }
 
 export interface ArchivedTerm {

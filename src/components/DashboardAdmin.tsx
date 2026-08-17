@@ -24,6 +24,7 @@ import {
   ScannerLog
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
+import { BUILDING_CLUSTERS, ACADEMIC_TERMS } from '../lib/msuUtils';
 import { 
   Users, 
   UserCheck, 
@@ -529,12 +530,16 @@ export default function DashboardAdmin({
   const [newRoomCapacity, setNewRoomCapacity] = React.useState(40);
   const [newRoomDevices, setNewRoomDevices] = React.useState(40);
   const [newRoomFloor, setNewRoomFloor] = React.useState('2nd Floor');
+  const [newRoomBuildingCluster, setNewRoomBuildingCluster] = React.useState<string>(BUILDING_CLUSTERS[0]);
+  const [selectedBuildingClusterFilter, setSelectedBuildingClusterFilter] = React.useState<string>('all');
   const [editingRoomId, setEditingRoomId] = React.useState<string | null>(null);
   const [editRoomName, setEditRoomName] = React.useState('');
   const [editRoomCapacity, setEditRoomCapacity] = React.useState(40);
   const [editRoomDevices, setEditRoomDevices] = React.useState(40);
   const [editRoomStatus, setEditRoomStatus] = React.useState<'occupied' | 'available' | 'maintenance'>('available');
   const [editRoomFloor, setEditRoomFloor] = React.useState('2nd Floor');
+  const [editRoomBuildingCluster, setEditRoomBuildingCluster] = React.useState<string>(BUILDING_CLUSTERS[0]);
+  const [selectedArchivedTermForInspection, setSelectedArchivedTermForInspection] = React.useState<any | null>(null);
   const [hoveredTrendIndex, setHoveredTrendIndex] = React.useState<number | null>(null);
   const [hoveredEnrollmentIndex, setHoveredEnrollmentIndex] = React.useState<number | null>(null);
   const [analyticsTab, setAnalyticsTab] = React.useState<'daily' | 'historical'>('daily');
@@ -815,63 +820,7 @@ export default function DashboardAdmin({
     conflictDesc?: string;
     resolved: boolean;
     resolution?: 'accept_local' | 'keep_server' | 'merged';
-  }>>([
-    {
-      id: 'psyn-1',
-      studentId: '2023-14923',
-      studentName: 'John Doe',
-      classId: 'class-1',
-      classCode: 'ITE183',
-      className: 'Web Systems',
-      room: 'Comp Lab 1',
-      timestamp: '09:05 AM',
-      status: 'present',
-      conflictType: 'double_check_in',
-      conflictDesc: 'Concurrent Scan Active: Card was also scanned in Comp Lab 2 overlapping at 09:04:15 AM.',
-      resolved: false
-    },
-    {
-      id: 'psyn-2',
-      studentId: '2023-10492',
-      studentName: 'Farhan Makil',
-      classId: 'class-2',
-      classCode: 'CSC150',
-      className: 'Data Structures',
-      room: 'Comp Lab 2',
-      timestamp: '10:45 AM',
-      status: 'late',
-      conflictType: 'schedule_mismatch',
-      conflictDesc: 'Session Schedule Gap: Scan logged at 10:45 AM, but registrar course calendar slot is set to start at 11:30 AM.',
-      resolved: false
-    },
-    {
-      id: 'psyn-3',
-      studentId: '2023-99124',
-      studentName: 'Bob Carter',
-      classId: 'class-1',
-      classCode: 'ITE183',
-      className: 'Web Systems',
-      room: 'Comp Lab 1',
-      timestamp: '09:04 AM',
-      status: 'present',
-      conflictType: 'duplicate_record',
-      conflictDesc: 'Server Collision: Identical attendance stamp exists on central server. Synced signature matches student UUID.',
-      resolved: false
-    },
-    {
-      id: 'psyn-4',
-      studentId: '2023-33412',
-      studentName: 'James Dean',
-      classId: 'class-2',
-      classCode: 'CSC150',
-      className: 'Data Structures',
-      room: 'Comp Lab 2',
-      timestamp: '11:35 AM',
-      status: 'present',
-      conflictType: 'none',
-      resolved: false
-    }
-  ]);
+  }>>([]);
   const [isPushingSync, setIsPushingSync] = React.useState(false);
   const [syncFilter, setSyncFilter] = React.useState<'all' | 'conflicts' | 'clean' | 'resolved'>('all');
   const [selectedResolvingId, setSelectedResolvingId] = React.useState<string | null>(null);
@@ -1170,7 +1119,7 @@ export default function DashboardAdmin({
   const presentCount = attendanceRecords.filter(r => r.status === 'present').length;
   const activeRatePercent = attendanceRecords.length > 0 
     ? Math.round((presentCount) / (attendanceRecords.length) * 100)
-    : 100;
+    : 0;
   const instantScansRecorded = attendanceRecords.length;
   const departmentsList = ['Computer Engineering', 'Computer Science', 'Information Systems', 'Information Technology', 'Software Engineering'];
   const SCHEDULING_TIME_SLOTS = React.useMemo(() => {
@@ -1571,7 +1520,9 @@ export default function DashboardAdmin({
       devicesCount: newRoomDevices,
       scannersActive: true,
       activeScannerLogs: [],
-      floor: newRoomFloor
+      floor: newRoomFloor,
+      buildingCluster: newRoomBuildingCluster || BUILDING_CLUSTERS[0],
+      building: newRoomBuildingCluster || BUILDING_CLUSTERS[0]
     };
     onUpdateLabRooms?.([...labRooms, newRoom]);
     setNewRoomName('');
@@ -1592,7 +1543,9 @@ export default function DashboardAdmin({
           status: editRoomStatus,
           currentOccupancy: editRoomStatus === 'available' || editRoomStatus === 'maintenance' ? 0 : rm.currentOccupancy,
           activeClass: editRoomStatus === 'available' || editRoomStatus === 'maintenance' ? '' : rm.activeClass,
-          floor: editRoomFloor
+          floor: editRoomFloor,
+          buildingCluster: editRoomBuildingCluster,
+          building: editRoomBuildingCluster
         };
       }
       return rm;
@@ -2266,13 +2219,10 @@ export default function DashboardAdmin({
                           absent = recsOnDay.filter(r => r.status === 'absent').length;
                           value = Math.round(((active + late) / recsOnDay.length) * 100);
                         } else {
-                          // Beautiful realistic generated baseline
-                          const dayNum = d.getDate();
-                          const seed = (dayNum * 5 + (d.getMonth() + 1) * 7) % 20;
-                          value = 75 + seed; // 75% to 95%
-                          active = 120 + (dayNum % 7) * 12;
-                          late = 10 + (dayNum % 5) * 4;
-                          absent = 15 + (dayNum % 4) * 3;
+                          value = 0;
+                          active = 0;
+                          late = 0;
+                          absent = 0;
                         }
                         
                         return {
@@ -2311,11 +2261,10 @@ export default function DashboardAdmin({
                           absent = recsInWeek.filter(r => r.status === 'absent').length;
                           value = Math.round(((active + late) / recsInWeek.length) * 100);
                         } else {
-                          const baselines = [78, 85, 82, 88, 85, 91, 88, 86, 92, 84, 89, 93];
-                          value = baselines[i % baselines.length] || 85;
-                          active = 750 + i * 25;
-                          late = 80 - i * 3;
-                          absent = 110 - i * 5;
+                          value = 0;
+                          active = 0;
+                          late = 0;
+                          absent = 0;
                         }
 
                         return {
@@ -2366,11 +2315,10 @@ export default function DashboardAdmin({
                           absent = recsInMonth.filter(r => r.status === 'absent').length;
                           value = Math.round(((active + late) / recsInMonth.length) * 100);
                         } else {
-                          const baselines = [84, 86, 83, 89, 87, 92];
-                          value = baselines[i % baselines.length] || 86;
-                          active = 3100 + i * 150;
-                          late = 320 - i * 20;
-                          absent = 450 - i * 30;
+                          value = 0;
+                          active = 0;
+                          late = 0;
+                          absent = 0;
                         }
 
                         return {
@@ -2648,18 +2596,25 @@ export default function DashboardAdmin({
                         : `${rm.currentOccupancy}/${rm.capacity} active slots`;
 
                       return (
-                        <div key={rm.id} className="space-y-1 bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-xl border border-zinc-200/50 dark:border-zinc-805 flex flex-col justify-between">
+                        <div key={rm.id} className={`space-y-1 bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-xl border flex flex-col justify-between transition-all ${
+                          rm.status === 'maintenance' ? 'border-amber-500/30' :
+                          occupancyPercent >= 85 ? 'border-red-500/30' :
+                          occupancyPercent >= 60 ? 'border-amber-500/30' :
+                          'border-emerald-500/20'
+                        }`}>
                           <div className="space-y-1">
                             <div className="flex justify-between items-start gap-2">
                               <span className="font-bold text-[10px] text-zinc-700 dark:text-zinc-200 line-clamp-1">{rm.name}</span>
                               <span className={`px-1.5 py-0.5 rounded-[4px] text-[8px] font-mono font-bold shrink-0 uppercase tracking-wider ${
                                 rm.status === 'maintenance' 
                                   ? 'bg-amber-500/10 text-amber-500' 
-                                  : isOccupied 
-                                  ? 'bg-indigo-500/10 text-indigo-400' 
-                                  : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-400'
+                                  : occupancyPercent >= 85
+                                  ? 'bg-red-500/10 text-red-500'
+                                  : occupancyPercent >= 60
+                                  ? 'bg-amber-500/10 text-amber-500'
+                                  : 'bg-emerald-500/10 text-emerald-500'
                               }`}>
-                                {rm.status}
+                                {rm.status === 'maintenance' ? '⚠️ Maint' : occupancyPercent >= 85 ? '🔴 High Occ' : occupancyPercent >= 60 ? '🟠 Mod Occ' : '🟢 Optimal'}
                               </span>
                             </div>
                             {rm.floor && (
@@ -2673,7 +2628,10 @@ export default function DashboardAdmin({
                               <div className="flex-1 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
                                 <div 
                                   className={`h-full rounded-full transition-all duration-500 ${
-                                    rm.status === 'maintenance' ? 'bg-amber-500' : occupancyPercent > 70 ? 'bg-indigo-500' : 'bg-emerald-500'
+                                    rm.status === 'maintenance' ? 'bg-amber-500' :
+                                    occupancyPercent >= 85 ? 'bg-red-500' :
+                                    occupancyPercent >= 60 ? 'bg-amber-500' :
+                                    'bg-emerald-500'
                                   }`}
                                   style={{ width: `${rm.status === 'maintenance' ? 100 : occupancyPercent}%` }}
                                 />
@@ -6030,210 +5988,329 @@ export default function DashboardAdmin({
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* List and Actions Grid Table */}
-            <div className="lg:col-span-12 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#CC762A]">Registered Room Registry</span>
-                <span className="text-[9px] font-mono text-zinc-450">{labRooms.length} ACTIVE ROOM RECORDS</span>
+            <div className="lg:col-span-12 p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 space-y-5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#CC762A] flex items-center gap-1.5 font-mono">
+                    <Building className="w-3.5 h-3.5 text-amber-500" />
+                    MSU Hierarchical Campus Room Registry
+                  </span>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Organized by Academic Building Clusters & Wing Complexes</p>
+                </div>
+                <span className="text-[9px] font-mono text-zinc-450 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
+                  {labRooms.length} ACTIVE ROOM RECORDS
+                </span>
               </div>
 
-              {/* Grid lists */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {labRooms.map(rm => {
-                  const isEditingThis = editingRoomId === rm.id;
-                  const percent = Math.min(100, Math.round((rm.currentOccupancy / rm.capacity) * 100)) || 0;
-
-                  if (isEditingThis) {
-                    return (
-                      <form 
-                        key={rm.id}
-                        onSubmit={handleSaveRoomEdit} 
-                        className="p-4 rounded-xl border border-amber-500 bg-amber-500/[0.03] space-y-3 text-left animate-scale-up"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center justify-between pb-1 border-b border-zinc-200/50 dark:border-zinc-805">
-                          <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1 font-mono">
-                            ⚙️ REVISE ROOM
-                          </h4>
-                          <button
-                            type="button"
-                            onClick={() => setEditingRoomId(null)}
-                            className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 text-[10px] font-bold"
-                          >
-                            CANCEL
-                          </button>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Room Identifier Name</label>
-                          <input 
-                            type="text" 
-                            value={editRoomName}
-                            onChange={(e) => setEditRoomName(e.target.value)}
-                            className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 focus:border-amber-500"
-                            required
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Capacity</label>
-                            <input 
-                              type="number" 
-                              min={1}
-                              value={editRoomCapacity}
-                              onChange={(e) => setEditRoomCapacity(Number(e.target.value))}
-                              className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Workstations</label>
-                            <input 
-                              type="number" 
-                              min={0}
-                              value={editRoomDevices}
-                              onChange={(e) => setEditRoomDevices(Number(e.target.value))}
-                              className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200"
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Operational Status</label>
-                          <select
-                            value={editRoomStatus === 'maintenance' ? 'maintenance' : 'available'}
-                            onChange={(e) => setEditRoomStatus(e.target.value as any)}
-                            className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans"
-                          >
-                            <option value="available" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">Operational (System Auto-detect)</option>
-                            <option value="maintenance" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">Under Maintenance Lockout</option>
-                          </select>
-                        </div>
-
-                        <div className="flex justify-end gap-1.5 pt-1.5 border-t border-zinc-200/40 dark:border-zinc-800">
-                          <button
-                            type="button"
-                            onClick={() => setEditingRoomId(null)}
-                            className="px-2.5 py-1 text-[9px] uppercase font-bold border border-zinc-250 dark:border-zinc-800 rounded-lg text-zinc-500 cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-3 py-1 text-[9px] uppercase font-black bg-amber-500 hover:bg-amber-400 text-black rounded-lg cursor-pointer transition-all"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </form>
-                    );
-                  }
-
+              {/* Building Cluster Filter Tabs */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBuildingClusterFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                    selectedBuildingClusterFilter === 'all'
+                      ? 'bg-emerald-500 text-black shadow-xs font-black'
+                      : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-750'
+                  }`}
+                >
+                  🏢 All Clusters ({labRooms.length})
+                </button>
+                {BUILDING_CLUSTERS.map(cluster => {
+                  const count = labRooms.filter(r => (r.buildingCluster || r.building || BUILDING_CLUSTERS[0]) === cluster).length;
+                  const shortName = cluster.split('(')[0].trim();
                   return (
-                    <div 
-                      key={rm.id} 
-                      className={`p-4 rounded-xl border text-left transition-all hover:border-emerald-500/30 flex flex-col justify-between gap-4 ${
-                        editingRoomId === rm.id ? 'border-amber-500/40 bg-zinc-50/50 dark:bg-zinc-900/20' : 'border-zinc-200 dark:border-zinc-805 bg-zinc-50/30 dark:bg-zinc-950/25'
+                    <button
+                      key={cluster}
+                      type="button"
+                      onClick={() => setSelectedBuildingClusterFilter(cluster)}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                        selectedBuildingClusterFilter === cluster
+                          ? 'bg-emerald-500 text-black shadow-xs font-black'
+                          : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-750'
                       }`}
                     >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100 leading-snug">{rm.name}</h4>
-                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 ${
-                            rm.status === 'occupied' ? 'bg-red-500/10 text-red-500' :
-                            rm.status === 'maintenance' ? 'bg-amber-500/10 text-amber-500' :
-                            'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450'
-                          }`}>
-                            {rm.status}
+                      <span>{shortName}</span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full ${
+                        selectedBuildingClusterFilter === cluster ? 'bg-black/20 text-black' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Hierarchical Clusters Display */}
+              <div className="space-y-6">
+                {(selectedBuildingClusterFilter === 'all' ? BUILDING_CLUSTERS : [selectedBuildingClusterFilter]).map(clusterName => {
+                  const clusterRooms = labRooms.filter(r => (r.buildingCluster || r.building || BUILDING_CLUSTERS[0]) === clusterName);
+                  if (clusterRooms.length === 0 && selectedBuildingClusterFilter === 'all') return null;
+
+                  const clusterCapacity = clusterRooms.reduce((acc, r) => acc + (r.capacity || 0), 0);
+                  const clusterOccupied = clusterRooms.reduce((acc, r) => acc + (r.currentOccupancy || 0), 0);
+                  const clusterScanners = clusterRooms.filter(r => r.scannersActive).length;
+
+                  return (
+                    <div key={clusterName} className="p-4 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-200/80 dark:border-zinc-800/80 space-y-3">
+                      {/* Cluster Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200/60 dark:border-zinc-800/80">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                            🏛️
                           </span>
-                        </div>
-
-                        {/* Capacity indicators */}
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-[9px] text-zinc-400 font-mono">
-                            <span>Occupancy:</span>
-                            <span className="font-bold text-zinc-700 dark:text-zinc-300">{rm.currentOccupancy} / {rm.capacity} Pax ({percent}%)</span>
-                          </div>
-                          <div className="w-full h-1 bg-zinc-200 dark:bg-zinc-850 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full ${
-                                rm.status === 'maintenance' ? 'bg-amber-500' :
-                                percent >= 80 ? 'bg-red-500' :
-                                'bg-emerald-500'
-                              }`} 
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[9px] pt-1 border-t border-zinc-100 dark:border-zinc-900/60 font-mono">
                           <div>
-                            <span className="text-zinc-400">Workstations:</span>
-                            <p className="font-bold text-zinc-700 dark:text-zinc-300">{rm.devicesCount} Terminals</p>
-                          </div>
-                          <div>
-                            <span className="text-zinc-400">Scanner system:</span>
-                            <p className={`font-black uppercase tracking-wide flex items-center gap-1 ${rm.scannersActive ? 'text-emerald-500' : 'text-zinc-450'}`}>
-                              <span className="w-1.5 h-1.5 rounded-full bg-current" /> {rm.scannersActive ? 'ACTIVE' : 'OFF'}
+                            <h3 className="text-xs font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                              {clusterName}
+                            </h3>
+                            <p className="text-[9px] text-zinc-400 font-mono">
+                              {clusterRooms.length} {clusterRooms.length === 1 ? 'Room Assigned' : 'Rooms Assigned'} • Total Pax: {clusterOccupied}/{clusterCapacity}
                             </p>
                           </div>
                         </div>
 
-                        {rm.activeClass && (
-                          <div className="p-1 px-2.5 bg-zinc-100 dark:bg-zinc-900 rounded-md text-[9px] text-zinc-500">
-                            Active Subject Class: <strong className="font-extrabold text-zinc-700 dark:text-zinc-300">{rm.activeClass}</strong>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 text-[9px] font-mono">
+                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-850 text-zinc-600 dark:text-zinc-300 font-bold">
+                            📡 {clusterScanners}/{clusterRooms.length} Scanners Active
+                          </span>
+                        </div>
                       </div>
 
-                      {/* Controls and Actions row */}
-                      <div className="flex items-center justify-between pt-2 border-t border-zinc-200/50 dark:border-zinc-800 text-[10px] flex-wrap gap-2">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingRoomId(rm.id);
-                              setEditRoomName(rm.name);
-                              setEditRoomCapacity(rm.capacity);
-                              setEditRoomDevices(rm.devicesCount);
-                              setEditRoomStatus(rm.status);
-                              setEditRoomFloor(rm.floor || '2nd Floor');
-                              setIsAddingRoom(false);
-                            }}
-                            className="bg-zinc-150 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 font-extrabold px-2 py-1 rounded cursor-pointer"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteRoom(rm.id, rm.name)}
-                            className="bg-red-500/10 hover:bg-red-500 text-red-550 hover:text-white font-extrabold px-2 py-1 rounded transition-colors cursor-pointer"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                      {/* Cluster Rooms Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {clusterRooms.map(rm => {
+                          const isEditingThis = editingRoomId === rm.id;
+                          const percent = Math.min(100, Math.round((rm.currentOccupancy / rm.capacity) * 100)) || 0;
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = labRooms.map(r => r.id === rm.id ? { ...r, scannersActive: !r.scannersActive } : r);
-                            onUpdateLabRooms?.(updated);
-                            speakText(`Scanner state toggled in ${rm.name}`, accessibility.readAloud);
-                          }}
-                          className={`text-[8.5px] font-mono tracking-tight font-black uppercase px-2 py-1 rounded border overflow-hidden cursor-pointer ${
-                            rm.scannersActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-450 border-zinc-200 dark:border-zinc-805'
-                          }`}
-                        >
-                          {rm.scannersActive ? 'Disable Scanner' : 'Enable Scanner'}
-                        </button>
+                          if (isEditingThis) {
+                            return (
+                              <form 
+                                key={rm.id}
+                                onSubmit={handleSaveRoomEdit} 
+                                className="p-4 rounded-xl border border-amber-500 bg-amber-500/[0.03] space-y-3 text-left animate-scale-up"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="flex items-center justify-between pb-1 border-b border-zinc-200/50 dark:border-zinc-805">
+                                  <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1 font-mono">
+                                    ⚙️ REVISE ROOM
+                                  </h4>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingRoomId(null)}
+                                    className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 text-[10px] font-bold"
+                                  >
+                                    CANCEL
+                                  </button>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Room Identifier Name</label>
+                                  <input 
+                                    type="text" 
+                                    value={editRoomName}
+                                    onChange={(e) => setEditRoomName(e.target.value)}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 focus:border-amber-500 font-bold"
+                                    required
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Building Cluster</label>
+                                  <select
+                                    value={editRoomBuildingCluster}
+                                    onChange={(e) => setEditRoomBuildingCluster(e.target.value)}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                  >
+                                    {BUILDING_CLUSTERS.map(c => (
+                                      <option key={c} value={c} className="bg-white dark:bg-zinc-950">{c}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Capacity</label>
+                                    <input 
+                                      type="number" 
+                                      min={1}
+                                      value={editRoomCapacity}
+                                      onChange={(e) => setEditRoomCapacity(Number(e.target.value))}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
+                                      required
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Workstations</label>
+                                    <input 
+                                      type="number" 
+                                      min={0}
+                                      value={editRoomDevices}
+                                      onChange={(e) => setEditRoomDevices(Number(e.target.value))}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Located Floor</label>
+                                    <select
+                                      value={editRoomFloor}
+                                      onChange={(e) => setEditRoomFloor(e.target.value)}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                    >
+                                      <option value="1st Floor" className="bg-white dark:bg-zinc-950">1st Floor</option>
+                                      <option value="2nd Floor" className="bg-white dark:bg-zinc-950">2nd Floor</option>
+                                      <option value="3rd Floor" className="bg-white dark:bg-zinc-950">3rd Floor</option>
+                                      <option value="4th Floor" className="bg-white dark:bg-zinc-950">4th Floor</option>
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Operational Status</label>
+                                    <select
+                                      value={editRoomStatus === 'maintenance' ? 'maintenance' : 'available'}
+                                      onChange={(e) => setEditRoomStatus(e.target.value as any)}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                    >
+                                      <option value="available" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">Operational</option>
+                                      <option value="maintenance" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">Maintenance Lockout</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div className="flex justify-end gap-1.5 pt-1.5 border-t border-zinc-200/40 dark:border-zinc-800">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingRoomId(null)}
+                                    className="px-2.5 py-1 text-[9px] uppercase font-bold border border-zinc-250 dark:border-zinc-800 rounded-lg text-zinc-500 cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="submit"
+                                    className="px-3 py-1 text-[9px] uppercase font-black bg-amber-500 hover:bg-amber-400 text-black rounded-lg cursor-pointer transition-all shadow-xs"
+                                  >
+                                    Save Changes
+                                  </button>
+                                </div>
+                              </form>
+                            );
+                          }
+
+                          return (
+                            <div 
+                              key={rm.id} 
+                              className={`p-4 rounded-xl border text-left transition-all hover:border-emerald-500/30 flex flex-col justify-between gap-3.5 ${
+                                editingRoomId === rm.id ? 'border-amber-500/40 bg-zinc-50/50 dark:bg-zinc-900/20' : 'border-zinc-200 dark:border-zinc-805 bg-white dark:bg-zinc-900/80 shadow-xs'
+                              }`}
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100 leading-snug">{rm.name}</h4>
+                                    <span className="text-[8.5px] font-mono text-zinc-400">{rm.floor || '2nd Floor'}</span>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 font-mono ${
+                                    rm.status === 'maintenance' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                    percent >= 85 ? 'bg-red-500/10 text-red-500 border border-red-500/30' :
+                                    percent >= 60 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                    'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
+                                  }`}>
+                                    {rm.status === 'maintenance' ? '⚠️ Maintenance' : percent >= 85 ? '🔴 High (≥85%)' : percent >= 60 ? '🟠 Moderate (60-84%)' : '🟢 Low (<60%)'}
+                                  </span>
+                                </div>
+
+                                {/* Capacity indicators */}
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[9px] text-zinc-400 font-mono">
+                                    <span>Occupancy:</span>
+                                    <span className="font-bold text-zinc-700 dark:text-zinc-300">{rm.currentOccupancy} / {rm.capacity} Pax ({percent}%)</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-850 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all duration-300 ${
+                                        rm.status === 'maintenance' ? 'bg-amber-500' :
+                                        percent >= 85 ? 'bg-red-500' :
+                                        percent >= 60 ? 'bg-amber-500' :
+                                        'bg-emerald-500'
+                                      }`} 
+                                      style={{ width: `${rm.status === 'maintenance' ? 100 : percent}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 text-[9px] pt-1 border-t border-zinc-100 dark:border-zinc-900/60 font-mono">
+                                  <div>
+                                    <span className="text-zinc-400">Workstations:</span>
+                                    <p className="font-bold text-zinc-700 dark:text-zinc-300">{rm.devicesCount} Terminals</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-400">Scanner system:</span>
+                                    <p className={`font-black uppercase tracking-wide flex items-center gap-1 ${rm.scannersActive ? 'text-emerald-500' : 'text-zinc-450'}`}>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-current" /> {rm.scannersActive ? 'ACTIVE' : 'OFF'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {rm.activeClass && (
+                                  <div className="p-1.5 px-2.5 bg-zinc-100 dark:bg-zinc-850 rounded-lg text-[9px] text-zinc-500">
+                                    Active Subject Class: <strong className="font-extrabold text-zinc-700 dark:text-zinc-300">{rm.activeClass}</strong>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Controls and Actions row */}
+                              <div className="flex items-center justify-between pt-2 border-t border-zinc-200/50 dark:border-zinc-800 text-[10px] flex-wrap gap-2">
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingRoomId(rm.id);
+                                      setEditRoomName(rm.name);
+                                      setEditRoomCapacity(rm.capacity);
+                                      setEditRoomDevices(rm.devicesCount);
+                                      setEditRoomStatus(rm.status);
+                                      setEditRoomFloor(rm.floor || '2nd Floor');
+                                      setEditRoomBuildingCluster(rm.buildingCluster || rm.building || BUILDING_CLUSTERS[0]);
+                                      setIsAddingRoom(false);
+                                    }}
+                                    className="bg-zinc-150 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 font-extrabold px-2.5 py-1 rounded-lg cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteRoom(rm.id, rm.name)}
+                                    className="bg-red-500/10 hover:bg-red-500 text-red-550 hover:text-white font-extrabold px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = labRooms.map(r => r.id === rm.id ? { ...r, scannersActive: !r.scannersActive } : r);
+                                    onUpdateLabRooms?.(updated);
+                                    speakText(`Scanner state toggled in ${rm.name}`, accessibility.readAloud);
+                                  }}
+                                  className={`text-[8.5px] font-mono tracking-tight font-black uppercase px-2 py-1 rounded-lg border overflow-hidden cursor-pointer ${
+                                    rm.scannersActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-450 border-zinc-200 dark:border-zinc-805'
+                                  }`}
+                                >
+                                  {rm.scannersActive ? 'Disable Scanner' : 'Enable Scanner'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
                 })}
 
                 {labRooms.length === 0 && (
-                  <div className="md:col-span-2 py-16 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
+                  <div className="py-16 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
                     <MapPin className="w-10 h-10 text-zinc-300 mx-auto mb-2 animate-bounce" />
                     <p className="text-zinc-400 text-xs font-black uppercase tracking-wider font-sans">No rooms found in registry</p>
                     <p className="text-[10px] text-zinc-450 mt-1">Deploy a new custom room registry using the top right button.</p>
@@ -6241,7 +6318,6 @@ export default function DashboardAdmin({
                 )}
               </div>
             </div>
-
           </div>
         </motion.div>
       )}
@@ -6814,13 +6890,27 @@ export default function DashboardAdmin({
             <div className="space-y-3 text-xs">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Archive Term Designation Name</label>
-                <input
-                  type="text"
-                  value={termNameInput}
-                  onChange={(e) => setTermNameInput(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none"
-                  placeholder="e.g. 1st Semester AY 2025-2026"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={termNameInput}
+                    onChange={(e) => setTermNameInput(e.target.value)}
+                    className="flex-1 p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none"
+                    placeholder="e.g. 1st Semester AY 2025-2026"
+                  />
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) setTermNameInput(e.target.value);
+                    }}
+                    className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none cursor-pointer"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Presets...</option>
+                    {ACADEMIC_TERMS.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 space-y-1 text-[11px]">
@@ -6835,16 +6925,23 @@ export default function DashboardAdmin({
               {archivedTermsList.length > 0 && (
                 <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-900">
                   <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Historical Term Archives ({archivedTermsList.length})</span>
-                  <div className="max-h-28 overflow-y-auto space-y-1.5">
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 scrollbar-thin">
                     {archivedTermsList.map(arch => (
-                      <div key={arch.id} className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-850 flex items-center justify-between text-[11px] font-mono">
+                      <div 
+                        key={arch.id} 
+                        onClick={() => setSelectedArchivedTermForInspection(arch)}
+                        className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 hover:bg-zinc-100 dark:hover:bg-zinc-850 border border-zinc-200/60 dark:border-zinc-800 flex items-center justify-between text-[11px] font-mono cursor-pointer transition-all"
+                      >
                         <div>
-                          <strong className="text-zinc-800 dark:text-zinc-200">{arch.termName}</strong>
+                          <strong className="text-zinc-800 dark:text-zinc-200 block hover:text-emerald-500">{arch.termName}</strong>
                           <span className="text-[9px] text-zinc-400 block">{arch.archivedAt}</span>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase">
-                          {arch.totalClasses} Courses Archived
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase">
+                            {arch.totalClasses || 0} Courses
+                          </span>
+                          <span className="text-xs text-zinc-400">🔍</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -6866,6 +6963,89 @@ export default function DashboardAdmin({
                 className="px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl bg-amber-500 hover:bg-amber-400 text-black shadow-xs transition-all cursor-pointer"
               >
                 🔒 Confirm Term Closure
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Historical Term Archive Inspection Modal */}
+      {selectedArchivedTermForInspection && (
+        <div className="fixed inset-0 z-56 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-3xl max-w-xl w-full text-left space-y-4 shadow-2xl relative animate-scale-up max-h-[90vh] flex flex-col">
+            <button
+              onClick={() => setSelectedArchivedTermForInspection(null)}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-650 cursor-pointer p-1 rounded-full bg-zinc-100 dark:bg-zinc-900"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-3">
+              <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
+                  📜 {selectedArchivedTermForInspection.termName}
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Archived on {selectedArchivedTermForInspection.archivedAt} • Read-Only Historical Snapshot
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block font-mono">Courses</span>
+                <span className="text-lg font-black text-zinc-800 dark:text-zinc-200 font-mono">{selectedArchivedTermForInspection.totalClasses || (selectedArchivedTermForInspection.classesSnapshot?.length || 0)}</span>
+              </div>
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block font-mono">Logs</span>
+                <span className="text-lg font-black text-emerald-500 font-mono">{selectedArchivedTermForInspection.totalAttendanceRecords || (selectedArchivedTermForInspection.recordsSnapshot?.length || 0)}</span>
+              </div>
+              <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block font-mono">Enrollments</span>
+                <span className="text-lg font-black text-blue-500 font-mono">{selectedArchivedTermForInspection.totalStudentsEnrolled || 0}</span>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 max-h-60 pr-1 scrollbar-thin">
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block">Archived Subjects in Term</span>
+              {(selectedArchivedTermForInspection.classesSnapshot || []).map((cls: any) => (
+                <div key={cls.id} className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800/80 flex items-center justify-between text-xs">
+                  <div>
+                    <strong className="text-zinc-900 dark:text-zinc-100 font-bold">{cls.code} - {cls.name}</strong>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">{cls.days?.join(', ')} • {cls.startTime}-{cls.endTime} • {cls.room}</p>
+                  </div>
+                  {cls.buildingCluster && (
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                      {cls.buildingCluster.split('(')[0]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center pt-3 border-t border-zinc-100 dark:border-zinc-900">
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = archivedTermsList.filter(t => t.id !== selectedArchivedTermForInspection.id);
+                  setArchivedTermsList(updated);
+                  localStorage.setItem('classpulse_archived_terms', JSON.stringify(updated));
+                  setSelectedArchivedTermForInspection(null);
+                  speakText("Historical term archive purged", accessibility.readAloud);
+                }}
+                className="px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer"
+              >
+                Delete Archive
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedArchivedTermForInspection(null)}
+                className="px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
+              >
+                Close View
               </button>
             </div>
           </div>
@@ -6976,6 +7156,21 @@ export default function DashboardAdmin({
                       required
                     />
                   </div>
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Building Cluster (MSU Main)</label>
+                  <select
+                    value={newRoomBuildingCluster}
+                    onChange={(e) => setNewRoomBuildingCluster(e.target.value)}
+                    className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-zinc-800 dark:text-zinc-100"
+                  >
+                    {BUILDING_CLUSTERS.map(cluster => (
+                      <option key={cluster} value={cluster} className="bg-white dark:bg-zinc-950">
+                        {cluster}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-1 text-left">

@@ -12,7 +12,8 @@ import {
   Activity,
   X,
   Chrome,
-  CheckCircle
+  CheckCircle,
+  Hash
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion } from 'motion/react';
@@ -24,6 +25,7 @@ import {
   savePasswordResetToFirestore,
   syncAllAccountsFromFirestore
 } from '../lib/firestoreSync';
+import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
 
 interface AuthScreensProps {
   onLoginSuccess: (role: Role, customName?: string, customEmail?: string) => void;
@@ -304,6 +306,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
   // Registration form states
   const [regName, setRegName] = React.useState('');
   const [regEmail, setRegEmail] = React.useState('');
+  const [regStudentId, setRegStudentId] = React.useState('');
   const [regRole, setRegRole] = React.useState<Role>('student');
   const [regPassword, setRegPassword] = React.useState('');
   const [googleIsLoading, setGoogleIsLoading] = React.useState(false);
@@ -524,6 +527,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
 
   const [regNameError, setRegNameError] = React.useState(false);
   const [regEmailError, setRegEmailError] = React.useState(false);
+  const [regStudentIdError, setRegStudentIdError] = React.useState(false);
   const [regPasswordError, setRegPasswordError] = React.useState(false);
   const [regErrorMessage, setRegErrorMessage] = React.useState<string | null>(null);
 
@@ -672,6 +676,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
     e.preventDefault();
     setRegNameError(false);
     setRegEmailError(false);
+    setRegStudentIdError(false);
     setRegPasswordError(false);
     setRegErrorMessage(null);
 
@@ -687,6 +692,13 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
     if (!regPassword.trim()) {
       setRegPasswordError(true);
       hasError = true;
+    }
+
+    if (regRole === 'student' && regStudentId.trim() && !isValidMsuId(regStudentId.trim())) {
+      setRegStudentIdError(true);
+      setRegErrorMessage("MSU Student ID must follow official format (YYYY-XXXXX, e.g., 2023-10492).");
+      speakText("Invalid MSU Student ID format.", accessibility.readAloud);
+      return;
     }
 
     if (hasError) {
@@ -711,13 +723,19 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
       return;
     }
 
+    const assignedUid = regRole === 'student'
+      ? (regStudentId.trim() ? formatMsuId(regStudentId.trim()) : '2023-' + Math.floor(10000 + Math.random() * 90000))
+      : regRole === 'faculty'
+        ? 'FAC-' + Math.floor(10000 + Math.random() * 90000)
+        : 'ADM-' + Math.floor(10000 + Math.random() * 90000);
+
     const newUserObj = {
       id: 'usr-' + Math.random().toString(36).substring(2, 7),
       name: regName,
       email: regEmail,
       role: regRole,
-      uid: regRole === 'student' ? '2023-' + Math.floor(10000 + Math.random() * 90000) : regRole === 'faculty' ? 'FAC-' + Math.floor(10000 + Math.random() * 90000) : 'ADM-' + Math.floor(10000 + Math.random() * 90000),
-      department: regRole === 'faculty' ? 'College of Computer Studies' : regRole === 'admin' ? 'Academic Registrar Board' : 'CCS Department'
+      uid: assignedUid,
+      department: regRole === 'faculty' ? 'College of Information & Computing Sciences' : regRole === 'admin' ? 'Academic Registrar Board' : 'CICS Department'
     };
 
     registeredUsers.push(newUserObj);
@@ -1343,6 +1361,38 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
                   )}
                 </select>
               </div>
+
+              {regRole === 'student' && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">MSU Student ID Number</label>
+                    <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400">YYYY-XXXXX</span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                      <Hash className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      value={regStudentId}
+                      onChange={(e) => {
+                        const formatted = formatMsuId(e.target.value);
+                        setRegStudentId(formatted);
+                        setRegStudentIdError(false);
+                        setRegErrorMessage(null);
+                      }}
+                      maxLength={10}
+                      placeholder="e.g. 2023-10492"
+                      className={`pl-9 pr-4 py-2.5 border rounded-xl text-xs font-mono w-full focus:outline-none transition-all ${
+                        regStudentIdError 
+                          ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
+                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                      }`}
+                    />
+                  </div>
+                  <p className="text-[10px] text-zinc-400">Official Mindanao State University ID pattern (leave blank to auto-generate).</p>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Password</label>

@@ -42,12 +42,12 @@ interface SupportTicket {
 
 const STUDENT_FAQS = [
   {
-    q: "How does the real-time RFID/QR attendance check-in work?",
-    a: "Your instructor broadcasts a live rotation key on the classroom display. Open the Attendance Scan tab to capture the QR code with your camera or enter the dynamic code manually. Your record is logged instantly."
+    q: "How does the real-time QR Code attendance check-in work?",
+    a: "Your instructor broadcasts a live rotation QR code on the classroom screen. Open the Attendance Scan tab to capture the QR code with your device camera or enter the dynamic code manually. Your record is logged instantly."
   },
   {
     q: "What should I do if I missed a lecture due to a medical emergency?",
-    a: "First, procure an official doctor's note. Go to your dashboard and look for 'File Excuse Letter' or navigate to the Excuse Inbox to upload your file. Once your professor reviews it, your absent status will be updated."
+    a: "First, procure an official doctor's note or MSU Infirmary slip. Go to your dashboard and look for 'File Excuse Letter' or navigate to the Excuse Inbox to upload your file. Once your professor reviews it, your absent status will be updated."
   },
   {
     q: "How is my cumulative academic check-in safety calculated?",
@@ -78,58 +78,7 @@ const FACULTY_FAQS = [
   }
 ];
 
-const DEFAULT_TICKETS: SupportTicket[] = [
-  {
-    id: "TIC-1029",
-    category: "RFID Card Sync",
-    subject: "RFID card doesn't register at Room 302",
-    description: "My student RFID card works for room entrances but flashes red when tapping on the attendance logger console. Please synchronize my credential tokens.",
-    status: "Resolved",
-    createdAt: "June 12, 2026, 09:30 AM",
-    messages: [
-      {
-        id: "m1",
-        sender: "user",
-        text: "Hi support, my RFID badge flashes red at the attendance logs in the Engineering build.",
-        timestamp: "09:30 AM"
-      },
-      {
-        id: "m2",
-        sender: "admin",
-        text: "Hello! We have forced an over-the-air sync payload for your card token. Please test it at your next lecture. Let us know if you encounter any other issues.",
-        timestamp: "11:15 AM"
-      },
-      {
-        id: "m3",
-        sender: "user",
-        text: "Thank you! Tested it this afternoon and it checked me in instantly.",
-        timestamp: "02:40 PM"
-      }
-    ]
-  },
-  {
-    id: "TIC-5581",
-    category: "Technical Bugs",
-    subject: "Class schedule calendar sync lag on dashboard",
-    description: "The dashboard calendar view does not match my official syllabus updates. Newly modified classes show up after a noticeable delay.",
-    status: "In Progress",
-    createdAt: "June 15, 2026, 04:10 PM",
-    messages: [
-      {
-        id: "m4",
-        sender: "user",
-        text: "The calendar scheduling updates seem to take 10-15 minutes to align on my mobile view.",
-        timestamp: "04:10 PM"
-      },
-      {
-        id: "m5",
-        sender: "admin",
-        text: "Greetings. We are currently debugging a database indexing lag that affects specific user cohorts. A permanent software patch is being deployed shortly.",
-        timestamp: "05:05 PM"
-      }
-    ]
-  }
-];
+const DEFAULT_TICKETS: SupportTicket[] = [];
 
 export default function HelpCenter({ userProfile, accessibility, onBack }: HelpCenterProps) {
   const [activeTab, setActiveTab] = React.useState<'faq' | 'tickets'>('faq');
@@ -480,10 +429,10 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
                       onChange={(e) => setNewCategory(e.target.value)}
                       className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 font-bold"
                     >
-                      <option value="Attendance Verification">Attendance Verification Scan Failures</option>
-                      <option value="RFID Card Sync">RFID Card & Device Token Synclink</option>
+                      <option value="Attendance Verification">Attendance QR Code Scan Failures</option>
+                      <option value="Camera Scanner Sync">Camera Scanner & Device Token Sync</option>
                       <option value="Scheduling Conflicts">Syllabus Class Schedule Corrections</option>
-                      <option value="Excusal Slips Appeal">Medical Excuse Letter Appeal Errors</option>
+                      <option value="Excusal Slips Appeal">Medical / Infirmary Excuse Slip Appeal</option>
                       <option value="Account Settings / Bug report">UI Profile Settings / Visual Glitches</option>
                     </select>
                   </div>
@@ -505,7 +454,7 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
                     <textarea
                       rows={4}
                       className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-bold leading-relaxed resize-none"
-                      placeholder="Provide full description of schedule codes, RFID IDs, or rooms affected..."
+                      placeholder="Provide full description of schedule codes, QR scan errors, or rooms affected..."
                       value={newDesc}
                       onChange={(e) => setNewDesc(e.target.value)}
                       required
@@ -620,7 +569,7 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
               <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-550/5 to-emerald-500/5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 relative overflow-hidden">
                 <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-wider mb-2">Campus Administration IT Core</h4>
                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed font-medium mb-4">
-                  The ClassPulse Central Hub coordinates biometric ledger logs, RFID beacons, and active professor schedules dynamically. If you have an inquiry regarding official registrar status, submit a ticket.
+                  The ClassPulse Central Hub coordinates dynamic QR scan streams, classroom sessions, and active professor schedules in real time. If you have an inquiry regarding official registrar status, submit a ticket.
                 </p>
 
                 <div className="space-y-2.5 text-[10px] text-zinc-500 dark:text-zinc-400 font-bold border-t border-zinc-100 dark:border-zinc-900 pt-3">

@@ -61,19 +61,21 @@ export default function StudentWeeklyAttendanceChart({
     );
   }, [classes, enrollments, userProfile]);
 
-  // Filter records by student and optional subject
+  // Filter records by student and optional subject (strictly only for currently enrolled subjects)
   const studentRecords = useMemo(() => {
+    const enrolledClassIdSet = new Set(studentEnrolledClasses.map(c => c.id));
     return records.filter(r => {
       const isStudentMatch = r.studentId === userProfile.studentId || 
                              r.studentName === userProfile.name ||
                              (userProfile.email && r.studentId === userProfile.email);
       if (!isStudentMatch) return false;
       if (selectedSubjectFilter !== 'all') {
-        return r.classId === selectedSubjectFilter;
+        return r.classId === selectedSubjectFilter && enrolledClassIdSet.has(r.classId);
       }
-      return true;
+      // When 'all', only include records for subjects that are currently enrolled
+      return enrolledClassIdSet.has(r.classId);
     });
-  }, [records, userProfile, selectedSubjectFilter]);
+  }, [records, userProfile, selectedSubjectFilter, studentEnrolledClasses]);
 
   // Calculate 4 weekly buckets relative to current date
   const weeklyTrendData: WeekData[] = useMemo(() => {
@@ -116,7 +118,7 @@ export default function StudentWeeklyAttendanceChart({
       // Rate calculation (present=100%, excused=100%, late=70%)
       const rate = total > 0 
         ? Math.round(((present + excused + late * 0.7) / total) * 100)
-        : 100;
+        : 0;
 
       const issues: string[] = [];
       if (absent > 0) {
@@ -159,12 +161,15 @@ export default function StudentWeeklyAttendanceChart({
 
     const overallRate = totalSessions > 0
       ? Math.round(((totalPresents + totalExcused + totalLates * 0.7) / totalSessions) * 100)
-      : 100;
+      : 0;
 
     let consistencyStatus = 'High Consistency';
     let statusColor = 'text-emerald-650 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
 
-    if (totalAbsents >= 2 || overallRate < 75) {
+    if (totalSessions === 0) {
+      consistencyStatus = 'No Records Recorded';
+      statusColor = 'text-zinc-500 dark:text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+    } else if (totalAbsents >= 2 || overallRate < 75) {
       consistencyStatus = 'Critical Attendance Risk';
       statusColor = 'text-red-650 dark:text-red-400 bg-red-500/10 border-red-500/20';
     } else if (totalLates >= 3 || totalAbsents === 1 || overallRate < 85) {
