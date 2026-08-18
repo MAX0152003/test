@@ -20,8 +20,7 @@ import {
   FacultyStatus,
   Announcement,
   AppNotification,
-  LabRoom,
-  ScannerLog
+  LabRoom
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
 import { BUILDING_CLUSTERS, ACADEMIC_TERMS } from '../lib/msuUtils';
@@ -32,7 +31,6 @@ import {
   Calendar, 
   Plus, 
   Minus,
-  Cpu,
   X, 
   CheckCircle, 
   TrendingUp, 
@@ -41,22 +39,16 @@ import {
   ShieldAlert, 
   Mail, 
   Building,
-  Sparkles,
   Clock,
   MapPin,
   AlertCircle,
   Edit,
   Search,
-  Megaphone,
   User,
   Download,
-  Bell,
-  BellRing,
-  MessageSquare,
   SlidersHorizontal,
   ChevronDown,
   Filter,
-  ChevronLeft,
   ArrowLeft,
   ArrowRight,
   RefreshCw,
@@ -67,8 +59,11 @@ import {
   Check,
   Lock,
   HelpCircle,
+  Sparkles,
+  Megaphone,
   LayoutGrid,
-  List
+  List,
+  BellRing
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { 

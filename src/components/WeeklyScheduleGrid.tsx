@@ -1,6 +1,6 @@
 import React from 'react';
 import { ClassSession, Enrollment, UserProfile } from '../types';
-import { Clock, MapPin, User, Calendar, LayoutGrid, Columns, ListFilter, ChevronRight, CheckCircle2, AlertCircle, Moon } from 'lucide-react';
+import { Clock, MapPin, User, Calendar, LayoutGrid, Columns, ListFilter } from 'lucide-react';
 import { motion } from 'motion/react';
 import { isFridayPrayerWindow } from '../lib/msuUtils';
 
@@ -97,9 +97,6 @@ export default function WeeklyScheduleGrid({
   userProfile,
   searchQuery = '',
   onOpenSubjectDetails,
-  onEditSubject,
-  onEnrollSubject,
-  onDropSubject,
 }: WeeklyScheduleGridProps) {
   const [viewMode, setViewMode] = React.useState<'matrix' | 'columns' | 'cards'>('matrix');
 
@@ -181,6 +178,59 @@ export default function WeeklyScheduleGrid({
 
   return (
     <div className="w-full text-left space-y-4 animate-fade-in">
+      {/* Schedule Header & View Mode Switcher */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-1 border-b border-zinc-100 dark:border-zinc-850">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5 font-mono">
+            <Calendar className="w-4 h-4 text-emerald-500" />
+            Timetable Schedule View
+          </span>
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800">
+            {filteredClasses.length} Sections Active
+          </span>
+        </div>
+
+        {/* View Mode Toggle Controls */}
+        <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 self-stretch sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setViewMode('matrix')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              viewMode === 'matrix'
+                ? 'bg-emerald-500 text-black shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Timetable Matrix</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('columns')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              viewMode === 'columns'
+                ? 'bg-emerald-500 text-black shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>Day Columns</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              viewMode === 'cards'
+                ? 'bg-emerald-500 text-black shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
+            }`}
+          >
+            <ListFilter className="w-3.5 h-3.5" />
+            <span>Cards</span>
+          </button>
+        </div>
+      </div>
+
       {/* Jum'ah Friday Banner Alert */}
       <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-3 text-xs text-amber-700 dark:text-amber-300">
         <div className="flex items-center gap-2.5">
@@ -541,7 +591,12 @@ export default function WeeklyScheduleGrid({
                     <span className={`text-xs font-black px-2.5 py-1 rounded-lg font-mono ${theme.badge}`}>
                       {cls.code}
                     </span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {userRole === 'student' && isEnrolled && (
+                        <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                          Enrolled
+                        </span>
+                      )}
                       {hasJumah && (
                         <span title="MSU Friday Prayer Window (11:30 AM - 1:30 PM)" className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                           🕌 Jum’ah Aware

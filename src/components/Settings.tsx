@@ -9,7 +9,6 @@ import {
   Trash2, 
   Save, 
   CheckCircle,
-  Eye, 
   Volume2, 
   VolumeX, 
   Sun, 
@@ -24,17 +23,13 @@ import {
   Camera,
   Lock,
   Key,
-  Calendar,
-  CloudLightning,
-  QrCode,
-  Maximize2,
-  Minimize2,
-  Layers
+  QrCode
 } from 'lucide-react';
 import { UserProfile, AccessibilityConfig, ClassSession, ViewDensity } from '../types';
 import { speakText } from './AccessibilitySettings';
 import { saveUserCredentialToFirestore, saveUserProfileToFirestore } from '../lib/firestoreSync';
 import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
+import { triggerTestDeviceAlarm, requestSystemNotificationPermission } from '../lib/classAlarmScheduler';
 
 interface SettingsProps {
   userProfile: UserProfile;
@@ -59,9 +54,7 @@ export default function Settings({
   onUpdateCompactMode,
   onUpdateColorAccent,
   setScreen,
-  classes = [],
-  onOpenAccountLinkQR,
-  isOffline = false
+  onOpenAccountLinkQR
 }: SettingsProps) {
   // 1. Current category selection
   const [activeCategory, setActiveCategory] = React.useState<'account' | 'appearance' | 'notifications' | 'security'>('account');
@@ -105,11 +98,8 @@ export default function Settings({
   // 4. Appearance Prefs states (Tied with globally accessible AccessibilityConfig & Auto-saved)
   const [viewDensity, setViewDensity] = React.useState<ViewDensity>(() => {
     const cached = localStorage.getItem('cp_pref_view_density');
-    if (cached === 'compact' || cached === 'comfortable') return cached;
+    if (cached === 'compact' || cached === 'comfortable' || cached === 'spacious') return cached as ViewDensity;
     return localStorage.getItem('cp_pref_compact_mode') === 'true' ? 'compact' : 'comfortable';
-  });
-  const [compactMode, setCompactMode] = React.useState(() => {
-    return localStorage.getItem('cp_pref_compact_mode') === 'true' || localStorage.getItem('cp_pref_view_density') === 'compact';
   });
   const [colorAccent, setColorAccent] = React.useState(() => {
     return localStorage.getItem('cp_pref_color_accent') || 'emerald';
@@ -256,21 +246,15 @@ export default function Settings({
     setConfirmPassword('');
   };
 
-  // User-selectable View Density handler (Comfortable vs Compact)
+  // User-selectable View Density handler (Left-to-right density & interface slider)
   const handleDensityChange = (density: ViewDensity) => {
     setViewDensity(density);
     const isCompact = density === 'compact';
-    setCompactMode(isCompact);
     localStorage.setItem('cp_pref_view_density', density);
     localStorage.setItem('cp_pref_compact_mode', String(isCompact));
     onUpdateDensity?.(density);
     onUpdateCompactMode?.(isCompact);
-    speakText(`View density set to ${density === 'compact' ? 'Compact' : 'Comfortable'}.`, accessibility.readAloud);
-  };
-
-  // Legacy toggle support
-  const toggleCompactMode = () => {
-    handleDensityChange(viewDensity === 'compact' ? 'comfortable' : 'compact');
+    speakText(`View scale adjusted.`, accessibility.readAloud);
   };
 
   // Change color accent (auto-save preference)
@@ -303,7 +287,6 @@ export default function Settings({
 
     // C. Reset custom viewports & accent toggles
     setViewDensity('comfortable');
-    setCompactMode(false);
     setColorAccent('emerald');
     onUpdateDensity?.('comfortable');
     onUpdateCompactMode?.(false);
@@ -855,88 +838,87 @@ export default function Settings({
                 </div>
               </div>
 
-              {/* View Density (Comfortable vs Compact) */}
-              <div className="space-y-2.5 pt-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">
-                      View Density & Spacing
-                    </label>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Adjust layout padding and spacing throughout the app for better usability on smaller screens and mobile devices.
-                    </p>
-                  </div>
-                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                    {viewDensity === 'compact' ? 'Compact' : 'Comfortable'}
-                  </span>
+              {/* Accent Color Palette */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">
+                  Brand Accent Highlights
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {accentsArr.map(accent => (
+                    <button
+                      key={accent.id}
+                      type="button"
+                      onClick={() => handleColorAccentChange(accent.id)}
+                      className={`p-3 rounded-2xl border flex items-center gap-2.5 transition-all cursor-pointer ${
+                        colorAccent === accent.id
+                          ? 'border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/20 shadow-xs text-zinc-900 dark:text-zinc-100 font-bold'
+                          : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded-full ${accent.bg} shrink-0 border border-white/20`} />
+                      <span className="text-[11px] truncate">{accent.name}</span>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Comfortable Option */}
-                  <button
-                    onClick={() => handleDensityChange('comfortable')}
-                    type="button"
-                    className={`p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 cursor-pointer transition-all ${
-                      viewDensity === 'comfortable'
-                        ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 ring-2 ring-emerald-500/20 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-2 rounded-xl ${viewDensity === 'comfortable' ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
-                          <Maximize2 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100">Comfortable</h4>
-                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">Spacious & Relaxed</p>
-                        </div>
-                      </div>
-                      {viewDensity === 'comfortable' && (
-                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Generous padding and open margins. Ideal for desktop viewports and relaxed reading.
-                    </p>
-                    <div className="flex items-center gap-1.5 pt-1 text-[10px] font-bold text-zinc-450 dark:text-zinc-500">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500/40" />
-                      Standard 16–24px padding
-                    </div>
-                  </button>
+              {/* View Density & Spacing Scroller Slider */}
+              <div className="space-y-3 pt-2">
+                {/* Clean slider track from left to right */}
+                <div className="p-4 rounded-2xl bg-zinc-50/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 space-y-4">
+                  <div className="flex items-center justify-between text-zinc-400 dark:text-zinc-500">
+                    <span className="text-[11px] font-bold tracking-tight">A</span>
+                    <span className="text-sm font-bold tracking-tight">A</span>
+                    <span className="text-lg font-bold tracking-tight">A</span>
+                  </div>
 
-                  {/* Compact Option */}
-                  <button
-                    onClick={() => handleDensityChange('compact')}
-                    type="button"
-                    className={`p-4 rounded-2xl border text-left flex flex-col justify-between gap-3 cursor-pointer transition-all ${
-                      viewDensity === 'compact'
-                        ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 ring-2 ring-emerald-500/20 text-zinc-900 dark:text-zinc-100 shadow-sm'
-                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`p-2 rounded-xl ${viewDensity === 'compact' ? 'bg-emerald-500 text-black font-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'}`}>
-                          <Minimize2 className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100">Compact</h4>
-                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">High Density & Mobile</p>
-                        </div>
-                      </div>
-                      {viewDensity === 'compact' && (
-                        <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Snug padding and tighter margins. Perfect for smaller screens, mobile ergonomics, and data-dense dashboards.
-                    </p>
-                    <div className="flex items-center gap-1.5 pt-1 text-[10px] font-bold text-zinc-450 dark:text-zinc-500">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500/40" />
-                      Optimized 8–14px padding
-                    </div>
-                  </button>
+                  {/* Left to right interactive range scroller slider */}
+                  <div className="relative flex items-center">
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="1"
+                      value={viewDensity === 'compact' ? 0 : viewDensity === 'spacious' ? 2 : 1}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        const nextDensity: ViewDensity = val === 0 ? 'compact' : val === 2 ? 'spacious' : 'comfortable';
+                        handleDensityChange(nextDensity);
+                      }}
+                      className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 transition-all focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Visual tick marks connecting left to right */}
+                  <div className="flex justify-between px-1">
+                    <button
+                      type="button"
+                      onClick={() => handleDensityChange('compact')}
+                      className={`w-3.5 h-3.5 rounded-full transition-all cursor-pointer border ${
+                        viewDensity === 'compact'
+                          ? 'bg-emerald-500 border-emerald-400 ring-2 ring-emerald-500/30 scale-125'
+                          : 'bg-zinc-300 dark:bg-zinc-700 border-transparent hover:bg-zinc-400'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDensityChange('comfortable')}
+                      className={`w-3.5 h-3.5 rounded-full transition-all cursor-pointer border ${
+                        viewDensity === 'comfortable'
+                          ? 'bg-emerald-500 border-emerald-400 ring-2 ring-emerald-500/30 scale-125'
+                          : 'bg-zinc-300 dark:bg-zinc-700 border-transparent hover:bg-zinc-400'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleDensityChange('spacious')}
+                      className={`w-3.5 h-3.5 rounded-full transition-all cursor-pointer border ${
+                        viewDensity === 'spacious'
+                          ? 'bg-emerald-500 border-emerald-400 ring-2 ring-emerald-500/30 scale-125'
+                          : 'bg-zinc-300 dark:bg-zinc-700 border-transparent hover:bg-zinc-400'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1052,14 +1034,14 @@ export default function Settings({
                   </button>
                 </div>
 
-                {/* 3. Leave request notifications */}
+                {/* 3. Schedule shift alarms */}
                 <div className="flex items-start justify-between gap-4 p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
                   <div className="flex items-start gap-3">
                     <Smartphone className="w-4.5 h-4.5 text-zinc-450 mt-0.5 shrink-0" />
                     <div>
-                      <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-250">Schedule Shift Alarms</h4>
+                      <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-250">Class Status & Screen Pop-up Alarms</h4>
                       <p className="text-[10px] text-zinc-550 dark:text-zinc-400 mt-0.5 leading-relaxed">
-                        Sound an alarm 5 minutes prior to the generation of a local attendance QR token rotation matrix.
+                        Trigger system clock alarms (15 min prior, 5 min prior, and at start) directly on your device screen even when you're not visiting or the app is minimized.
                       </p>
                     </div>
                   </div>
@@ -1068,7 +1050,7 @@ export default function Settings({
                     onClick={() => {
                       const next = !scheduleAlarms;
                       setScheduleAlarms(next);
-                      speakText(`Schedule shift alerts set to ${next ? 'enabled' : 'disabled'}`, accessibility.readAloud);
+                      speakText(`Class status screen alarms set to ${next ? 'enabled' : 'disabled'}`, accessibility.readAloud);
                     }}
                     className={`w-11 h-6 rounded-full p-1 transition-all cursor-pointer inline-flex shrink-0 ${
                       scheduleAlarms 
@@ -1106,6 +1088,46 @@ export default function Settings({
                   >
                     <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 block shadow-sm" />
                   </button>
+                </div>
+
+                {/* 5. Device Native Notification Permissions & Testing Suite */}
+                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-left space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 tracking-wider">
+                      🔔 Phone & Desktop Native Alarm Diagnostic
+                    </span>
+                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      STATUS: {typeof window !== 'undefined' && 'Notification' in window ? Notification.permission.toUpperCase() : 'SUPPORTED'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                    Test your device's built-in pop-up screen notification and sound alert. This verifies that you will receive class status notifications on your home screen or lock screen even when you are not currently in the app.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await requestSystemNotificationPermission();
+                        if (res) {
+                          if (typeof window !== 'undefined' && (window as any).showToast) {
+                            (window as any).showToast("Screen notifications enabled!", "success");
+                          }
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-xl cursor-pointer active:scale-95 transition-all"
+                    >
+                      Request / Renew Screen Permissions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerTestDeviceAlarm(userProfile.role || 'faculty');
+                      }}
+                      className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl cursor-pointer active:scale-95 transition-all shadow-xs"
+                    >
+                      Test Pop-up Alarm on Screen Now
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

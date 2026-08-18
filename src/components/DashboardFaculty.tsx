@@ -28,29 +28,24 @@ import {
   AlertCircle,
   Calendar,
   Layers,
-  Sparkles,
   Filter,
-  Camera,
-  UploadCloud,
-  TrendingUp,
   UserCheck,
-  MessageSquare,
-  Eye,
-  EyeOff,
-  BellRing,
   Search,
   Inbox,
   Download,
   SlidersHorizontal,
   ArrowLeft,
-  Settings,
-  Send,
   FileText,
-  CheckSquare,
   AlertTriangle,
   Mail,
-  LayoutGrid,
-  List
+  Sparkles,
+  Eye,
+  EyeOff,
+  BellRing,
+  Camera,
+  UploadCloud,
+  Settings,
+  CheckSquare
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock from './AlarmClock';
@@ -64,7 +59,7 @@ import {
   BUILDING_CLUSTERS, 
   ACADEMIC_TERMS, 
   GRACE_PERIOD_OPTIONS, 
-  DEFAULT_GRACE_PERIOD_MINUTES, 
+  DEFAULT_GRACE_PERIOD_MINUTES,
   EXCUSE_PRESET_TYPES, 
   isFridayPrayerWindow 
 } from '../lib/msuUtils';
@@ -231,7 +226,6 @@ export default function DashboardFaculty({
   // Fast Class Search & Student Search states
   const [classSearchQuery, setClassSearchQuery] = React.useState('');
   const [studentSearchQuery, setStudentSearchQuery] = React.useState('');
-  const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
 
   React.useEffect(() => {
     localStorage.setItem('classpulse_faculty_bulletins_hidden', String(isBulletinsHidden));
@@ -1606,33 +1600,6 @@ export default function DashboardFaculty({
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
-                      <button
-                        type="button"
-                        onClick={() => setScheduleViewMode('grid')}
-                        className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                          scheduleViewMode === 'grid'
-                            ? 'bg-emerald-500 text-black shadow-xs'
-                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                        }`}
-                      >
-                        <LayoutGrid className="w-3.5 h-3.5" />
-                        <span>Weekly Grid</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setScheduleViewMode('cards')}
-                        className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                          scheduleViewMode === 'cards'
-                            ? 'bg-emerald-500 text-black shadow-xs'
-                            : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                        }`}
-                      >
-                        <List className="w-3.5 h-3.5" />
-                        <span>Card List</span>
-                      </button>
-                    </div>
-
                     <button
                       onClick={handleOpenAddForm}
                       type="button"
@@ -1889,149 +1856,14 @@ export default function DashboardFaculty({
           </AnimatePresence>
 
           {/* List of active schedules */}
-          {scheduleViewMode === 'grid' ? (
-            <WeeklyScheduleGrid
-              classes={classes}
-              userRole="faculty"
-              enrollments={enrollments}
-              userProfile={userProfile}
-              onOpenSubjectDetails={handleOpenSubjectDetails}
-              onEditSubject={handleOpenEditForm}
-            />
-          ) : (
-          (() => {
-            const todayIndex = new Date().getDay();
-            const dayMap: Record<number, string> = {
-              1: 'Mon',
-              2: 'Tue',
-              3: 'Wed',
-              4: 'Thu',
-              5: 'Fri',
-              6: 'Sat',
-              0: 'Sun'
-            };
-            const todayLabel = dayMap[todayIndex] || 'Mon';
-
-            const todayClasses = classes.filter(cls => {
-              const expandedClassDays = expandDaysToSpecificOnesVal(cls.days);
-              const expandedToday = expandDaysToSpecificOnesVal([todayLabel]);
-              return expandedClassDays.some(d => expandedToday.includes(d));
-            });
-            const otherClasses = classes.filter(cls => {
-              const expandedClassDays = expandDaysToSpecificOnesVal(cls.days);
-              const expandedToday = expandDaysToSpecificOnesVal([todayLabel]);
-              return !expandedClassDays.some(d => expandedToday.includes(d));
-            });
-
-            const renderClassItem = (cls: typeof classes[0]) => {
-              const studentRegisteredCount = enrollments.filter(e => e.classId === cls.id).length;
-              return (
-                <div 
-                  key={cls.id}
-                  className="p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:border-emerald-500/10 cursor-pointer"
-                  onClick={() => handleOpenSubjectDetails(cls)}
-                >
-                  <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-350 px-2.5 py-0.5 rounded">
-                        {cls.code}
-                      </span>
-                      <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 hover:underline">{cls.name}</h3>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-zinc-400 mt-2.5">
-                      <span className="flex items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-300">
-                        <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                        {cls.startTime} - {cls.endTime}
-                      </span>
-                      <span className="flex items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-300">
-                        <MapPin className="w-3.5 h-3.5 text-zinc-400" />
-                        {cls.room}
-                      </span>
-                      <span className="text-[10px] bg-zinc-150 dark:bg-zinc-900 px-2.5 py-0.5 rounded font-black uppercase text-zinc-650 dark:text-zinc-400">
-                        {cls.days.join(', ')}
-                      </span>
-                      <span className="text-[10px] bg-indigo-100/50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-2.5 py-0.5 rounded font-black uppercase">
-                        {studentRegisteredCount} enrolled
-                      </span>
-                      <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-md font-extrabold flex items-center gap-1">
-                        <span>⏱️ {cls.gracePeriodMinutes ?? DEFAULT_GRACE_PERIOD_MINUTES}m Grace Period</span>
-                      </span>
-                      {isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime) && (
-                        <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1">
-                          <span>🕌 Jum’ah Aware</span>
-                        </span>
-                      )}
-                      {cls.buildingCluster && (
-                        <span className="text-[10px] bg-zinc-100 dark:bg-zinc-900 text-zinc-500 px-2 py-0.5 rounded-md font-medium border border-zinc-200 dark:border-zinc-800">
-                          {cls.buildingCluster.split('(')[0].trim()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Operational actions - stopPropagation so click detail modal doesn't fire when deleting */}
-                  <div className="flex items-center gap-2 self-end sm:self-auto" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleOpenEditForm(cls)}
-                      type="button"
-                      className="p-2.5 border border-zinc-200 dark:border-zinc-850 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 cursor-pointer"
-                      title="Edit Class details"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(cls.id, cls.code)}
-                      type="button"
-                      className="p-2.5 border border-red-200 dark:border-red-950/40 rounded-xl hover:bg-red-500/10 text-red-500 cursor-pointer"
-                      title="Delete Class Schedule"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            };
-
-            if (classes.length === 0) {
-              return <ScheduleListSkeleton count={3} />;
-            }
-
-            return (
-              <div className="space-y-6">
-                {/* Today's Schedule */}
-                {todayClasses.length > 0 && (
-                  <div className="space-y-3 flex flex-col text-left">
-                    <h4 className="text-xs font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Current Classes ({todayLabel})
-                    </h4>
-                    <div className="space-y-4">
-                      {todayClasses.map(cls => renderClassItem(cls))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Future/Other Schedules */}
-                <div className="space-y-3 text-left">
-                  {otherClasses.length > 0 && (
-                    <h4 className="text-xs font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest pt-2">
-                      Future Schedule
-                    </h4>
-                  )}
-                  {otherClasses.length > 0 ? (
-                    <div className="space-y-4">
-                      {otherClasses.map(cls => renderClassItem(cls))}
-                    </div>
-                  ) : (
-                    todayClasses.length === 0 && (
-                      <p className="text-xs text-zinc-500 italic text-center">No classes scheduled.</p>
-                    )
-                  )}
-                </div>
-              </div>
-            );
-          })())}
+          <WeeklyScheduleGrid
+            classes={classes}
+            userRole="faculty"
+            enrollments={enrollments}
+            userProfile={userProfile}
+            onOpenSubjectDetails={handleOpenSubjectDetails}
+            onEditSubject={handleOpenEditForm}
+          />
         </motion.div>
       )}
 

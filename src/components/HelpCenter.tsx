@@ -7,11 +7,9 @@ import {
   CheckCircle, 
   ArrowLeft, 
   MessageSquare, 
-  Clock, 
   FileText, 
   ShieldAlert, 
   ChevronRight,
-  User,
   Activity,
   UserCheck
 } from 'lucide-react';

@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ClassSession, Enrollment, AttendanceRecord, UserProfile, FacultyStatus } from '../types';
+import { ClassSession, Enrollment, AttendanceRecord, FacultyStatus } from '../types';
 import AttendanceGraph from './AttendanceGraph';
-import { X, Calendar, Clock, MapPin, User, Users, ShieldAlert, CheckCircle, Activity, Download, Search } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, User, Users, CheckCircle, Activity, Download, Search } from 'lucide-react';
 
 interface SubjectDetailModalProps {
   isOpen: boolean;

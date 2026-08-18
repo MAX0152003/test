@@ -97,119 +97,171 @@ html.dark, html.dark body, html.dark #root {
   animation: ripple 2s infinite ease-in-out;
 }
 
-/* View Density (Comfortable vs Compact) Styling */
+/* View Density & Spacing Slider Scaling (Small / Medium / Large) */
+/* Level 1: Compact (Small) */
+.density-compact {
+  --app-font-scale: 0.93;
+}
 .density-compact .p-8,
 .app-compact-mode .p-8 {
-  padding: 1.1rem !important;
+  padding: 1rem !important;
 }
-
 .density-compact .p-6,
 .density-compact .p-6.p-6,
 .app-compact-mode .p-6,
 .app-compact-mode .p-6.p-6 {
-  padding: 0.85rem !important;
+  padding: 0.75rem !important;
 }
-
 .density-compact .p-5,
 .app-compact-mode .p-5 {
-  padding: 0.7rem !important;
+  padding: 0.625rem !important;
 }
-
 .density-compact .p-4,
 .app-compact-mode .p-4 {
-  padding: 0.6rem !important;
+  padding: 0.5rem !important;
 }
-
 .density-compact .px-6,
 .app-compact-mode .px-6 {
-  padding-left: 0.85rem !important;
-  padding-right: 0.85rem !important;
-}
-
-.density-compact .py-6,
-.app-compact-mode .py-6 {
-  padding-top: 0.75rem !important;
-  padding-bottom: 0.75rem !important;
-}
-
-.density-compact .px-5,
-.app-compact-mode .px-5 {
   padding-left: 0.75rem !important;
   padding-right: 0.75rem !important;
 }
-
-.density-compact .py-5,
-.app-compact-mode .py-5 {
+.density-compact .py-6,
+.app-compact-mode .py-6 {
   padding-top: 0.65rem !important;
   padding-bottom: 0.65rem !important;
 }
-
+.density-compact .px-5,
+.app-compact-mode .px-5 {
+  padding-left: 0.65rem !important;
+  padding-right: 0.65rem !important;
+}
+.density-compact .py-5,
+.app-compact-mode .py-5 {
+  padding-top: 0.55rem !important;
+  padding-bottom: 0.55rem !important;
+}
 .density-compact .px-4,
 .app-compact-mode .px-4 {
-  padding-left: 0.6rem !important;
-  padding-right: 0.6rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
 }
-
 .density-compact .py-4,
 .app-compact-mode .py-4 {
-  padding-top: 0.5rem !important;
-  padding-bottom: 0.5rem !important;
+  padding-top: 0.45rem !important;
+  padding-bottom: 0.45rem !important;
 }
-
 .density-compact .pb-6,
 .app-compact-mode .pb-6 {
-  padding-bottom: 0.7rem !important;
+  padding-bottom: 0.6rem !important;
 }
-
 .density-compact .pt-6,
 .app-compact-mode .pt-6 {
-  padding-top: 0.7rem !important;
+  padding-top: 0.6rem !important;
 }
-
 .density-compact .gap-6,
 .app-compact-mode .gap-6 {
-  gap: 0.75rem !important;
-}
-
-.density-compact .gap-5,
-.app-compact-mode .gap-5 {
   gap: 0.65rem !important;
 }
-
+.density-compact .gap-5,
+.app-compact-mode .gap-5 {
+  gap: 0.55rem !important;
+}
 .density-compact .gap-4,
 .app-compact-mode .gap-4 {
-  gap: 0.5rem !important;
+  gap: 0.45rem !important;
 }
-
 .density-compact .space-y-6 > :not([hidden]) ~ :not([hidden]),
 .app-compact-mode .space-y-6 > :not([hidden]) ~ :not([hidden]) {
-  margin-top: 0.75rem !important;
-}
-
-.density-compact .space-y-5 > :not([hidden]) ~ :not([hidden]),
-.app-compact-mode .space-y-5 > :not([hidden]) ~ :not([hidden]) {
   margin-top: 0.65rem !important;
 }
-
+.density-compact .space-y-5 > :not([hidden]) ~ :not([hidden]),
+.app-compact-mode .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.55rem !important;
+}
 .density-compact .space-y-4 > :not([hidden]) ~ :not([hidden]),
 .app-compact-mode .space-y-4 > :not([hidden]) ~ :not([hidden]) {
-  margin-top: 0.5rem !important;
+  margin-top: 0.45rem !important;
 }
-
 .density-compact .my-5,
 .app-compact-mode .my-5 {
-  margin-top: 0.55rem !important;
-  margin-bottom: 0.55rem !important;
+  margin-top: 0.45rem !important;
+  margin-bottom: 0.45rem !important;
 }
-
 .density-compact table th,
 .density-compact table td,
 .app-compact-mode table th,
 .app-compact-mode table td {
-  padding-top: 0.45rem !important;
-  padding-bottom: 0.45rem !important;
-  padding-left: 0.65rem !important;
-  padding-right: 0.65rem !important;
+  padding-top: 0.35rem !important;
+  padding-bottom: 0.35rem !important;
+  padding-left: 0.55rem !important;
+  padding-right: 0.55rem !important;
+}
+
+/* Level 3: Spacious (Large) */
+.density-spacious {
+  --app-font-scale: 1.06;
+}
+.density-spacious .p-8 {
+  padding: 2.25rem !important;
+}
+.density-spacious .p-6,
+.density-spacious .p-6.p-6 {
+  padding: 1.75rem !important;
+}
+.density-spacious .p-5 {
+  padding: 1.45rem !important;
+}
+.density-spacious .p-4 {
+  padding: 1.2rem !important;
+}
+.density-spacious .px-6 {
+  padding-left: 1.75rem !important;
+  padding-right: 1.75rem !important;
+}
+.density-spacious .py-6 {
+  padding-top: 1.75rem !important;
+  padding-bottom: 1.75rem !important;
+}
+.density-spacious .px-5 {
+  padding-left: 1.45rem !important;
+  padding-right: 1.45rem !important;
+}
+.density-spacious .py-5 {
+  padding-top: 1.45rem !important;
+  padding-bottom: 1.45rem !important;
+}
+.density-spacious .px-4 {
+  padding-left: 1.2rem !important;
+  padding-right: 1.2rem !important;
+}
+.density-spacious .py-4 {
+  padding-top: 1.1rem !important;
+  padding-bottom: 1.1rem !important;
+}
+.density-spacious .gap-6 {
+  gap: 1.85rem !important;
+}
+.density-spacious .gap-5 {
+  gap: 1.5rem !important;
+}
+.density-spacious .gap-4 {
+  gap: 1.25rem !important;
+}
+.density-spacious .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.85rem !important;
+}
+.density-spacious .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.5rem !important;
+}
+.density-spacious .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.25rem !important;
+}
+.density-spacious table th,
+.density-spacious table td {
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
 }
 
 /* Specific small screen & mobile density optimizations */
@@ -261,22 +313,49 @@ html.dark, html.dark body, html.dark #root {
   --color-brand-hover: #4f46e5 !important;
 }
 
-/* Ensure the HTML5 QR Code scanner container and video render correctly */
+/* Ensure the HTML5 QR Code scanner container and video render correctly on iOS and mobile */
 #live-qr-reader {
   width: 100% !important;
   height: 100% !important;
-  min-height: 300px !important;
-  display: block !important;
+  min-height: 260px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   background-color: #09090b !important;
+  overflow: hidden !important;
+  position: relative !important;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 #live-qr-reader video {
   width: 100% !important;
   height: 100% !important;
-  min-height: 300px !important;
+  min-height: 260px !important;
   object-fit: cover !important;
   display: block !important;
   border-radius: 12px !important;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+#live-qr-reader img,
+#live-qr-reader canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+}
+
+/* iOS Safe-Area Inset Support and Momentum Scrolling */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+html, body {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
 }
 
 /* Gentle transitions of major theme attributes without breaking Framer Motion animations or interactive scaling */

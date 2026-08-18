@@ -38,7 +38,6 @@ import {
 } from './lib/firestoreSync';
 import { normalizeUserIdentity } from './lib/authUtils';
 import AccountLinkQRModal from './components/AccountLinkQRModal';
-import { auth, db } from './lib/googleAuth';
 import { 
   INITIAL_CLASSES, 
   INITIAL_FACULTY_STATUSES, 
@@ -48,6 +47,14 @@ import {
   DEFAULT_FACULTY_PROFILE,
   DEFAULT_ADMIN_PROFILE
 } from './data';
+import { 
+  registerAlarmServiceWorker, 
+  checkActiveScheduleAlarms, 
+  requestSystemNotificationPermission,
+  triggerClassAlarmNotification,
+  ClassAlarmPayload
+} from './lib/classAlarmScheduler';
+import { auth } from './lib/googleAuth';
 import Sidebar from './components/Sidebar';
 import DashboardStudent from './components/DashboardStudent';
 import DashboardFaculty from './components/DashboardFaculty';
@@ -58,26 +65,22 @@ import SettingsPage from './components/Settings';
 import { 
   Wifi, 
   WifiOff, 
-  Type, 
   Settings, 
   X, 
-  RefreshCw, 
-  CheckCircle,
   HelpCircle,
   Bell,
   Search,
   LayoutDashboard,
-  QrCode,
+  Activity,
+  Inbox,
+  Menu,
+  Users,
   CalendarDays,
+  UserCircle,
   Scan,
   MessageSquare,
-  Users,
-  Inbox,
-  UserCircle,
-  AlertTriangle,
-  Info,
-  Menu,
-  Activity
+  QrCode,
+  CheckCircle
 } from 'lucide-react';
 
 // Safe Local Storage Wrapper to prevent app crashes due to QuotaExceededError or browser iframe restrictions
@@ -497,7 +500,7 @@ export default function App() {
 
   const [viewDensity, setViewDensity] = React.useState<ViewDensity>(() => {
     const cached = safeStorage.getItem('cp_pref_view_density');
-    if (cached === 'compact' || cached === 'comfortable') return cached;
+    if (cached === 'compact' || cached === 'comfortable' || cached === 'spacious') return cached as ViewDensity;
     return safeStorage.getItem('cp_pref_compact_mode') === 'true' ? 'compact' : 'comfortable';
   });
 
@@ -1034,6 +1037,15 @@ export default function App() {
               return [newNotif, ...prev];
             });
 
+            // Trigger real device pop-up screen notification & sound alarm
+            triggerClassAlarmNotification({
+              title: `🏢 Room Update: ${rm.name} is now ${rm.status.toUpperCase()}`,
+              message: `Assigned course room "${rm.name}" changed from ${prevStatus} to ${rm.status}. Tap to view schedule.`,
+              room: rm.name,
+              type: 'room_change',
+              screen: 'schedule'
+            }).catch(() => {});
+
             speakText(`Push Alert: Laboratory room "${rm.name}" is now "${rm.status}".`, accessibility.readAloud);
             
             if (typeof window !== 'undefined' && (window as any).showToast) {
@@ -1045,6 +1057,58 @@ export default function App() {
       prevLabRoomsRef.current[rm.id] = rm.status;
     });
   }, [labRooms, classes, accessibility.readAloud]);
+
+  // Register Background Notification Service Worker on app load
+  React.useEffect(() => {
+    registerAlarmServiceWorker();
+    
+    // Auto-check system notification permission if enabled in preferences
+    const scheduleAlarmsPref = safeStorage.getItem('cp_pref_schedule_alarms') !== 'false';
+    if (scheduleAlarmsPref && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      const timer = setTimeout(() => {
+        requestSystemNotificationPermission().catch(() => {});
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Continuous background schedule alarm monitor (runs every 10s like a built-in alarm clock)
+  React.useEffect(() => {
+    const alarmsEnabled = safeStorage.getItem('cp_pref_schedule_alarms') !== 'false';
+    if (!alarmsEnabled || !user) return;
+
+    const runAlarmCheck = () => {
+      checkActiveScheduleAlarms(classes, enrollments, user, (alarm: ClassAlarmPayload) => {
+        const newNotif: AppNotification = {
+          id: 'alarm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
+          title: alarm.title,
+          message: alarm.message,
+          timestamp: 'Just Now',
+          type: alarm.type === 'late_warning' ? 'warning' : alarm.type === 'started' ? 'success' : 'info',
+          read: false
+        };
+        setNotifications(prev => [newNotif, ...prev]);
+        if (typeof window !== 'undefined' && (window as any).showToast) {
+          (window as any).showToast(alarm.title, alarm.type === 'late_warning' ? 'warning' : 'success');
+        }
+      });
+    };
+
+    runAlarmCheck();
+    const interval = setInterval(runAlarmCheck, 10000);
+    return () => clearInterval(interval);
+  }, [classes, enrollments, user]);
+
+  // Listen to custom navigation events from notifications & service worker
+  React.useEffect(() => {
+    const handleNavEvent = (e: any) => {
+      if (e.detail?.screen) {
+        handleSetScreen(e.detail.screen);
+      }
+    };
+    window.addEventListener('classpulse-navigate', handleNavEvent);
+    return () => window.removeEventListener('classpulse-navigate', handleNavEvent);
+  }, []);
 
   React.useEffect(() => {
     safeStorage.setItem('cp_offline', String(isOffline));
@@ -1981,7 +2045,13 @@ export default function App() {
   return (
     <div 
       id="app-root-level-wrapper"
-      className={`${getThemeClass(accessibility.theme)} theme-accent-${colorAccent} ${viewDensity === 'compact' ? 'density-compact app-compact-mode' : 'density-comfortable'} trans-all-theme`}
+      className={`${getThemeClass(accessibility.theme)} theme-accent-${colorAccent} ${
+        viewDensity === 'compact' 
+          ? 'density-compact app-compact-mode' 
+          : viewDensity === 'spacious' 
+            ? 'density-spacious' 
+            : 'density-comfortable'
+      } trans-all-theme`}
     >
       
       {/* 1. AUTHENTICATOR ENVELOPE */}
@@ -2389,7 +2459,9 @@ export default function App() {
 
             {/* Primary content grid layout block */}
             <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2.5 max-w-7xl w-full mx-auto flex-1 overflow-y-auto ${
-              activeScreen === 'messages' || activeScreen === 'tickets' ? 'pb-16 md:pb-2 space-y-0' : 'pb-20 md:pb-6 space-y-2.5 sm:space-y-4'
+              activeScreen === 'messages' || activeScreen === 'tickets' 
+                ? 'pb-24 md:pb-4 space-y-0' 
+                : 'pb-32 sm:pb-28 md:pb-8 space-y-2.5 sm:space-y-4'
             }`}>
               
               {/* Accessibility options expansion widget */}

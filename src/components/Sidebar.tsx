@@ -1,29 +1,23 @@
 import React from 'react';
 import { Role, AccessibilityConfig } from '../types';
 import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Scan, 
-  Bell, 
-  UserCircle, 
-  LogOut, 
-  Users, 
   X,
-  Menu,
   Activity,
   ChevronLeft,
-  MessageSquare,
-  Inbox,
   Settings,
-  Download,
   HelpCircle,
   MapPin,
   Lock,
-  Unlock,
-  Eye,
-  EyeOff,
-  ChevronDown,
-  ChevronUp
+  LayoutDashboard,
+  CalendarDays,
+  Scan,
+  MessageSquare,
+  Bell,
+  UserCircle,
+  Users,
+  Inbox,
+  Download,
+  LogOut
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion, AnimatePresence } from 'motion/react';
@@ -60,9 +54,7 @@ export default function Sidebar({
     return localStorage.getItem('cp_sidebar_collapsed') === 'true';
   });
   const [isHovered, setIsHovered] = React.useState(false);
-  const [facultyCode, setFacultyCode] = React.useState('Faculty123');
-  const [isCabinetOpen, setIsCabinetOpen] = React.useState(false);
-  const [isKeyVisible, setIsKeyVisible] = React.useState(false);
+  const [, setFacultyCode] = React.useState('Faculty123');
   const [pendingResetsCount, setPendingResetsCount] = React.useState(0);
   const [pendingTicketsCount, setPendingTicketsCount] = React.useState(0);
 
@@ -253,40 +245,7 @@ export default function Sidebar({
     }
   };
 
-  const themeColors = getRoleNavColors();
   const navSections = getNavSections();
-
-  // Primary mobile bottom navigation items
-  const getMobileNavItems = () => {
-    switch (role) {
-      case 'student':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'schedule', label: 'Schedule', icon: CalendarDays },
-          { id: 'attendance', label: 'Scan', icon: Scan },
-          { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages },
-          { id: 'settings', label: 'Settings', icon: Settings },
-        ];
-      case 'faculty':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'schedule-editor', label: 'Classes', icon: CalendarDays },
-          { id: 'qr-generator', label: 'QR Scan', icon: Scan },
-          { id: 'excuse-inbox', label: 'Inbox', icon: Inbox, badge: pendingExcuseCount },
-          { id: 'settings', label: 'Settings', icon: Settings },
-        ];
-      case 'admin':
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-          { id: 'users', label: 'Users', icon: Users },
-          { id: 'schedule-editor', label: 'Schedules', icon: CalendarDays },
-          { id: 'resets', label: 'Resets', icon: Lock, badge: pendingResetsCount },
-          { id: 'settings', label: 'Settings', icon: Settings },
-        ];
-    }
-  };
-
-  const mobileNavItems = getMobileNavItems();
 
   const handleNavClick = (screenId: string, label: string) => {
     setScreen(screenId);

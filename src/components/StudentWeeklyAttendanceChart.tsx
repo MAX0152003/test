@@ -18,7 +18,6 @@ import {
   Clock, 
   Calendar, 
   Filter, 
-  Sparkles,
   Info
 } from 'lucide-react';
 
@@ -190,7 +189,7 @@ export default function StudentWeeklyAttendanceChart({
   }, [weeklyTrendData]);
 
   // Custom Recharts Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as WeekData;
       return (

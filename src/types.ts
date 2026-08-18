@@ -63,7 +63,7 @@ export interface AccessibilityConfig {
   readAloud: boolean;
 }
 
-export type ViewDensity = 'comfortable' | 'compact';
+export type ViewDensity = 'compact' | 'comfortable' | 'spacious';
 
 export interface FacultyStatus {
   id: string;

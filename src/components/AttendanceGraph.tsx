@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js/auto';
 import { AttendanceRecord } from '../types';
-import { Activity, Award, TrendingUp, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Activity, TrendingUp, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 // Register standard Chart.js modules just in case
 try {

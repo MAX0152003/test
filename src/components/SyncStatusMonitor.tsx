@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Database, CheckCircle2, Wifi, WifiOff, ShieldCheck, Layers, Clock } from 'lucide-react';
+import { RefreshCw, Database, CheckCircle2, Wifi, WifiOff, ShieldCheck, Clock, Layers } from 'lucide-react';
 import { forceResyncAllFromFirestore } from '../lib/firestoreSync';
 import { playSuccessChime, triggerHapticFeedback } from '../lib/soundUtils';
 

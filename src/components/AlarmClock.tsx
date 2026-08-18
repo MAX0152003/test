@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Clock as ClockIcon, Bell, BellOff, Volume2, Play, CircleAlert, CheckCircle, Sparkles } from 'lucide-react';
+import { Clock as ClockIcon, Bell, BellOff, Volume2, CircleAlert, CheckCircle, Play, Sparkles } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 
 // Helper to synthesise a dual-tone, professional electronic chime

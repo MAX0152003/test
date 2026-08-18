@@ -3,24 +3,15 @@ import { UserProfile, ChatMessage, ClassSession, Enrollment } from '../types';
 import { 
   Send, 
   MessageSquare, 
-  Sparkles, 
   Paperclip, 
   Image as ImageIcon, 
   Link as LinkIcon, 
   FileText, 
   Download, 
   X, 
-  Smile, 
-  User, 
   ExternalLink,
-  Bot,
-  Search,
-  SlidersHorizontal,
   ArrowLeft,
-  RefreshCw,
   LifeBuoy,
-  MessageSquarePlus,
-  HelpCircle,
   PlusCircle
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
@@ -261,6 +252,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   const [activeContactId, setActiveContactId] = useState<string>('');
   const [inputText, setInputText] = useState('');
   const [userSearchText, setUserSearchText] = useState('');
+  const [isPeerTyping] = useState(false);
+  const [typingPeerName] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Support Ticket interfaces for admin helpdesk ticketing view
   interface TicketMessage {
@@ -419,11 +413,6 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   const [pendingLink, setPendingLink] = useState<{ url: string; title: string; desc: string } | null>(null);
   const [pendingFile, setPendingFile] = useState<{ name: string; size: string } | null>(null);
 
-  // Typing indicators
-  const [isPeerTyping, setIsPeerTyping] = useState(false);
-  const [typingPeerName, setTypingPeerName] = useState('');
-
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const ticketMessagesContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -467,7 +456,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     scrollToBottom(false);
   }, [messages]);
 
-  const scrollToBottom = (instant: boolean = false) => {
+  const scrollToBottom = (_instant: boolean = false) => {
     try {
       const performScroll = () => {
         if (messagesContainerRef.current) {
@@ -879,40 +868,6 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     }, 50);
 
     speakText("Message transmitted.", accessibility.readAloud);
-  };
-
-  // Preset loaders for mockup attachments
-  const attachPresetImage = (type: 'lab' | 'library' | 'campus') => {
-    const urls = {
-      lab: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=400',
-      library: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&q=80&w=400',
-      campus: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&q=80&w=400'
-    };
-    setPendingImg(urls[type]);
-    setPendingLink(null);
-    setPendingFile(null);
-    setShowAttachmentMenu(false);
-    speakText("Preset college image prepared for attachment.", accessibility.readAloud);
-  };
-
-  const attachPresetLink = () => {
-    setPendingLink({
-      url: 'https://github.com/varsity-hub/react-vite-blueprint',
-      title: 'Vite React Tailwind Starter Framework',
-      desc: 'Optimized full-stack architecture for university dashboards and real-time calendars.'
-    });
-    setPendingImg(null);
-    setPendingFile(null);
-    setShowAttachmentMenu(false);
-    speakText("Resource web bookmark attached.", accessibility.readAloud);
-  };
-
-  const attachPresetFile = (fileName: string, fileSize: string) => {
-    setPendingFile({ name: fileName, size: fileSize });
-    setPendingImg(null);
-    setPendingLink(null);
-    setShowAttachmentMenu(false);
-    speakText("Syllabus resource file attached.", accessibility.readAloud);
   };
 
   const dynPeopleForSearch = getDynamicCampusPeople(

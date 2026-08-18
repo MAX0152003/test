@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { ClassSession, AttendanceRecord } from '../types';
-import { BarChart3, TrendingUp, CheckCircle2, Clock, AlertCircle, Filter, Calendar, Users } from 'lucide-react';
+import { BarChart3, TrendingUp, CheckCircle2, Clock, Filter, Calendar } from 'lucide-react';
 
 interface FacultyAttendanceTrendsChartProps {
   classes: ClassSession[];

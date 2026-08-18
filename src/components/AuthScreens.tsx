@@ -5,13 +5,11 @@ import {
   Mail, 
   User, 
   ChevronRight, 
-  Sparkles, 
   Shield,
   Eye,
   EyeOff,
   Activity,
   X,
-  Chrome,
   CheckCircle,
   Hash
 } from 'lucide-react';

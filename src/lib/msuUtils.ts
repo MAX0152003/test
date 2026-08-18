@@ -54,7 +54,7 @@ export function isValidMsuId(value: string): boolean {
 /**
  * Checks if a given class schedule overlaps with Friday Jum'ah Prayer window (11:30 AM - 1:30 PM)
  */
-export function isFridayPrayerWindow(days: string[] = [], startTime?: string, endTime?: string): boolean {
+export function isFridayPrayerWindow(days: string[] = [], startTime?: string, _endTime?: string): boolean {
   const hasFriday = days.some(d => d.includes('F') || d.toLowerCase().includes('fri') || d.toLowerCase() === 'friday');
   if (!hasFriday) return false;
 

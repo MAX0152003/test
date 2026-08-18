@@ -1,6 +1,6 @@
 import React from 'react';
 import { AccessibilityConfig } from '../types';
-import { Volume2, VolumeX, Eye, Sun, Moon, Activity, Wifi, WifiOff } from 'lucide-react';
+import { Volume2, VolumeX, Eye, Sun, Moon, Wifi, WifiOff, Activity } from 'lucide-react';
 
 interface AccessibilitySettingsProps {
   config: AccessibilityConfig;

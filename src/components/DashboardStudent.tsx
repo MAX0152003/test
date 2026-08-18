@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
 import { playSuccessChime, playWarningChime, triggerHapticFeedback } from '../lib/soundUtils';
+import { triggerTestDeviceAlarm, requestSystemNotificationPermission, getNotificationPermissionStatus } from '../lib/classAlarmScheduler';
 import { 
   Scan, 
   Calendar, 
@@ -21,42 +22,30 @@ import {
   AlertTriangle, 
   Clock, 
   MapPin, 
-  Zap, 
   User, 
   ChevronRight, 
   ChevronDown,
   ChevronUp,
-  BookOpen,
   FileText, 
-  Sparkles,
   Camera,
-  Play,
-  RotateCcw,
   Wifi,
   WifiOff,
   Search,
   BellRing,
-  Award,
-  UploadCloud,
+  Users,
   X,
-  XCircle,
-  MessageSquare,
+  Sparkles,
   Eye,
   EyeOff,
-  Trash2,
+  MessageSquare,
+  UploadCloud,
   Download,
-  SlidersHorizontal,
-  Users,
+  Trash2,
   ArrowLeft,
-  ArrowRight,
-  TrendingUp,
-  TrendingDown,
-  Check,
-  LayoutGrid,
-  List,
-  HelpCircle,
+  XCircle,
   Vibrate,
-  ShieldAlert
+  Zap,
+  SlidersHorizontal
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock, { triggerNativeChime } from './AlarmClock';
@@ -66,21 +55,6 @@ import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import StudentWeeklyAttendanceChart from './StudentWeeklyAttendanceChart';
 import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  ReferenceLine
-} from 'recharts';
 import { EXCUSE_PRESET_TYPES, isFridayPrayerWindow } from '../lib/msuUtils';
 
 const expandDaysToSpecificOnesVal = (days: string[]): string[] => {
@@ -561,6 +535,30 @@ export default function DashboardStudent({
     speakText(`Attendance recorded successfully. Checked as ${status}`, accessibility.readAloud);
   };
 
+  // Helper to enforce inline video playback on iOS Safari & WebKit
+  const ensureIOSVideoInline = () => {
+    try {
+      const container = document.getElementById("live-qr-reader");
+      if (container) {
+        const videos = container.querySelectorAll('video');
+        videos.forEach((v: HTMLVideoElement) => {
+          v.setAttribute('playsinline', 'true');
+          v.setAttribute('webkit-playsinline', 'true');
+          v.setAttribute('muted', 'true');
+          v.setAttribute('autoplay', 'true');
+          v.muted = true;
+          v.autoplay = true;
+          v.style.width = '100%';
+          v.style.height = '100%';
+          v.style.objectFit = 'cover';
+          v.play().catch(() => {});
+        });
+      }
+    } catch (e) {
+      // Non-blocking
+    }
+  };
+
   // Real Web Camera implementation with iOS, macOS, and multi-platform resilience
   const startLiveCamera = async () => {
     setCameraError(null);
@@ -569,7 +567,7 @@ export default function DashboardStudent({
     
     const elementId = "live-qr-reader";
     // Short deferment to ensure viewport is mounted in the DOM
-    await new Promise(resolve => setTimeout(resolve, 120));
+    await new Promise(resolve => setTimeout(resolve, 100));
     const element = document.getElementById(elementId);
     if (!element) {
       setIsCameraLoading(false);
@@ -597,15 +595,14 @@ export default function DashboardStudent({
       html5QrCodeRef.current = new Html5Qrcode(elementId);
 
       setIsScanning(true);
-      speakText("Starting real-time camera feed. Please point your lens at the QR code.", accessibility.readAloud);
+      speakText("Starting camera feed. Please point your lens at the QR code.", accessibility.readAloud);
 
-      // Construct primary camera constraint
+      // Construct primary camera constraint optimized for iOS Safari & Android
       let primaryConstraint: any;
       if (isIOS) {
-        // iOS Safari performs best with standard facingMode environment
+        // iOS Safari performs best with facingMode environment or ideal constraints
         primaryConstraint = { facingMode: "environment" };
       } else if (isMac) {
-        // macOS WebKit / Safari standard user-facing webcam
         if (selectedCameraId) {
           primaryConstraint = { deviceId: { exact: selectedCameraId } };
         } else {
@@ -625,16 +622,26 @@ export default function DashboardStudent({
         fps: 15,
         qrbox: (width: number, height: number) => {
           const minSize = Math.min(width, height);
-          const boxSize = Math.max(160, Math.round(minSize * 0.72));
+          const boxSize = Math.max(160, Math.round(minSize * 0.75));
           return { width: boxSize, height: boxSize };
-        }
+        },
+        aspectRatio: 1.0
       };
+
+      // Set up MutationObserver to ensure any injected <video> has iOS playsinline & muted
+      const observer = new MutationObserver(() => {
+        ensureIOSVideoInline();
+      });
+      if (element) {
+        observer.observe(element, { childList: true, subtree: true });
+      }
 
       // Multi-tier attempt: try specific constraint, fallback to facingMode, fallback to basic video
       let started = false;
       const constraintTiers = [
         primaryConstraint,
-        isMobileDevice ? { facingMode: "environment" } : { facingMode: "user" },
+        { facingMode: { ideal: "environment" } },
+        { facingMode: "environment" },
         { facingMode: "user" },
         true
       ];
@@ -654,12 +661,18 @@ export default function DashboardStudent({
             }
           );
           started = true;
+          ensureIOSVideoInline();
           break;
         } catch (err: any) {
           lastError = err;
           console.warn("Camera start constraint tier failed, trying next fallback...", constraint, err);
         }
       }
+
+      setTimeout(() => {
+        observer.disconnect();
+        ensureIOSVideoInline();
+      }, 2000);
 
       if (!started) {
         throw lastError || new Error("Unable to start video stream with available camera constraints.");
@@ -689,14 +702,14 @@ export default function DashboardStudent({
       
       const errMsg = String(err?.message || err || '');
       if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission denied') || errMsg.includes('permission')) {
-        setCameraError("Camera permission was denied or restricted in browser settings. Please allow camera access, or use the instant code verification option below.");
+        setCameraError("Camera permission requested. Tap the 'Start Camera' button or use the 'Scan from Photo' option below.");
       } else if (errMsg.includes('OverconstrainedError') || errMsg.includes('NotFoundError')) {
-        setCameraError("Camera hardware unavailable or overconstrained. You can use the instant verification key or simulated scanner below.");
+        setCameraError("Camera hardware unavailable or busy. You can use the instant passcode verification or take a photo below.");
       } else {
-        setCameraError(errMsg || "Failed to initiate camera. Please ensure permissions are granted in browser settings.");
+        setCameraError(errMsg || "Camera stream unavailable. Tap 'Start Camera Scanner' or upload a photo of the QR code.");
       }
       
-      speakText("Camera initiation failed. Quick verification option is ready below.", accessibility.readAloud);
+      speakText("Camera scanner standby. You can tap Start Camera or enter session passcode below.", accessibility.readAloud);
     }
   };
 
@@ -713,6 +726,37 @@ export default function DashboardStudent({
     }
     setIsScanning(false);
     setIsCameraLoading(false);
+  };
+
+  // Instant QR Code reader from image file or iOS camera photo snapshot
+  const handleQrPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCameraLoading(true);
+    setCameraError(null);
+    setScanResult(null);
+
+    try {
+      await stopLiveCamera();
+      const tempScanner = new Html5Qrcode("live-qr-reader");
+      const decodedText = await tempScanner.scanFile(file, true);
+      await handleDecodedText(decodedText);
+    } catch (err: any) {
+      console.warn("Photo QR scan error:", err);
+      setScanResult({
+        success: false,
+        message: "Could not detect a clear QR code in this image. Please ensure the QR code is in focus and well-lit, or use manual session passcode."
+      });
+      triggerVisualHaptic(
+        'error',
+        'QR Detection Failed',
+        'Image could not be decoded. Please retry or enter passcode.'
+      );
+    } finally {
+      setIsCameraLoading(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   const handleDecodedText = async (decodedText: string) => {
@@ -1860,6 +1904,24 @@ export default function DashboardStudent({
                   {/* Camera Feed Target Container */}
                   <div id="live-qr-reader" className="w-full h-[290px] sm:h-[310px] bg-zinc-950 overflow-hidden relative"></div>
 
+                  {/* iOS & Mobile Tap-to-Start Live Camera Direct Gesture Overlay */}
+                  {!isScanning && !isCameraLoading && (
+                    <div 
+                      onClick={startLiveCamera}
+                      className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950/85 hover:bg-zinc-950/75 transition-colors cursor-pointer text-center p-4 group"
+                    >
+                      <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-active:scale-95 transition-transform shadow-[0_0_30px_rgba(16,185,129,0.5)]">
+                        <Camera className="w-8 h-8 animate-pulse" />
+                      </div>
+                      <span className="mt-3 text-xs font-black uppercase tracking-wider text-emerald-400">
+                        Tap to Launch Live Camera
+                      </span>
+                      <span className="text-[10px] text-zinc-400 mt-1 max-w-[220px]">
+                        Direct touch optimized for iOS Safari & Android mobile scanners
+                      </span>
+                    </div>
+                  )}
+
                   {/* Visual Haptic Flash Indicator Overlay (Flashes Green for Success or Red for Error) */}
                   <AnimatePresence>
                     {visualHaptic && (
@@ -2178,24 +2240,38 @@ export default function DashboardStudent({
                   </div>
                 )}
 
-                <div className="flex gap-2.5">
+                <div className="flex flex-col sm:flex-row gap-2.5">
                   {isScanning ? (
                     <button
                       type="button"
                       onClick={stopLiveCamera}
-                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all"
+                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all shadow-xs"
                     >
-                      Stop Finder Feed
+                      Stop Live Camera
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={startLiveCamera}
-                      className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all"
+                      className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all shadow-xs flex items-center justify-center gap-1.5"
                     >
-                      Start Camera scanner
+                      <Camera className="w-4 h-4" />
+                      <span>Start Camera Scanner</span>
                     </button>
                   )}
+
+                  {/* Direct Camera Photo Snapshot / File QR Scan Option (100% Reliable on all iOS versions) */}
+                  <label className="flex-1 py-3 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-zinc-200 dark:border-zinc-700">
+                    <Scan className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Scan from Photo</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="environment" 
+                      onChange={handleQrPhotoUpload} 
+                      className="hidden" 
+                    />
+                  </label>
                 </div>
 
                 {/* Fallback Manual Secret Code Entry */}
@@ -2236,6 +2312,60 @@ export default function DashboardStudent({
                     >
                       Verify Code
                     </button>
+                  </div>
+                </div>
+
+                {/* Built-in Device Screen Alarm & Status Pop-up Controller */}
+                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-850 space-y-2.5 mt-4">
+                  <div className="p-3.5 rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-800 text-left space-y-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0">
+                          <BellRing className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wide">
+                            Phone Screen Alarms & Class Status
+                          </h4>
+                          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight mt-0.5">
+                            Native pop-ups ring on your device screen even when minimized or outside this site.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                        ACTIVE ALARM
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await requestSystemNotificationPermission();
+                          if (ok) {
+                            if (typeof window !== 'undefined' && (window as any).showToast) {
+                              (window as any).showToast("✅ Device screen alarms enabled successfully!", "success");
+                            }
+                          } else {
+                            if (typeof window !== 'undefined' && (window as any).showToast) {
+                              (window as any).showToast("Please allow notifications in your browser or iOS settings.", "warning");
+                            }
+                          }
+                        }}
+                        className="flex-1 py-2 px-3 bg-zinc-200/80 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10.5px] font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Enable Phone Screen Permissions</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => triggerTestDeviceAlarm('student')}
+                        className="py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-black text-[10.5px] font-black rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Test Pop-up Alarm</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 

@@ -9,9 +9,9 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, auth } from './googleAuth';
+import { db, handleFirestoreError, OperationType } from './googleAuth';
 import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry, FacultyStatus, LeaveRequest } from '../types';
-import { normalizeUserIdentity, normalizeUid, normalizeEmail, generateSessionToken } from './authUtils';
+import { normalizeUserIdentity, generateSessionToken } from './authUtils';
 
 /**
  * Recursively removes undefined fields from an object or array before passing to Firestore setDoc/updateDoc.
