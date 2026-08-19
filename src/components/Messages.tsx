@@ -36,15 +36,7 @@ interface EnrichedChatMessage extends ChatMessage {
   attachmentFile?: { name: string; size: string };
 }
 
-const ALL_CAMPUS_PEOPLE = [
-  { id: '2023-10492', name: 'John Doe', role: 'student', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150', dept: 'ComSci', email: 'john.doe@msu.edu.ph' },
-  { id: '2023-88211', name: 'Alice Vance', role: 'student', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150', dept: 'Engineering', email: 'alice.vance@msu.edu.ph' },
-  { id: '2023-99124', name: 'Bob Smith', role: 'student', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150', dept: 'Information Tech', email: 'bob.smith@msu.edu.ph' },
-  { id: '2023-77215', name: 'Charlie Dean', role: 'student', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150', dept: 'ComSci', email: 'charlie.dean@msu.edu.ph' },
-  { id: '2023-33491', name: 'Diana Ross', role: 'student', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150', dept: 'Nursing', email: 'diana.ross@msu.edu.ph' },
-  { id: 'fac-1', name: 'Dr. Ahmad Khan', role: 'faculty', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150', dept: 'Information Technology', email: 'ahmad.khan@msu.edu.ph' },
-  { id: 'admin-01', name: 'Master Admin', role: 'admin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150', dept: 'Registrar Board', email: 'admin@msu.edu.ph' }
-];
+const ALL_CAMPUS_PEOPLE: any[] = [];
 
 export const getDynamicCampusPeople = (userRole?: string, userId?: string, userName?: string, userAvatar?: string, userEmail?: string) => {
   let registeredList: any[] = [];
@@ -54,80 +46,39 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
     // ignore
   }
 
-  // Filter static campus people: remove unregistered admins
-  const staticToMap = ALL_CAMPUS_PEOPLE.filter(p => {
-    if (p.role === 'admin') {
-      const isRegistered = registeredList.some((u: any) => 
-        u.role === 'admin' && (
-          u.id === p.id || 
-          u.uid === p.id || 
-          (u.email && p.email && u.email.toLowerCase() === p.email.toLowerCase())
-        )
-      );
-      const isCurrentAdmin = userRole === 'admin' && (
-        (userId && p.id === userId) || 
-        (userEmail && p.email && p.email.toLowerCase() === userEmail.toLowerCase())
-      );
-      if (!isRegistered && !isCurrentAdmin) {
-        return false;
-      }
-    }
-    if (userRole !== 'admin' && p.role === 'admin') {
-      return false;
-    }
-    return true;
-  });
+  const result: any[] = [];
+  const addedIds = new Set<string>();
 
-  const mappedStatic = staticToMap.map(p => {
-    const matchedReg = registeredList.find((u: any) => 
-      u.id === p.id || 
-      u.uid === p.id ||
-      (p.role === 'admin' && u.role === 'admin' && u.email && p.email && u.email.toLowerCase() === p.email.toLowerCase()) ||
-      (p.role === 'faculty' && u.role === 'faculty' && p.id === 'fac-1' && u.email === 'ahmad.khan@msu.edu.ph') ||
-      (p.role === 'student' && p.id === '2023-10492' && u.email === 'john.doe@msu.edu.ph')
-    );
+  // If active user exists, include them
+  if (userId) {
+    result.push({
+      id: userId,
+      name: userName || 'Current User',
+      role: userRole || 'student',
+      avatar: userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      email: userEmail || '',
+      dept: 'Academic Portal'
+    });
+    addedIds.add(userId);
+  }
 
-    const isCurrentUser = (userId && p.id === userId) || 
-                         (userEmail && p.email && p.email.toLowerCase() === userEmail.toLowerCase()) ||
-                         (!userEmail && userRole && p.role === userRole && userRole === 'student' && p.id === '2023-10492') ||
-                         (!userEmail && p.role === 'faculty' && p.id === 'fac-1' && userRole === 'faculty');
-
-    let currentAvatar = p.avatar;
-    let currentName = p.name;
-
-    if (isCurrentUser) {
-      currentAvatar = userAvatar !== undefined ? userAvatar : p.avatar;
-      currentName = userName || p.name;
-    } else if (matchedReg) {
-      currentAvatar = matchedReg.avatar !== undefined ? matchedReg.avatar : p.avatar;
-      currentName = matchedReg.name;
-    }
-
-    return {
-      ...p,
-      name: currentName,
-      avatar: currentAvatar
-    };
-  });
-
-  const result = [...mappedStatic];
   registeredList.forEach((r: any) => {
     if (userRole !== 'admin' && r.role === 'admin') {
       return;
     }
     const rId = r.id || r.uid;
-    const exists = result.some(p => p.id === rId || p.id === r.uid || p.id === r.id || (r.email && p.email && r.email.toLowerCase() === p.email.toLowerCase()));
-    if (!exists) {
+    if (rId && !addedIds.has(rId)) {
       const isCurrentUser = (userId && (r.id === userId || r.uid === userId)) ||
                            (userEmail && r.email && r.email.toLowerCase() === userEmail.toLowerCase());
       result.push({
         id: rId,
-        name: isCurrentUser && userName ? userName : r.name,
-        role: r.role,
-        avatar: isCurrentUser && userAvatar !== undefined ? userAvatar : (r.avatar || ''),
-        email: r.email,
+        name: isCurrentUser && userName ? userName : (r.name || 'Academic User'),
+        role: r.role || 'student',
+        avatar: isCurrentUser && userAvatar !== undefined ? userAvatar : (r.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'),
+        email: r.email || '',
         dept: r.department || (r.role === 'faculty' ? 'College Staff' : r.role === 'admin' ? 'Registrar' : 'CCS Student')
       });
+      addedIds.add(rId);
     }
   });
 
@@ -198,55 +149,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         // Fallback
       }
     }
-    
-    // Seed default rich live chat histories
-    return [
-      {
-        id: 'msg-seed-1',
-        senderId: 'fac-1',
-        senderName: 'Dr. Ahmad Khan',
-        senderRole: 'faculty',
-        receiverId: '2023-10492',
-        receiverName: 'John Doe',
-        message: 'Hello class, welcome to MSU Academic Portal! Here are the slides for session #1.',
-        timestamp: '10:00 AM',
-        read: false
-      },
-      {
-        id: 'msg-seed-2',
-        senderId: '2023-10492',
-        senderName: 'John Doe',
-        senderRole: 'student',
-        receiverId: 'CS-101', // Group room
-        receiverName: 'Introduction to Computer Science',
-        message: 'Has anyone finished compiling the web component blueprint?',
-        timestamp: '10:05 AM',
-        read: true
-      },
-      {
-        id: 'msg-seed-3',
-        senderId: 'sys-pulse',
-        senderName: 'System Pulse Bot',
-        senderRole: 'admin',
-        receiverId: 'CS-101',
-        receiverName: 'Introduction to Computer Science',
-        message: 'Welcome everyone to the channel! Here is our syllabus for this term. Please review.',
-        timestamp: '10:06 AM',
-        attachmentFile: { name: 'CS101_Syllabus_Revised.pdf', size: '1.4 MB' },
-        read: true
-      },
-      {
-        id: 'msg-seed-4',
-        senderId: 'fac-2',
-        senderName: 'Prof. Maria Santos',
-        senderRole: 'faculty',
-        receiverId: '2023-10492',
-        receiverName: 'John Doe',
-        message: 'Please review the exam guidelines before Friday morning.',
-        timestamp: '10:14 AM',
-        read: false
-      }
-    ];
+    return [];
   });
 
   const [activeContactId, setActiveContactId] = useState<string>('');

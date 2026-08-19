@@ -463,7 +463,7 @@ export default function DashboardFaculty({
   }, [classes, selectedMonitoringClassId, selectedAlarmClassId]);
 
   const activeMonClass = classes.find(c => c.id === selectedMonitoringClassId);
-  const monEnrollments = enrollments.filter(e => e.classId === selectedMonitoringClassId);
+  const monEnrollments = enrollments.filter(e => e.classId === selectedMonitoringClassId && !e.deletedByStudent);
 
   // Compute analytics data for active monitoring class
   const monClassRecords = attendanceRecords.filter(r => r.classId === selectedMonitoringClassId);

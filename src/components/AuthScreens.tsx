@@ -11,7 +11,8 @@ import {
   Activity,
   X,
   CheckCircle,
-  Hash
+  Hash,
+  ArrowLeft
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion } from 'motion/react';
@@ -28,10 +29,12 @@ import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
 interface AuthScreensProps {
   onLoginSuccess: (role: Role, customName?: string, customEmail?: string) => void;
   accessibility: AccessibilityConfig;
+  onBackToLanding?: () => void;
+  initialMode?: 'login' | 'register';
 }
 
-export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScreensProps) {
-  const [isLoginView, setIsLoginView] = React.useState(true);
+export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLanding, initialMode = 'login' }: AuthScreensProps) {
+  const [isLoginView, setIsLoginView] = React.useState(initialMode === 'login');
   const [isForgotPwdView, setIsForgotPwdView] = React.useState(false);
   const [isCheckingCredentials, setIsCheckingCredentials] = React.useState(false);
   const [credentialErrorSkeleton, setCredentialErrorSkeleton] = React.useState<string | null>(null);
@@ -779,25 +782,6 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
     startLoginFlow(regRole, regName, regEmail);
   };
 
-  // Preset demo accounts login trigger
-  const triggerDemoLogin = (role: Role) => {
-    let email = '';
-    let name = '';
-    if (role === 'student') {
-      email = 'john.doe@msu.edu.ph';
-      name = 'John Doe';
-    } else if (role === 'faculty') {
-      email = 'ahmad.khan@msu.edu.ph';
-      name = 'Dr. Ahmad Khan';
-    } else {
-      email = 'admin@msu.edu.ph';
-      name = 'Admin Strator';
-    }
-    
-    speakText(`Demo account loaded. Switched to ${role} role.`, accessibility.readAloud);
-    startLoginFlow(role, name, email);
-  };
-
   const isDark = accessibility.theme === 'dark';
 
   return (
@@ -812,6 +796,20 @@ export default function AuthScreens({ onLoginSuccess, accessibility }: AuthScree
         className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.01]" 
         style={{ backgroundImage: 'radial-gradient(circle, #10b981 1px, transparent 1px)', backgroundSize: '32px 32px' }}
       />
+
+      {/* Back to Landing Page Button */}
+      {onBackToLanding && (
+        <div className="w-full max-w-md flex justify-start mb-2 z-10">
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-500 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100/80 dark:hover:bg-zinc-900/80 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-all cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to MSU Landing Page</span>
+          </button>
+        </div>
+      )}
       
       {/* Brand Launcher Logo Header */}
       <div className="mb-7 text-center z-10 space-y-2">

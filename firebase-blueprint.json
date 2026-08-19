@@ -56,6 +56,20 @@
         "department": { "type": "string" }
       },
       "required": ["id", "name", "email", "role"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Student subject course enrollment records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentEmail": { "type": "string" },
+        "classId": { "type": "string" },
+        "enrolledAt": { "type": "string" }
+      },
+      "required": ["id", "studentId", "classId"]
     }
   },
   "firestore": {
@@ -74,6 +88,10 @@
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Collection of registered user profiles"
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Collection of subject enrollments"
     }
   }
 }

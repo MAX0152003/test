@@ -39,14 +39,22 @@ export default function SubjectDetailModal({
 
   const [rosterSearch, setRosterSearch] = React.useState('');
 
+  const uEmail = (studentEmail || '').trim().toLowerCase();
+  const uStuId = (studentId || '').trim().toLowerCase();
+  const uName = (studentName || '').trim().toLowerCase();
+
   // Check if current student is enrolled
-  const isEnrolled = enrollments.some(
-    e => e.classId === cls.id &&
-         ((studentId && e.studentId === studentId) || 
-          (studentName && e.studentName === studentName) || 
-          (studentEmail && e.studentEmail === studentEmail)) &&
-         !e.deletedByStudent
-  );
+  const isEnrolled = enrollments.some(e => {
+    if (e.classId !== cls.id || e.deletedByStudent) return false;
+    const eEmail = (e.studentEmail || '').trim().toLowerCase();
+    const eStuId = (e.studentId || '').trim().toLowerCase();
+    const eName = (e.studentName || '').trim().toLowerCase();
+
+    if (uEmail && eEmail && uEmail === eEmail) return true;
+    if (uStuId && eStuId && uStuId === eStuId) return true;
+    if (uName && eName && uName === eName) return true;
+    return false;
+  });
 
   // Find enrolled students for this class (excluding students who unenrolled/dropped)
   const classEnrollments = enrollments.filter(e => e.classId === cls.id && !e.deletedByStudent);

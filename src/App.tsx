@@ -28,13 +28,18 @@ import {
   syncExcuseLettersFromFirestore,
   saveExcuseLetterToFirestore,
   listenToExcuseLetters,
+  syncEnrollmentsFromFirestore,
+  saveEnrollmentToFirestore,
+  deleteEnrollmentFromFirestore,
+  listenToEnrollments,
   listenToClasses,
   listenToAttendance,
   listenToRegisteredUsers,
   listenToCredentials,
   listenToPasswordResets,
   claimSessionLinkFromFirestore,
-  forceResyncAllFromFirestore
+  forceResyncAllFromFirestore,
+  wipeAllFirestoreAndLocalData
 } from './lib/firestoreSync';
 import { normalizeUserIdentity } from './lib/authUtils';
 import AccountLinkQRModal from './components/AccountLinkQRModal';
@@ -60,6 +65,7 @@ import DashboardStudent from './components/DashboardStudent';
 import DashboardFaculty from './components/DashboardFaculty';
 import DashboardAdmin from './components/DashboardAdmin';
 import AuthScreens from './components/AuthScreens';
+import LandingPage from './components/LandingPage';
 import AccessibilitySettings, { speakText } from './components/AccessibilitySettings';
 import SettingsPage from './components/Settings';
 import { 
@@ -119,7 +125,7 @@ const safeStorage = {
 
 export default function App() {
   // Synchronously purge old cache/demo data to guarantee a fresh zero-record start
-  if (typeof window !== 'undefined' && !safeStorage.getItem('cp_purged_v7')) {
+  if (typeof window !== 'undefined' && !safeStorage.getItem('cp_fresh_wipe_v11')) {
     safeStorage.removeItem('cp_classes');
     safeStorage.removeItem('cp_records');
     safeStorage.removeItem('cp_notifications');
@@ -135,15 +141,20 @@ export default function App() {
     safeStorage.removeItem('cp_offline_queue_count');
     safeStorage.removeItem('cp_user');
     safeStorage.removeItem('cp_screen');
+    safeStorage.removeItem('cp_chat_messages_v2');
     try {
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('cp_support_tickets_') || k.startsWith('cp_chat_') || k.startsWith('cp_'))) {
+        if (k && (k.startsWith('cp_') || k.startsWith('classpulse_') || k.startsWith('firebase:'))) {
           localStorage.removeItem(k);
         }
       }
     } catch (_) {}
-    safeStorage.setItem('cp_purged_v7', 'true');
+    safeStorage.setItem('cp_fresh_wipe_v11', 'true');
+    // Wipe all Firestore collections asynchronously
+    wipeAllFirestoreAndLocalData().catch((err) => {
+      console.warn('Wipe all data error:', err);
+    });
   }
 
   // Global App-level Toast System
@@ -179,6 +190,9 @@ export default function App() {
     }
     return null;
   });
+
+  const [unauthView, setUnauthView] = React.useState<'landing' | 'auth'>('landing');
+  const [authInitialMode, setAuthInitialMode] = React.useState<'login' | 'register'>('login');
 
   const [activeScreen, setActiveScreen] = React.useState<string>(() => {
     return safeStorage.getItem('cp_screen') || 'dashboard';
@@ -755,6 +769,10 @@ export default function App() {
       setExcuseLetters(fetchedLetters);
       safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
     });
+    syncEnrollmentsFromFirestore(false, (fetchedEnrollments) => {
+      setEnrollments(fetchedEnrollments);
+      safeStorage.setItem('cp_enrollments', JSON.stringify(fetchedEnrollments));
+    });
     syncAllAccountsFromFirestore(false);
 
     const unsubClasses = listenToClasses(false, (fetchedClasses) => {
@@ -773,6 +791,10 @@ export default function App() {
       setExcuseLetters(fetchedLetters);
       safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
     });
+    const unsubEnrollments = listenToEnrollments(false, (fetchedEnrollments) => {
+      setEnrollments(fetchedEnrollments);
+      safeStorage.setItem('cp_enrollments', JSON.stringify(fetchedEnrollments));
+    });
     const unsubUsers = listenToRegisteredUsers(false);
     const unsubCreds = listenToCredentials(false);
     const unsubResets = listenToPasswordResets(false);
@@ -782,13 +804,14 @@ export default function App() {
       unsubAttendance();
       unsubFaculty();
       unsubExcuses();
+      unsubEnrollments();
       unsubUsers();
       unsubCreds();
       unsubResets();
     };
   }, []);
 
-  // Firestore Sync Data: pulls down classes and attendance records once online
+  // Firestore Sync Data: pulls down classes, attendance records and enrollments once online
   React.useEffect(() => {
     if (isOffline) return;
 
@@ -810,6 +833,10 @@ export default function App() {
         syncExcuseLettersFromFirestore(false, (fetchedLetters) => {
           setExcuseLetters(fetchedLetters);
           safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
+        }),
+        syncEnrollmentsFromFirestore(false, (fetchedEnrollments) => {
+          setEnrollments(fetchedEnrollments);
+          safeStorage.setItem('cp_enrollments', JSON.stringify(fetchedEnrollments));
         }),
         saveUserProfileToFirestore(false, user)
       ])
@@ -1378,6 +1405,7 @@ export default function App() {
  
   const handleLogout = () => {
     setUser(null);
+    setUnauthView('landing');
     setActiveScreen('dashboard');
     safeStorage.removeItem('cp_user');
     safeStorage.removeItem('cp_pending_attendance_queue');
@@ -1427,20 +1455,32 @@ export default function App() {
     const matchedClass = classes.find(c => c.id === classId);
     if (!matchedClass) return;
 
+    const studentIdentifier = user?.studentId || user?.id || user?.email || '2023-10492';
+    const userEmailNorm = (user?.email || '').trim().toLowerCase();
+    const userStuIdNorm = (user?.studentId || '').trim().toLowerCase();
+    const userIdNorm = (user?.id || '').trim().toLowerCase();
+    const userNameNorm = (user?.name || '').trim().toLowerCase();
+
     // A. AUTOMATIC ENROLLMENT SERVICE INTERCEPTOR
-    const existingEnrollment = enrollments.find(
-      e => e.classId === classId && (e.studentId === user?.studentId || e.studentEmail === user?.email)
-    );
+    const existingEnrollment = enrollments.find(e => {
+      if (e.classId !== classId) return false;
+      const eEmail = (e.studentEmail || '').trim().toLowerCase();
+      const eStuId = (e.studentId || '').trim().toLowerCase();
+      const eName = (e.studentName || '').trim().toLowerCase();
+
+      if (userEmailNorm && eEmail && userEmailNorm === eEmail) return true;
+      if (userStuIdNorm && eStuId && userStuIdNorm === eStuId) return true;
+      if (userIdNorm && eStuId && userIdNorm === eStuId) return true;
+      if (userNameNorm && eName && userNameNorm === eName) return true;
+      return false;
+    });
 
     if (existingEnrollment) {
       if (existingEnrollment.deletedByStudent) {
         // Automatically restore!
-        setEnrollments(prev => prev.map(e => {
-          if (e.id === existingEnrollment.id) {
-            return { ...e, deletedByStudent: false };
-          }
-          return e;
-        }));
+        const restoredEnrollment: Enrollment = { ...existingEnrollment, deletedByStudent: false };
+        setEnrollments(prev => prev.map(e => e.id === existingEnrollment.id ? restoredEnrollment : e));
+        saveEnrollmentToFirestore(false, restoredEnrollment).catch(err => console.error("Firestore restore enrollment error:", err));
         
         const restoreNotif: AppNotification = {
           id: 'notif-restore-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
@@ -1457,15 +1497,17 @@ export default function App() {
       const newEnrolID = 'enr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
       const newEnrollmentRecord: Enrollment = {
         id: newEnrolID,
-        studentId: user.studentId || '2023-10492',
+        studentId: studentIdentifier,
         studentName: user.name,
         studentEmail: user.email,
         studentAvatar: user.avatar,
         classId: classId,
-        enrolledAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        enrolledAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        deletedByStudent: false
       };
 
       setEnrollments(prev => [...prev, newEnrollmentRecord]);
+      saveEnrollmentToFirestore(false, newEnrollmentRecord).catch(err => console.error("Firestore auto-enrollment error:", err));
 
       // Trigger educational success toast
       const automaticNotif: AppNotification = {
@@ -1483,11 +1525,10 @@ export default function App() {
     // B. LOG ATTENDANCE LOG (With Deduplication protection)
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const todayISO = new Date().toISOString().split('T')[0];
-    const studentIdentifier = user?.studentId || user?.id || user?.email || '2023-10492';
 
     let finalRecord: AttendanceRecord;
     const existingIndex = attendanceRecords.findIndex(
-      r => r.classId === classId && (r.studentId === studentIdentifier || r.studentName === user?.name) && r.date === todayISO
+      r => r.classId === classId && (r.studentId === studentIdentifier || r.studentName === user?.name || (userEmailNorm && r.studentId === userEmailNorm)) && r.date === todayISO
     );
 
     if (existingIndex >= 0) {
@@ -1525,7 +1566,7 @@ export default function App() {
       
       // Deduplicate offline queue by student + class + date
       const queueIdx = pendingQueue.findIndex(
-        q => q.classId === classId && (q.studentId === studentIdentifier || q.studentName === user?.name) && q.date === todayISO
+        q => q.classId === classId && (q.studentId === studentIdentifier || q.studentName === user?.name || (userEmailNorm && q.studentId === userEmailNorm)) && q.date === todayISO
       );
       if (queueIdx >= 0) {
         pendingQueue[queueIdx] = finalRecord;
@@ -1590,9 +1631,28 @@ export default function App() {
   };
 
   const handleDropSubject = (classId: string) => {
+    const userEmailNorm = (user?.email || '').trim().toLowerCase();
+    const userStuIdNorm = (user?.studentId || '').trim().toLowerCase();
+    const userIdNorm = (user?.id || '').trim().toLowerCase();
+    const userNameNorm = (user?.name || '').trim().toLowerCase();
+
+    let foundMatch = false;
     setEnrollments(prev => prev.map(e => {
-      if (e.classId === classId && (e.studentId === user?.studentId || e.studentEmail === user?.email)) {
-        return { ...e, deletedByStudent: true };
+      if (e.classId !== classId) return e;
+      const eEmail = (e.studentEmail || '').trim().toLowerCase();
+      const eStuId = (e.studentId || '').trim().toLowerCase();
+      const eName = (e.studentName || '').trim().toLowerCase();
+
+      const isMatch = (userEmailNorm && eEmail && userEmailNorm === eEmail) ||
+                      (userStuIdNorm && eStuId && userStuIdNorm === eStuId) ||
+                      (userIdNorm && eStuId && userIdNorm === eStuId) ||
+                      (userNameNorm && eName && userNameNorm === eName);
+
+      if (isMatch) {
+        foundMatch = true;
+        const updated: Enrollment = { ...e, deletedByStudent: true };
+        saveEnrollmentToFirestore(false, updated).catch(err => console.error("Firestore drop enrollment error:", err));
+        return updated;
       }
       return e;
     }));
@@ -1613,18 +1673,30 @@ export default function App() {
     const matchedClass = classes.find(c => c.id === classId);
     if (!matchedClass) return;
 
-    const existingEnrollment = enrollments.find(
-      e => e.classId === classId && (e.studentId === user?.studentId || e.studentEmail === user?.email)
-    );
+    const studentIdentifier = user?.studentId || user?.id || user?.email || '2023-10492';
+    const userEmailNorm = (user?.email || '').trim().toLowerCase();
+    const userStuIdNorm = (user?.studentId || '').trim().toLowerCase();
+    const userIdNorm = (user?.id || '').trim().toLowerCase();
+    const userNameNorm = (user?.name || '').trim().toLowerCase();
+
+    const existingEnrollment = enrollments.find(e => {
+      if (e.classId !== classId) return false;
+      const eEmail = (e.studentEmail || '').trim().toLowerCase();
+      const eStuId = (e.studentId || '').trim().toLowerCase();
+      const eName = (e.studentName || '').trim().toLowerCase();
+
+      if (userEmailNorm && eEmail && userEmailNorm === eEmail) return true;
+      if (userStuIdNorm && eStuId && userStuIdNorm === eStuId) return true;
+      if (userIdNorm && eStuId && userIdNorm === eStuId) return true;
+      if (userNameNorm && eName && userNameNorm === eName) return true;
+      return false;
+    });
 
     if (existingEnrollment) {
       if (existingEnrollment.deletedByStudent) {
-        setEnrollments(prev => prev.map(e => {
-          if (e.id === existingEnrollment.id) {
-            return { ...e, deletedByStudent: false };
-          }
-          return e;
-        }));
+        const restoredEnrollment: Enrollment = { ...existingEnrollment, deletedByStudent: false };
+        setEnrollments(prev => prev.map(e => e.id === existingEnrollment.id ? restoredEnrollment : e));
+        saveEnrollmentToFirestore(false, restoredEnrollment).catch(err => console.error("Firestore restore enrollment error:", err));
         
         const restoreNotif: AppNotification = {
           id: 'notif-restore-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
@@ -1641,15 +1713,17 @@ export default function App() {
       const newEnrolID = 'enr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
       const newEnrollmentRecord: Enrollment = {
         id: newEnrolID,
-        studentId: user.studentId || '2023-10492',
+        studentId: studentIdentifier,
         studentName: user.name,
         studentEmail: user.email,
         studentAvatar: user.avatar,
         classId: classId,
-        enrolledAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        enrolledAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        deletedByStudent: false
       };
 
       setEnrollments(prev => [...prev, newEnrollmentRecord]);
+      saveEnrollmentToFirestore(false, newEnrollmentRecord).catch(err => console.error("Firestore save enrollment error:", err));
 
       const automaticNotif: AppNotification = {
         id: 'notif-autoenr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
@@ -2054,12 +2128,30 @@ export default function App() {
       } trans-all-theme`}
     >
       
-      {/* 1. AUTHENTICATOR ENVELOPE */}
+      {/* 1. LANDING PAGE & AUTHENTICATOR ENVELOPE */}
       {!user ? (
-        <AuthScreens 
-          onLoginSuccess={handleLoginSuccess} 
-          accessibility={accessibility} 
-        />
+        unauthView === 'landing' ? (
+          <LandingPage
+            onEnterPortal={(mode) => {
+              setAuthInitialMode(mode || 'login');
+              setUnauthView('auth');
+            }}
+            accessibility={accessibility}
+            onToggleTheme={() => {
+              setAccessibility(prev => ({
+                ...prev,
+                theme: prev.theme === 'dark' ? 'light' : 'dark'
+              }));
+            }}
+          />
+        ) : (
+          <AuthScreens 
+            onLoginSuccess={handleLoginSuccess} 
+            accessibility={accessibility} 
+            onBackToLanding={() => setUnauthView('landing')}
+            initialMode={authInitialMode}
+          />
+        )
       ) : (
         /* ================= FULL PAGE SERVICE GRID ================= */
         <div className="flex flex-col md:flex-row h-screen overflow-hidden">
@@ -2085,54 +2177,6 @@ export default function App() {
                 let msgs = [];
                 if (cached) {
                   msgs = JSON.parse(cached);
-                } else {
-                  msgs = [
-                    {
-                      id: 'msg-seed-1',
-                      senderId: 'fac-1',
-                      senderName: 'Dr. Ahmad Khan',
-                      senderRole: 'faculty',
-                      receiverId: '2023-10492',
-                      receiverName: 'John Doe',
-                      message: 'Hello class, welcome to MSU Academic Portal! Here are the slides for session #1.',
-                      timestamp: '10:00 AM',
-                      read: false
-                    },
-                    {
-                      id: 'msg-seed-2',
-                      senderId: '2023-10492',
-                      senderName: 'John Doe',
-                      senderRole: 'student',
-                      receiverId: 'CS-101',
-                      receiverName: 'Introduction to Computer Science',
-                      message: 'Has anyone finished compiling the web component blueprint?',
-                      timestamp: '10:05 AM',
-                      read: true
-                    },
-                    {
-                      id: 'msg-seed-3',
-                      senderId: 'sys-pulse',
-                      senderName: 'System Pulse Bot',
-                      senderRole: 'admin',
-                      receiverId: 'CS-101',
-                      receiverName: 'Introduction to Computer Science',
-                      message: 'Welcome everyone to the channel! Here is our syllabus for this term. Please review.',
-                      timestamp: '10:06 AM',
-                      attachmentFile: { name: 'CS101_Syllabus_Revised.pdf', size: '1.4 MB' },
-                      read: true
-                    },
-                    {
-                      id: 'msg-seed-4',
-                      senderId: 'fac-2',
-                      senderName: 'Prof. Maria Santos',
-                      senderRole: 'faculty',
-                      receiverId: '2023-10492',
-                      receiverName: 'John Doe',
-                      message: 'Please review the exam guidelines before Friday morning.',
-                      timestamp: '10:14 AM',
-                      read: false
-                    }
-                  ];
                 }
                 
                 return msgs.filter((m: any) => {

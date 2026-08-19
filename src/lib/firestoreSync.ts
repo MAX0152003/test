@@ -10,8 +10,98 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './googleAuth';
-import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry, FacultyStatus, LeaveRequest } from '../types';
+import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry, FacultyStatus, LeaveRequest, Enrollment } from '../types';
 import { normalizeUserIdentity, generateSessionToken } from './authUtils';
+
+/**
+ * Sync enrollments: pulls all subject enrollments from Firestore.
+ */
+export async function syncEnrollmentsFromFirestore(
+  isOffline: boolean,
+  onSync: (enrollments: Enrollment[]) => void
+): Promise<void> {
+  if (isOffline) return;
+  const colPath = 'enrollments';
+  try {
+    const querySnapshot = await getDocs(collection(db, colPath));
+    const enrollments: Enrollment[] = [];
+    querySnapshot.forEach((docSnap) => {
+      enrollments.push(docSnap.data() as Enrollment);
+    });
+    if (enrollments.length > 0) {
+      onSync(enrollments);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, colPath);
+  }
+}
+
+/**
+ * Saves or updates an Enrollment document in Firestore.
+ */
+export async function saveEnrollmentToFirestore(
+  isOffline: boolean,
+  enrollmentObj: Enrollment
+): Promise<void> {
+  if (isOffline || !enrollmentObj || !enrollmentObj.id) return;
+  const colPath = 'enrollments';
+  try {
+    await setDoc(doc(db, colPath, enrollmentObj.id), sanitizeForFirestore(enrollmentObj), { merge: true });
+    console.log(`Enrollment ${enrollmentObj.id} (${enrollmentObj.studentName} in ${enrollmentObj.classId}) saved to Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${colPath}/${enrollmentObj.id}`);
+  }
+}
+
+/**
+ * Deletes an Enrollment document from Firestore.
+ */
+export async function deleteEnrollmentFromFirestore(
+  isOffline: boolean,
+  enrollmentId: string
+): Promise<void> {
+  if (isOffline || !enrollmentId) return;
+  const colPath = 'enrollments';
+  try {
+    await deleteDoc(doc(db, colPath, enrollmentId));
+    console.log(`Enrollment ${enrollmentId} deleted from Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${colPath}/${enrollmentId}`);
+  }
+}
+
+/**
+ * Real-time listener for subject enrollments from Firestore.
+ * Ensures student enrollments immediately update across student, faculty, and admin views.
+ */
+export function listenToEnrollments(
+  isOffline: boolean,
+  onSync: (enrollments: Enrollment[]) => void
+): () => void {
+  if (isOffline) return () => {};
+  const colPath = 'enrollments';
+  try {
+    const unsubscribe = onSnapshot(
+      collection(db, colPath),
+      (snapshot) => {
+        const enrollments: Enrollment[] = [];
+        snapshot.forEach((docSnap) => {
+          enrollments.push(docSnap.data() as Enrollment);
+        });
+        if (enrollments.length > 0) {
+          onSync(enrollments);
+        }
+      },
+      (error) => {
+        console.warn("[Firestore] listenToEnrollments error caught:", error);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    console.warn("[Firestore] listenToEnrollments setup error:", error);
+    return () => {};
+  }
+}
 
 /**
  * Recursively removes undefined fields from an object or array before passing to Firestore setDoc/updateDoc.
@@ -476,7 +566,6 @@ export function listenToPasswordResets(
 
 /**
  * Synchronizes all registered accounts, credentials, and password resets from Firestore.
- * Seeds initial demo accounts into Firestore if empty.
  */
 export async function syncAllAccountsFromFirestore(isOffline: boolean): Promise<void> {
   if (isOffline) return;
@@ -495,49 +584,13 @@ export async function syncAllAccountsFromFirestore(isOffline: boolean): Promise<
     } catch {}
 
     const userMap = new Map<string, any>();
-    // Pre-populate default demo users if neither local nor firestore has users
-    const defaultDemos = [
-      {
-        id: 'usr-demo-student',
-        name: 'John Doe',
-        email: 'john.doe@msu.edu.ph',
-        role: 'student',
-        uid: '2023-10924',
-        department: 'CCS Department'
-      },
-      {
-        id: 'usr-demo-faculty',
-        name: 'Dr. Ahmad Khan',
-        email: 'ahmad.khan@msu.edu.ph',
-        role: 'faculty',
-        uid: 'FAC-88102',
-        department: 'College of Computer Studies'
-      },
-      {
-        id: 'usr-demo-admin',
-        name: 'Admin Strator',
-        email: 'admin@msu.edu.ph',
-        role: 'admin',
-        uid: 'ADM-00001',
-        department: 'Academic Registrar Board'
-      }
-    ];
-
-    defaultDemos.forEach(u => userMap.set(u.id, u));
-    localUsers.forEach(u => u.id && userMap.set(u.id, u));
-    firestoreUsers.forEach(u => u.id && userMap.set(u.id, u));
+    localUsers.forEach(u => u && u.id && userMap.set(u.id, u));
+    firestoreUsers.forEach(u => u && u.id && userMap.set(u.id, u));
 
     const combinedUsers = Array.from(userMap.values());
     localStorage.setItem('classpulse_registered_users', JSON.stringify(combinedUsers));
     localStorage.setItem('classpulse_registered_admins', JSON.stringify(combinedUsers.filter(u => u.role === 'admin')));
     window.dispatchEvent(new Event('registered-users-changed'));
-
-    // Upload local/demo users to Firestore if they aren't in Firestore yet
-    for (const u of combinedUsers) {
-      if (!firestoreUsers.some(f => f.id === u.id)) {
-        await saveRegisteredUserToFirestore(isOffline, u);
-      }
-    }
 
     // 2. Fetch credentials
     const credSnap = await getDocs(collection(db, 'credentials'));
@@ -545,11 +598,6 @@ export async function syncAllAccountsFromFirestore(isOffline: boolean): Promise<
     try {
       savedPasswords = JSON.parse(localStorage.getItem('classpulse_custom_passwords') || '{}');
     } catch {}
-
-    // Default passwords
-    if (!savedPasswords['john.doe@msu.edu.ph']) savedPasswords['john.doe@msu.edu.ph'] = 'student123';
-    if (!savedPasswords['ahmad.khan@msu.edu.ph']) savedPasswords['ahmad.khan@msu.edu.ph'] = 'faculty123';
-    if (!savedPasswords['admin@msu.edu.ph']) savedPasswords['admin@msu.edu.ph'] = 'admin123';
 
     credSnap.forEach((docSnap) => {
       const data = docSnap.data();
@@ -559,11 +607,6 @@ export async function syncAllAccountsFromFirestore(isOffline: boolean): Promise<
     });
 
     localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
-
-    // Upload credentials to Firestore if not present
-    for (const [key, pass] of Object.entries(savedPasswords)) {
-      await saveUserCredentialToFirestore(isOffline, key, pass as string);
-    }
 
     // 3. Fetch password_resets
     const resetSnap = await getDocs(collection(db, 'password_resets'));
@@ -744,12 +787,13 @@ export async function forceResyncAllFromFirestore(
   callbacks?: {
     onClassesSync?: (classes: ClassSession[]) => void;
     onAttendanceSync?: (records: AttendanceRecord[]) => void;
+    onEnrollmentsSync?: (enrollments: Enrollment[]) => void;
     onUserSync?: () => void;
   }
-): Promise<{ success: boolean; durationMs: number; stats: { users: number; classes: number; records: number } }> {
+): Promise<{ success: boolean; durationMs: number; stats: { users: number; classes: number; records: number; enrollments: number } }> {
   const startTime = Date.now();
   if (isOffline) {
-    return { success: false, durationMs: Date.now() - startTime, stats: { users: 0, classes: 0, records: 0 } };
+    return { success: false, durationMs: Date.now() - startTime, stats: { users: 0, classes: 0, records: 0, enrollments: 0 } };
   }
 
   try {
@@ -770,6 +814,13 @@ export async function forceResyncAllFromFirestore(
       if (callbacks?.onAttendanceSync) callbacks.onAttendanceSync(fetchedRecords);
     });
 
+    // 4. Re-sync enrollments
+    let enrollmentCount = 0;
+    await syncEnrollmentsFromFirestore(false, (fetchedEnrollments) => {
+      enrollmentCount = fetchedEnrollments.length;
+      if (callbacks?.onEnrollmentsSync) callbacks.onEnrollmentsSync(fetchedEnrollments);
+    });
+
     if (callbacks?.onUserSync) callbacks.onUserSync();
 
     const usersListRaw = localStorage.getItem('classpulse_registered_users') || '[]';
@@ -785,12 +836,13 @@ export async function forceResyncAllFromFirestore(
       stats: {
         users: usersCount,
         classes: classCount,
-        records: recordCount
+        records: recordCount,
+        enrollments: enrollmentCount
       }
     };
   } catch (err) {
     console.error("[Firestore] forceResyncAllFromFirestore failed:", err);
-    return { success: false, durationMs: Date.now() - startTime, stats: { users: 0, classes: 0, records: 0 } };
+    return { success: false, durationMs: Date.now() - startTime, stats: { users: 0, classes: 0, records: 0, enrollments: 0 } };
   }
 }
 
@@ -939,6 +991,76 @@ export function listenToExcuseLetters(
     return () => {};
   }
 }
+
+/**
+ * Completely purges all Firestore collections and local storage data for a 100% fresh start.
+ */
+export async function wipeAllFirestoreAndLocalData(): Promise<void> {
+  const collectionsToWipe = [
+    'registered_users',
+    'credentials',
+    'classes',
+    'attendance',
+    'enrollments',
+    'faculty_statuses',
+    'excuse_letters',
+    'messages',
+    'password_resets',
+    'announcements',
+    'user_profiles',
+    'lab_rooms',
+    'session_links',
+    'audit_logs',
+    'support_tickets',
+    'tickets',
+    'notifications',
+    'users',
+    'conversations'
+  ];
+
+  try {
+    for (const colName of collectionsToWipe) {
+      try {
+        const snap = await getDocs(collection(db, colName));
+        const deletePromises = snap.docs.map(d => deleteDoc(doc(db, colName, d.id)));
+        await Promise.all(deletePromises);
+      } catch (err) {
+        console.warn(`[Firestore] Failed to delete collection ${colName}:`, err);
+      }
+    }
+  } catch (error) {
+    console.warn('[Firestore] Error during wipeAllFirestoreAndLocalData:', error);
+  }
+
+  // Clear all local storage records
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('classpulse_') || k.startsWith('cp_') || k.startsWith('firebase:'))) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem('classpulse_registered_users');
+      localStorage.removeItem('classpulse_registered_admins');
+      localStorage.removeItem('classpulse_custom_passwords');
+      localStorage.removeItem('classpulse_classes');
+      localStorage.removeItem('classpulse_attendance');
+      localStorage.removeItem('classpulse_faculty_statuses');
+      localStorage.removeItem('classpulse_excuse_letters');
+      localStorage.removeItem('classpulse_password_reset_requests');
+      localStorage.removeItem('classpulse_messages');
+      localStorage.removeItem('classpulse_active_user');
+      localStorage.removeItem('classpulse_active_role');
+      localStorage.removeItem('classpulse_remember_me');
+    }
+  } catch (err) {
+    console.warn('[Storage] Failed to clear local storage:', err);
+  }
+}
+
 
 
 

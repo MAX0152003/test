@@ -876,21 +876,50 @@ export default function DashboardStudent({
     }
   };
 
+  // Helper to determine if an enrollment belongs to this logged-in student
+  const isStudentEnrollmentMatch = React.useCallback((e: Enrollment) => {
+    if (!userProfile) return false;
+    const uEmail = (userProfile.email || '').trim().toLowerCase();
+    const uStuId = (userProfile.studentId || '').trim().toLowerCase();
+    const uId = (userProfile.id || '').trim().toLowerCase();
+    const uName = (userProfile.name || '').trim().toLowerCase();
+
+    const eEmail = (e.studentEmail || '').trim().toLowerCase();
+    const eStuId = (e.studentId || '').trim().toLowerCase();
+    const eName = (e.studentName || '').trim().toLowerCase();
+
+    if (uEmail && eEmail && uEmail === eEmail) return true;
+    if (uStuId && eStuId && uStuId === eStuId) return true;
+    if (uId && eStuId && uId === eStuId) return true;
+    if (uName && eName && uName === eName) return true;
+    return false;
+  }, [userProfile]);
+
   // Compute enrolled class IDs for this student (excluding unenrolled/dropped/deleted subjects)
   const studentEnrolledClassIds = React.useMemo(() => {
     return new Set(
       enrollments
-        .filter(e => (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) && !e.deletedByStudent)
+        .filter(e => isStudentEnrollmentMatch(e) && !e.deletedByStudent)
         .map(e => e.classId)
     );
-  }, [enrollments, userProfile]);
+  }, [enrollments, isStudentEnrollmentMatch]);
 
   // Filter attendance records to ONLY those belonging to currently enrolled classes
   const enrolledStudentRecords = React.useMemo(() => {
     return attendanceRecords.filter(r => {
-      const isStudentMatch = r.studentId === userProfile.studentId || 
-                             r.studentName === userProfile.name ||
-                             (userProfile.email && r.studentId === userProfile.email);
+      const uEmail = (userProfile.email || '').trim().toLowerCase();
+      const uStuId = (userProfile.studentId || '').trim().toLowerCase();
+      const uId = (userProfile.id || '').trim().toLowerCase();
+      const uName = (userProfile.name || '').trim().toLowerCase();
+
+      const rStuId = (r.studentId || '').trim().toLowerCase();
+      const rStuName = (r.studentName || '').trim().toLowerCase();
+
+      const isStudentMatch = (uStuId && rStuId && uStuId === rStuId) ||
+                             (uId && rStuId && uId === rStuId) ||
+                             (uEmail && rStuId && uEmail === rStuId) ||
+                             (uName && rStuName && uName === rStuName);
+
       return isStudentMatch && studentEnrolledClassIds.has(r.classId);
     });
   }, [attendanceRecords, userProfile, studentEnrolledClassIds]);
@@ -1530,13 +1559,7 @@ export default function DashboardStudent({
 
               <div className="space-y-2 text-left">
                 {(() => {
-                  const enrolledList = classes.filter(cls =>
-                    enrollments.some(
-                      e => e.classId === cls.id && 
-                           (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
-                           !e.deletedByStudent
-                    )
-                  );
+                  const enrolledList = classes.filter(cls => studentEnrolledClassIds.has(cls.id));
                   if (enrolledList.length === 0) {
                     return <div className="text-[10px] text-zinc-400 text-center py-4">No enrolled classes in schedule.</div>;
                   }
@@ -1622,13 +1645,7 @@ export default function DashboardStudent({
                         (cls.room || '').toLowerCase().includes(query)
                       );
                     } else {
-                      displayClasses = classes.filter(cls =>
-                        enrollments.some(
-                          e => e.classId === cls.id && 
-                               (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
-                               !e.deletedByStudent
-                        )
-                      );
+                      displayClasses = classes.filter(cls => studentEnrolledClassIds.has(cls.id));
                     }
 
                     if (displayClasses.length === 0) {
@@ -1651,11 +1668,7 @@ export default function DashboardStudent({
                     }
 
                     return displayClasses.map(cls => {
-                      const isEnrolled = enrollments.some(
-                        e => e.classId === cls.id && 
-                             (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
-                             !e.deletedByStudent
-                      );
+                      const isEnrolled = studentEnrolledClassIds.has(cls.id);
 
                       // Compute active standing indicators
                       const studentRecordsForClass = attendanceRecords.filter(
@@ -1827,13 +1840,7 @@ export default function DashboardStudent({
                 (cls.facultyName || '').toLowerCase().includes(query)
               );
             } else {
-              targetClasses = classes.filter(cls =>
-                enrollments.some(
-                  e => e.classId === cls.id && 
-                       (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) && 
-                       !e.deletedByStudent
-                )
-              );
+              targetClasses = classes.filter(cls => studentEnrolledClassIds.has(cls.id));
             }
 
             return (

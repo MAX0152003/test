@@ -157,6 +157,24 @@ export default function WeeklyScheduleGrid({
     (cls.facultyName || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const isStudentMatch = React.useCallback((e: Enrollment) => {
+    if (!userProfile) return true;
+    const uEmail = (userProfile.email || '').trim().toLowerCase();
+    const uStuId = (userProfile.studentId || '').trim().toLowerCase();
+    const uId = (userProfile.id || '').trim().toLowerCase();
+    const uName = (userProfile.name || '').trim().toLowerCase();
+
+    const eEmail = (e.studentEmail || '').trim().toLowerCase();
+    const eStuId = (e.studentId || '').trim().toLowerCase();
+    const eName = (e.studentName || '').trim().toLowerCase();
+
+    if (uEmail && eEmail && uEmail === eEmail) return true;
+    if (uStuId && eStuId && uStuId === eStuId) return true;
+    if (uId && eStuId && uId === eStuId) return true;
+    if (uName && eName && uName === eName) return true;
+    return false;
+  }, [userProfile]);
+
   // Filter time slots to ONLY those that have scheduled classes, eliminating empty redundant rows
   const activeTimeSlots = React.useMemo(() => {
     const slotsWithClasses = timeSlots.filter(slot => {
@@ -349,7 +367,7 @@ export default function WeeklyScheduleGrid({
                           <div className="space-y-1.5 h-full relative z-1">
                             {matchingClasses.map(cls => {
                               const isEnrolled = enrollments.some(
-                                e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
+                                e => e.classId === cls.id && isStudentMatch(e) && !e.deletedByStudent
                               );
                               const theme = getColorThemeForCode(cls.code);
                               const hasJumah = isFriday && isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime);
@@ -481,7 +499,7 @@ export default function WeeklyScheduleGrid({
                   {dayClasses.length > 0 ? (
                     dayClasses.map(cls => {
                       const isEnrolled = enrollments.some(
-                        e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
+                        e => e.classId === cls.id && isStudentMatch(e) && !e.deletedByStudent
                       );
                       const hasJumah = isFriday && isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime);
 
@@ -572,7 +590,7 @@ export default function WeeklyScheduleGrid({
           {filteredClasses.length > 0 ? (
             filteredClasses.map(cls => {
               const isEnrolled = enrollments.some(
-                e => e.classId === cls.id && (userProfile ? (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) : true) && !e.deletedByStudent
+                e => e.classId === cls.id && isStudentMatch(e) && !e.deletedByStudent
               );
               const theme = getColorThemeForCode(cls.code);
               const hasJumah = isFridayPrayerWindow(cls.days, cls.startTime, cls.endTime);
