@@ -12,6 +12,7 @@ import {
   Announcement
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
+import { ImagePreviewModal } from './ImagePreviewModal';
 import { playSuccessChime, playWarningChime, triggerHapticFeedback } from '../lib/soundUtils';
 import { triggerTestDeviceAlarm, requestSystemNotificationPermission, getNotificationPermissionStatus } from '../lib/classAlarmScheduler';
 import { 
@@ -145,6 +146,7 @@ export default function DashboardStudent({
   const [scheduleSearch, setScheduleSearch] = React.useState('');
   const [registeredCourseSearch, setRegisteredCourseSearch] = React.useState('');
   const [selectedFacultyForChat, setSelectedFacultyForChat] = React.useState<{ id: string; name?: string; ts: number } | undefined>(undefined);
+  const [imagePreviewData, setImagePreviewData] = React.useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
 
   // Automatically reset selectedFacultyForChat when leaving messages screen
   React.useEffect(() => {
@@ -472,13 +474,23 @@ export default function DashboardStudent({
     const now = new Date();
     const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const todayLabel = dayLabels[now.getDay()];
+    
+    // First check enrolled classes for today
+    const enrolledClasses = classes.filter(c => studentEnrolledClassIds.has(c.id));
+    const todayEnrolledMatch = enrolledClasses.find(c => {
+      const expanded = expandDaysToSpecificOnesVal(c.days);
+      return expanded.includes(todayLabel);
+    });
+    if (todayEnrolledMatch) return todayEnrolledMatch;
+
+    // Check all classes for today
     const todayMatch = classes.find(c => {
       const expanded = expandDaysToSpecificOnesVal(c.days);
       return expanded.includes(todayLabel);
     });
     if (todayMatch) return todayMatch;
 
-    return classes[0];
+    return enrolledClasses[0] || classes[0];
   };
 
   // Trigger simulated scan sequence
@@ -495,9 +507,9 @@ export default function DashboardStudent({
           handleScanSuccess();
           return 100;
         }
-        return prev + 20;
+        return prev + 25;
       });
-    }, 200);
+    }, 150);
   };
 
   const handleScanSuccess = () => {
@@ -515,7 +527,7 @@ export default function DashboardStudent({
     }
 
     // Determine present or late state
-    const status = Math.random() > 0.8 ? 'late' : 'present';
+    const status = Math.random() > 0.85 ? 'late' : 'present';
     onRecordAttendance(matchedClass.id, status);
 
     setIsScanning(false);
@@ -533,6 +545,9 @@ export default function DashboardStudent({
     });
     
     speakText(`Attendance recorded successfully. Checked as ${status}`, accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`Dynamically checked into ${matchedClass.code} (${status.toUpperCase()})`, 'success');
+    }
   };
 
   // Helper to enforce inline video playback on iOS Safari & WebKit
@@ -767,7 +782,7 @@ export default function DashboardStudent({
       let tokenValue = "";
       let parsedJson: any = null;
 
-      // Check if it is a JSON string
+      // 1. Check if it is a JSON string
       if (decodedText.trim().startsWith('{') && decodedText.trim().endsWith('}')) {
         try {
           parsedJson = JSON.parse(decodedText);
@@ -778,26 +793,52 @@ export default function DashboardStudent({
         }
       }
 
+      // 2. Check URL query params if user scanned a full web link
+      if (!classId && decodedText.includes('?')) {
+        try {
+          const queryString = decodedText.split('?')[1] || '';
+          const urlParams = new URLSearchParams(queryString);
+          classId = urlParams.get('classId') || urlParams.get('class') || '';
+          tokenValue = urlParams.get('qrToken') || urlParams.get('token') || urlParams.get('code') || '';
+        } catch (e) {}
+      }
+
       let matchedClass: ClassSession | undefined;
       
       if (classId) {
         matchedClass = classes.find(c => c.id === classId);
       }
       
-      if (!matchedClass) {
-        const cleanText = (tokenValue || decodedText).trim();
+      const cleanText = (tokenValue || decodedText).trim();
+      const cleanAlphaNum = cleanText.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+      if (!matchedClass && cleanText) {
         matchedClass = classes.find(c => 
           c.qrToken === cleanText || 
-          (c.qrToken && c.qrToken.toLowerCase() === cleanText.toLowerCase())
+          (c.qrToken && c.qrToken.toLowerCase() === cleanText.toLowerCase()) ||
+          (c.qrToken && c.qrToken.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanAlphaNum)
         );
       }
 
+      if (!matchedClass && cleanText) {
+        matchedClass = classes.find(c => {
+          const cCodeAlpha = (c.code || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          const cNameAlpha = (c.name || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          return (
+            (cCodeAlpha && cleanAlphaNum.includes(cCodeAlpha)) ||
+            (cCodeAlpha && cCodeAlpha.includes(cleanAlphaNum)) ||
+            (cNameAlpha && cleanAlphaNum.includes(cNameAlpha)) ||
+            c.id.toLowerCase() === cleanText.toLowerCase()
+          );
+        });
+      }
+
+      // 3. If still not matched, fallback to currently active / detected class session
       if (!matchedClass) {
-        const cleanText = decodedText.trim();
-        matchedClass = classes.find(c => 
-          (c.code && cleanText.includes(c.code)) || 
-          (c.code || '').toLowerCase().includes((cleanText || '').toLowerCase())
-        );
+        const detected = getDetectedClass();
+        if (detected && (cleanText.toUpperCase().startsWith('CODE_') || cleanText.toUpperCase().startsWith('QR_KEY_') || cleanText.toUpperCase().startsWith('CLASS_') || cleanText.length >= 3)) {
+          matchedClass = detected;
+        }
       }
 
       if (!matchedClass) {
@@ -821,15 +862,18 @@ export default function DashboardStudent({
       triggerVisualHaptic(
         'success',
         'Attendance Verified',
-        `Live camera confirmed for ${matchedClass.name} in Room ${matchedClass.room}`,
+        `Live check-in confirmed for ${matchedClass.name} in Room ${matchedClass.room}`,
         { code: matchedClass.code, status: status.toUpperCase() }
       );
 
       setScanResult({
         success: true,
-        message: `Verified! Physical Camera scan successful for ${matchedClass.code} (${matchedClass.name}) at Room ${matchedClass.room} as ${status.toUpperCase()}!`
+        message: `Verified! Dynamic attendance checked into ${matchedClass.code} (${matchedClass.name}) at Room ${matchedClass.room} as ${status.toUpperCase()}!`
       });
       speakText(`Scanned present successfully to ${matchedClass.name}`, accessibility.readAloud);
+      if (typeof window !== 'undefined' && (window as any).showToast) {
+        (window as any).showToast(`Dynamically checked into ${matchedClass.code} (${status.toUpperCase()})`, 'success');
+      }
     } catch (err: any) {
       triggerVisualHaptic(
         'error',
@@ -1117,17 +1161,14 @@ export default function DashboardStudent({
 
               <button
                 type="button"
+                id="quick-scan-attendance-qr-btn"
                 onClick={() => {
-                  // Scroll smoothly to attendance scanner section at bottom of container
-                  const scannerEl = document.getElementById('attendance-scanner-card');
-                  if (scannerEl) {
-                    scannerEl.scrollIntoView({ behavior: 'smooth' });
-                    speakText("Navigating downwards to QR attendance scanner.", accessibility.readAloud);
-                  }
+                  setScreen('attendance');
+                  speakText("Opening QR attendance scanner for dynamic check-in.", accessibility.readAloud);
                 }}
                 className="p-3.5 sm:p-4 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
               >
-                <div className="p-1.5 rounded-lg bg-indigo-550 bg-indigo-500 text-white w-fit">
+                <div className="p-1.5 rounded-lg bg-indigo-500 text-white w-fit">
                   <Scan className="w-4 h-4" />
                 </div>
                 <div>
@@ -1297,15 +1338,43 @@ export default function DashboardStudent({
                       />
                       <div
                         onClick={() => {
-                          document.getElementById('excuse-letter-upload-real')?.click();
+                          if (leaveAttachment) {
+                            setImagePreviewData({
+                              url: leaveAttachment,
+                              title: 'Uploaded Excuse Attachment',
+                              subtitle: `File: ${leaveAttachmentName || 'Attached Document'}`,
+                              fileName: leaveAttachmentName || 'excuse_attachment.png'
+                            });
+                          } else {
+                            document.getElementById('excuse-letter-upload-real')?.click();
+                          }
                         }}
                         className="border border-dashed border-zinc-300 dark:border-zinc-800 rounded-xl p-4 text-center hover:bg-zinc-50 dark:hover:bg-zinc-900/40 cursor-pointer transition-colors space-y-1"
                       >
-                        <UploadCloud className="w-7 h-7 mx-auto text-zinc-400 shrink-0" />
-                        <h5 className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                          {leaveAttachmentName ? `File Attached: ${leaveAttachmentName}` : 'Click to Upload supporting Cert / Slip'}
-                        </h5>
-                        <p className="text-[9px] text-zinc-400">PDF, PNG, JPG (maximum size 5MB supported)</p>
+                        {leaveAttachment ? (
+                          <div className="flex items-center justify-center gap-3">
+                            <img 
+                              src={leaveAttachment} 
+                              alt="Attached Preview" 
+                              className="w-12 h-12 object-cover rounded-lg border border-emerald-500/30"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="text-left">
+                              <h5 className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                📎 {leaveAttachmentName || 'Document Attached'}
+                              </h5>
+                              <p className="text-[9px] text-zinc-400">Click to view/save or change file</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <UploadCloud className="w-7 h-7 mx-auto text-zinc-400 shrink-0" />
+                            <h5 className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                              Click to Upload supporting Cert / Slip
+                            </h5>
+                            <p className="text-[9px] text-zinc-400">PDF, PNG, JPG (maximum size 5MB supported)</p>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -1338,8 +1407,28 @@ export default function DashboardStudent({
                           )}
                         </div>
                         <p className="text-[10px] text-zinc-450 leading-normal mt-0.5">Duration: {req.startDate} to {req.endDate} • {req.reason}</p>
-                        {req.attachmentName && (
-                          <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded mt-1 inline-block">📎 {req.attachmentName}</span>
+                        {(req.attachmentImg || req.attachmentData || req.attachmentName) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const img = req.attachmentImg || req.attachmentData || '';
+                              if (img) {
+                                setImagePreviewData({
+                                  url: img,
+                                  title: req.excuseType || 'Excuse Letter Attachment',
+                                  subtitle: `Class: ${req.className} • ${req.startDate} to ${req.endDate}`,
+                                  fileName: req.attachmentName || `excuse_${req.id}.png`
+                                });
+                              } else {
+                                if (typeof window !== 'undefined' && (window as any).showToast) {
+                                  (window as any).showToast(`Document: ${req.attachmentName}`, "info");
+                                }
+                              }
+                            }}
+                            className="text-[9px] font-mono bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded mt-1 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            📎 {req.attachmentName || 'Supporting Attachment'} (Click to View/Save)
+                          </button>
                         )}
                       </div>
                       <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ml-2 ${
@@ -1863,6 +1952,7 @@ export default function DashboardStudent({
       {activeScreen === 'attendance' && (
         <motion.div
           key="attendance"
+          id="attendance-scanner-card"
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
@@ -1884,9 +1974,45 @@ export default function DashboardStudent({
                   <Scan className="w-5 h-5 text-emerald-500" />
                   Live Attendance Scantool
                 </h2>
-                <p className="text-xs text-zinc-400 mt-1">Position your camera viewpoint to read the live generated class pass codes.</p>
+                <p className="text-xs text-zinc-400 mt-1">Position your camera viewpoint or use dynamic 1-tap check-in to record attendance.</p>
               </div>
             </div>
+
+            {/* Dynamic Active Session Card Banner */}
+            {(() => {
+              const detected = getDetectedClass();
+              if (!detected) return null;
+              return (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 max-w-sm mx-auto">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-emerald-500 text-black shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-black uppercase text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/15">
+                          {detected.code}
+                        </span>
+                        <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">
+                          {detected.name}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        Room {detected.room} • {detected.startTime} - {detected.endTime}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={startSimulationScan}
+                    className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-xs active:scale-95 transition-all"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Dynamic Check-in</span>
+                  </button>
+                </div>
+              );
+            })()}
 
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4 max-w-sm mx-auto">
               <div className="space-y-4 animate-fade-in">
@@ -2247,6 +2373,25 @@ export default function DashboardStudent({
                   </div>
                 )}
 
+                {/* Scanning Progress Bar for Simulation / Dynamic Scan */}
+                {isScanning && scanningProgress > 0 && (
+                  <div className="space-y-1.5 animate-fade-in">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-zinc-500 dark:text-zinc-400">
+                      <span className="flex items-center gap-1.5 text-emerald-500">
+                        <Sparkles className="w-3 h-3 animate-spin" />
+                        Validating dynamic class token...
+                      </span>
+                      <span className="font-mono">{scanningProgress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-500 transition-all duration-150 ease-out rounded-full"
+                        style={{ width: `${scanningProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   {isScanning ? (
                     <button
@@ -2279,6 +2424,17 @@ export default function DashboardStudent({
                       className="hidden" 
                     />
                   </label>
+
+                  {/* 1-Tap Instant Dynamic Check-In */}
+                  <button
+                    type="button"
+                    onClick={startSimulationScan}
+                    disabled={isScanning}
+                    className="flex-1 py-3 px-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
+                  >
+                    <Zap className="w-4 h-4 text-amber-300 shrink-0" />
+                    <span>1-Tap Dynamic</span>
+                  </button>
                 </div>
 
                 {/* Fallback Manual Secret Code Entry */}
@@ -3057,6 +3213,16 @@ export default function DashboardStudent({
         </div>
       )}
 
+      {/* Image Preview Lightbox with Save & Rotate Controls */}
+      <ImagePreviewModal
+        isOpen={!!imagePreviewData}
+        onClose={() => setImagePreviewData(null)}
+        imageUrl={imagePreviewData?.url || null}
+        title={imagePreviewData?.title}
+        subtitle={imagePreviewData?.subtitle}
+        fileName={imagePreviewData?.fileName}
+        readAloudEnabled={accessibility.readAloud}
+      />
     </div>
   );
 }

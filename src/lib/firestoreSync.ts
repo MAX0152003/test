@@ -386,6 +386,85 @@ export async function saveRegisteredUserToFirestore(
 }
 
 /**
+ * Directly looks up a user from Firestore across registered_users and users collections.
+ * Enables instant recognition when an account is created on mobile/iOS and logged into laptop (or vice-versa).
+ */
+export async function fetchUserByEmailOrIdFromFirestore(identifier: string): Promise<any | null> {
+  if (!identifier) return null;
+  const cleanId = identifier.toLowerCase().trim();
+  try {
+    // 1. Check registered_users collection
+    const userSnap = await getDocs(collection(db, 'registered_users'));
+    for (const docSnap of userSnap.docs) {
+      const u = docSnap.data();
+      if (
+        (u.email && u.email.toLowerCase().trim() === cleanId) ||
+        (u.uid && u.uid.toLowerCase().trim() === cleanId) ||
+        (u.id && u.id.toLowerCase().trim() === cleanId) ||
+        (u.name && u.name.toLowerCase().trim() === cleanId)
+      ) {
+        return u;
+      }
+    }
+
+    // 2. Check users collection (for user profiles)
+    const profileSnap = await getDocs(collection(db, 'users'));
+    for (const docSnap of profileSnap.docs) {
+      const u = docSnap.data();
+      if (
+        (u.email && u.email.toLowerCase().trim() === cleanId) ||
+        (u.uid && u.uid.toLowerCase().trim() === cleanId) ||
+        (u.id && u.id.toLowerCase().trim() === cleanId) ||
+        (u.studentId && u.studentId.toLowerCase().trim() === cleanId) ||
+        (u.facultyId && u.facultyId.toLowerCase().trim() === cleanId) ||
+        (u.name && u.name.toLowerCase().trim() === cleanId)
+      ) {
+        return u;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn("[Firestore] Error in fetchUserByEmailOrIdFromFirestore:", err);
+    return null;
+  }
+}
+
+/**
+ * Directly looks up password credential from Firestore for a given email or student/faculty ID.
+ */
+export async function fetchUserCredentialFromFirestore(key: string): Promise<string | null> {
+  if (!key) return null;
+  const sanitizedKey = key.toLowerCase().trim();
+  const safeDocId = sanitizedKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+  try {
+    // Check direct doc with safe ID
+    const directDoc = await getDoc(doc(db, 'credentials', safeDocId));
+    if (directDoc.exists() && directDoc.data()?.password) {
+      return directDoc.data().password;
+    }
+
+    // Check direct doc with URI encoded ID
+    const uriDoc = await getDoc(doc(db, 'credentials', encodeURIComponent(sanitizedKey)));
+    if (uriDoc.exists() && uriDoc.data()?.password) {
+      return uriDoc.data().password;
+    }
+
+    // Search across credentials collection
+    const credSnap = await getDocs(collection(db, 'credentials'));
+    for (const docSnap of credSnap.docs) {
+      const data = docSnap.data();
+      if (data && (data.key === sanitizedKey || docSnap.id === safeDocId || docSnap.id === sanitizedKey)) {
+        return data.password;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.warn("[Firestore] Error in fetchUserCredentialFromFirestore:", err);
+    return null;
+  }
+}
+
+/**
  * Deletes a registered user account from Firestore.
  */
 export async function deleteRegisteredUserFromFirestore(
@@ -413,17 +492,17 @@ export async function saveUserCredentialToFirestore(
 ): Promise<void> {
   if (isOffline || !key || !password) return;
   const sanitizedKey = key.toLowerCase().trim();
-  const docId = encodeURIComponent(sanitizedKey);
+  const safeDocId = sanitizedKey.replace(/[^a-zA-Z0-9_-]/g, '_');
   const colPath = 'credentials';
   try {
     await setDoc(
-      doc(db, colPath, docId),
-      sanitizeForFirestore({ key: sanitizedKey, password: password.trim(), updatedAt: new Date().toISOString() }),
+      doc(db, colPath, safeDocId),
+      sanitizeForFirestore({ id: safeDocId, key: sanitizedKey, password: password.trim(), updatedAt: new Date().toISOString() }),
       { merge: true }
     );
     console.log(`Credential for ${sanitizedKey} saved to Firestore.`);
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, `${colPath}/${docId}`);
+    handleFirestoreError(error, OperationType.WRITE, `${colPath}/${safeDocId}`);
   }
 }
 

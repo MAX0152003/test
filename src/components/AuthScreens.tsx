@@ -22,7 +22,9 @@ import {
   saveRegisteredUserToFirestore,
   saveUserCredentialToFirestore,
   savePasswordResetToFirestore,
-  syncAllAccountsFromFirestore
+  syncAllAccountsFromFirestore,
+  fetchUserByEmailOrIdFromFirestore,
+  fetchUserCredentialFromFirestore
 } from '../lib/firestoreSync';
 import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
 
@@ -540,7 +542,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
   const [newFpPwdError, setNewFpPwdError] = React.useState(false);
   const [confirmFpPwdError, setConfirmFpPwdError] = React.useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginEmailError(false);
     setLoginPasswordError(false);
@@ -563,7 +565,9 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       return;
     }
 
-    // 2. Synchronously check if the email exists in register list to avoid loading skeleton for bad inputs
+    const cleanInput = loginEmail.toLowerCase().trim();
+
+    // 2. Check local register list first
     let registeredUsers: any[] = [];
     try {
       registeredUsers = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
@@ -571,9 +575,39 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       console.error(err);
     }
 
-    const matched = registeredUsers.find((u: any) => u.email && loginEmail && u.email.toLowerCase() === loginEmail.toLowerCase().trim());
+    let matched = registeredUsers.find((u: any) => 
+      (u.email && u.email.toLowerCase().trim() === cleanInput) ||
+      (u.uid && u.uid.toLowerCase().trim() === cleanInput) ||
+      (u.id && u.id.toLowerCase().trim() === cleanInput) ||
+      (u.name && u.name.toLowerCase().trim() === cleanInput)
+    );
+
+    // If not found in local storage, query Firestore directly for cross-device support (mobile <-> laptop <-> iOS)
+    if (!matched) {
+      setIsCheckingCredentials(true);
+      try {
+        const firestoreUser = await fetchUserByEmailOrIdFromFirestore(cleanInput);
+        if (firestoreUser) {
+          matched = firestoreUser;
+          // Merge into local storage so subsequent lookups are instant
+          const userMap = new Map<string, any>();
+          registeredUsers.forEach(u => u && u.id && userMap.set(u.id, u));
+          userMap.set(firestoreUser.id, firestoreUser);
+          const updatedUsers = Array.from(userMap.values());
+          localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedUsers));
+          localStorage.setItem('classpulse_registered_admins', JSON.stringify(updatedUsers.filter(u => u.role === 'admin')));
+          window.dispatchEvent(new Event('registered-users-changed'));
+        }
+      } catch (err) {
+        console.warn("Firestore lookup failed:", err);
+      } finally {
+        setIsCheckingCredentials(false);
+      }
+    }
+
     if (!matched) {
       setLoginEmailError(true);
+      setLoginErrorMessage("Account not found. Please verify your email / ID or create an account.");
       speakText("Account not found. Verification blocked.", accessibility.readAloud);
       return;
     }
@@ -589,9 +623,10 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
 
     const matchedApproved = savedReqs.find((r: any) => 
       r.status === 'approved' && (
-        (r.idNumber || '').toLowerCase() === loginEmail.toLowerCase().trim() ||
-        (((r.completeName || '').toLowerCase().replace(/\s+/g, '')) + "@msu.edu.ph") === loginEmail.toLowerCase().trim() ||
-        (r.completeName || '').toLowerCase() === loginEmail.toLowerCase().trim()
+        (r.idNumber || '').toLowerCase() === cleanInput ||
+        (((r.completeName || '').toLowerCase().replace(/\s+/g, '')) + "@msu.edu.ph") === cleanInput ||
+        (r.completeName || '').toLowerCase() === cleanInput ||
+        (matched && matched.uid && (r.idNumber || '').toLowerCase() === matched.uid.toLowerCase())
       )
     );
 
@@ -607,7 +642,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       return;
     }
 
-    // Check custom customized password
+    // Check custom customized password from localStorage
     const savedPasswordsRaw = localStorage.getItem('classpulse_custom_passwords') || '{}';
     let savedPasswords: Record<string, string> = {};
     try {
@@ -616,8 +651,31 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       console.error(err);
     }
 
-    const emailKey = loginEmail.toLowerCase().trim();
-    const storedPassword = savedPasswords[emailKey];
+    let storedPassword = savedPasswords[cleanInput] || 
+      (matched.email ? savedPasswords[matched.email.toLowerCase().trim()] : undefined) ||
+      (matched.uid ? savedPasswords[matched.uid.toLowerCase().trim()] : undefined) ||
+      (matched.id ? savedPasswords[matched.id.toLowerCase().trim()] : undefined);
+
+    // If password not in localStorage, fetch directly from Firestore credentials
+    if (!storedPassword) {
+      setIsCheckingCredentials(true);
+      try {
+        const firestorePwd = await fetchUserCredentialFromFirestore(cleanInput) ||
+          (matched.email ? await fetchUserCredentialFromFirestore(matched.email) : null) ||
+          (matched.uid ? await fetchUserCredentialFromFirestore(matched.uid) : null);
+        if (firestorePwd) {
+          storedPassword = firestorePwd;
+          savedPasswords[cleanInput] = firestorePwd;
+          if (matched.email) savedPasswords[matched.email.toLowerCase().trim()] = firestorePwd;
+          if (matched.uid) savedPasswords[matched.uid.toLowerCase().trim()] = firestorePwd;
+          localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
+        }
+      } catch (err) {
+        console.warn("Firestore password lookup failed:", err);
+      } finally {
+        setIsCheckingCredentials(false);
+      }
+    }
 
     if (!storedPassword) {
       // First-time login detected (no password set in custom passwords). Redirect them to setup.
@@ -625,19 +683,19 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
         id: 'req-auto-' + matched.id,
         role: matched.role,
         completeName: matched.name,
-        idNumber: matched.uid,
+        idNumber: matched.uid || matched.id,
         contactNumber: '+63 901 000 0000',
         status: 'approved',
         requestedAt: new Date().toISOString()
       };
 
-      let savedReqs = [];
+      let currentReqs = [];
       try {
-        savedReqs = JSON.parse(localStorage.getItem('classpulse_password_reset_requests') || '[]');
+        currentReqs = JSON.parse(localStorage.getItem('classpulse_password_reset_requests') || '[]');
       } catch {}
-      if (!savedReqs.some((r: any) => r.idNumber === matched.uid)) {
-        savedReqs.push(autoResetReq);
-        localStorage.setItem('classpulse_password_reset_requests', JSON.stringify(savedReqs));
+      if (!currentReqs.some((r: any) => r.idNumber === matched.uid)) {
+        currentReqs.push(autoResetReq);
+        localStorage.setItem('classpulse_password_reset_requests', JSON.stringify(currentReqs));
         window.dispatchEvent(new Event('password-reset-requests-changed'));
       }
 
@@ -647,7 +705,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       setFpErrorMsg(null);
       setFpResetSuccess(false);
       setApprovedResetRequest(autoResetReq);
-      setCheckIdNumber(matched.uid);
+      setCheckIdNumber(matched.uid || matched.id);
 
       if (typeof window !== 'undefined' && (window as any).showToast) {
         (window as any).showToast("First-time login detected. Please customize your password!", "info");
@@ -656,24 +714,25 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       return;
     }
 
-    // 3. Check password mismatch instantly (DO NOT show spinner/skeleton if incorrect!)
+    // 3. Check password mismatch
     if (loginPassword !== storedPassword) {
       setLoginPasswordError(true);
+      setLoginErrorMessage("Incorrect password. Access denied.");
       speakText("Incorrect password. Access denied.", accessibility.readAloud);
       return;
     }
 
-    // 4. Everything matches! Now, briefly trigger checking state transition to simulate institutional security check
+    // 4. Everything matches! Now trigger checking state transition and start session
     setIsCheckingCredentials(true);
     speakText("Verifying academic credentials with institutional database registry.", accessibility.readAloud);
 
     setTimeout(() => {
       setIsCheckingCredentials(false);
-      startLoginFlow(matched.role, matched.name, matched.email);
-    }, 1200);
+      startLoginFlow(matched.role, matched.name, matched.email || cleanInput);
+    }, 600);
   };
 
-  const handleSignUpSubmit = (e: React.FormEvent) => {
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegNameError(false);
     setRegEmailError(false);
@@ -708,6 +767,8 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       return;
     }
 
+    const cleanRegEmail = regEmail.toLowerCase().trim();
+
     let registeredUsers = [];
     try {
       registeredUsers = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
@@ -715,12 +776,20 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       console.error(err);
     }
 
-    // Check if user with this email already exists
-    const existingUser = registeredUsers.find((u: any) => u.email && regEmail && u.email.toLowerCase().trim() === regEmail.toLowerCase().trim());
+    // Check if user with this email already exists locally or in Firestore
+    const existingUser = registeredUsers.find((u: any) => u.email && u.email.toLowerCase().trim() === cleanRegEmail);
     if (existingUser) {
       setRegEmailError(true);
       setRegErrorMessage("An account with this email address (" + regEmail.trim() + ") is already registered. Please log in instead.");
       speakText("An account with this email is already registered.", accessibility.readAloud);
+      return;
+    }
+
+    const firestoreExisting = await fetchUserByEmailOrIdFromFirestore(cleanRegEmail);
+    if (firestoreExisting) {
+      setRegEmailError(true);
+      setRegErrorMessage("An account with this email address (" + regEmail.trim() + ") already exists on the cloud server. Please log in instead.");
+      speakText("An account with this email already exists. Please log in.", accessibility.readAloud);
       return;
     }
 
@@ -732,8 +801,8 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
 
     const newUserObj = {
       id: 'usr-' + Math.random().toString(36).substring(2, 7),
-      name: regName,
-      email: regEmail,
+      name: regName.trim(),
+      email: cleanRegEmail,
       role: regRole,
       uid: assignedUid,
       department: regRole === 'faculty' ? 'College of Information & Computing Sciences' : regRole === 'admin' ? 'Academic Registrar Board' : 'CICS Department'
@@ -748,6 +817,17 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       window.dispatchEvent(new Event('registered-admins-changed'));
     }
 
+    // Save custom password locally
+    let savedPasswords: any = {};
+    try {
+      savedPasswords = JSON.parse(localStorage.getItem('classpulse_custom_passwords') || '{}');
+    } catch (err) {
+      console.error(err);
+    }
+    savedPasswords[cleanRegEmail] = regPassword.trim();
+    savedPasswords[assignedUid.toLowerCase()] = regPassword.trim();
+    localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
+
     // Save user profile to Firestore
     const isOffline = localStorage.getItem('cp_offline') === 'true';
     const userProfileObj: UserProfile = {
@@ -759,27 +839,24 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       facultyId: newUserObj.role === 'faculty' ? newUserObj.uid : '',
       department: newUserObj.department,
       avatar: '',
-      bio: 'Registered securely via ClassPulse credentials.'
+      bio: 'Registered securely via ClassPulse institutional credentials.'
     };
-    saveUserProfileToFirestore(isOffline, userProfileObj).catch(err => console.error(err));
-    saveRegisteredUserToFirestore(isOffline, newUserObj).catch(err => console.error(err));
 
-    // Save custom password
-    let savedPasswords: any = {};
     try {
-      savedPasswords = JSON.parse(localStorage.getItem('classpulse_custom_passwords') || '{}');
+      await Promise.all([
+        saveUserProfileToFirestore(isOffline, userProfileObj),
+        saveRegisteredUserToFirestore(isOffline, newUserObj),
+        saveUserCredentialToFirestore(isOffline, cleanRegEmail, regPassword.trim()),
+        saveUserCredentialToFirestore(isOffline, assignedUid.toLowerCase(), regPassword.trim())
+      ]);
     } catch (err) {
-      console.error(err);
+      console.warn("Firestore registration sync warning:", err);
     }
-    savedPasswords[regEmail.toLowerCase().trim()] = regPassword;
-    localStorage.setItem('classpulse_custom_passwords', JSON.stringify(savedPasswords));
-
-    saveUserCredentialToFirestore(isOffline, regEmail.toLowerCase().trim(), regPassword.trim()).catch(err => console.error(err));
 
     speakText(`Account registered successfully. Loading ${regRole} portal now.`, accessibility.readAloud);
     
     // Log them in immediately!
-    startLoginFlow(regRole, regName, regEmail);
+    startLoginFlow(regRole, regName, cleanRegEmail);
   };
 
   const isDark = accessibility.theme === 'dark';

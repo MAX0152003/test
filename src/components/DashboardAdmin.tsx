@@ -23,7 +23,8 @@ import {
   LabRoom
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
-import { BUILDING_CLUSTERS, ACADEMIC_TERMS } from '../lib/msuUtils';
+import { ACADEMIC_TERMS } from '../lib/msuUtils';
+import { ImagePreviewModal } from './ImagePreviewModal';
 import { 
   Users, 
   UserCheck, 
@@ -73,7 +74,6 @@ import {
 } from '../lib/firestoreSync';
 import SubjectDetailModal from './SubjectDetailModal';
 import Messages from './Messages';
-import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 
 interface DashboardAdminProps {
   activeScreen: string;
@@ -97,6 +97,8 @@ interface DashboardAdminProps {
   onMarkAllNotificationsRead: () => void;
   labRooms?: LabRoom[];
   onUpdateLabRooms?: (rooms: LabRoom[]) => void;
+  buildingClusters?: string[];
+  onUpdateBuildingClusters?: (clusters: string[]) => void;
   excuseLetters?: any[];
   onUpdateExcuseStatus?: (id: string, status: 'pending' | 'valid' | 'invalid' | 'approved' | 'rejected') => void;
   onResetSystem?: () => Promise<void>;
@@ -221,12 +223,6 @@ function StatCard({ stat, idx }: StatCardProps) {
         <h3 className="text-2xl sm:text-3xl font-black mt-1 font-mono text-zinc-900 dark:text-zinc-100 truncate">
           {displayCount}
         </h3>
-        <div className="mt-1.5 flex flex-col gap-0.5">
-          <span className="text-[9px] sm:text-[10px] text-emerald-500 font-extrabold flex items-center gap-0.5 truncate">
-            <ArrowUpRight className="w-3 sm:w-3.5 h-3 sm:h-3.5 shrink-0" /> {stat.text}
-          </span>
-          <span className="text-[8px] sm:text-[9px] text-zinc-400 dark:text-zinc-600 block truncate">{stat.detail}</span>
-        </div>
       </div>
       <div className={`p-2 sm:p-3 rounded-xl ${
         stat.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' :
@@ -386,6 +382,8 @@ export default function DashboardAdmin({
   onMarkAllNotificationsRead,
   labRooms = [],
   onUpdateLabRooms,
+  buildingClusters = [],
+  onUpdateBuildingClusters,
   excuseLetters = [],
   onUpdateExcuseStatus,
   onResetSystem
@@ -429,7 +427,6 @@ export default function DashboardAdmin({
   }, [usersList, userProfile]);
 
   // Directory filter state
-  const [scheduleViewMode, setScheduleViewMode] = React.useState<'grid' | 'cards'>('grid');
   const [directoryRoleFilter, setDirectoryRoleFilter] = React.useState<'all' | 'student' | 'faculty' | 'admin'>('all');
   const [telemetryFilter, setTelemetryFilter] = React.useState<'all' | 'charts' | 'users' | 'leaves'>('all');
 
@@ -522,18 +519,65 @@ export default function DashboardAdmin({
   const [selectedRoomId, setSelectedRoomId] = React.useState('lab-1');
   const [isAddingRoom, setIsAddingRoom] = React.useState(false);
   const [newRoomName, setNewRoomName] = React.useState('');
-  const [newRoomCapacity, setNewRoomCapacity] = React.useState(40);
-  const [newRoomDevices, setNewRoomDevices] = React.useState(40);
+  const [newRoomCapacity, setNewRoomCapacity] = React.useState<number | ''>(40);
+  const [newRoomDevices, setNewRoomDevices] = React.useState<number | ''>(40);
   const [newRoomFloor, setNewRoomFloor] = React.useState('2nd Floor');
-  const [newRoomBuildingCluster, setNewRoomBuildingCluster] = React.useState<string>(BUILDING_CLUSTERS[0]);
+  const [newRoomBuildingCluster, setNewRoomBuildingCluster] = React.useState<string>('');
+  const [isAddingCustomBuildingInline, setIsAddingCustomBuildingInline] = React.useState(false);
+  const [inlineNewBuildingName, setInlineNewBuildingName] = React.useState('');
   const [selectedBuildingClusterFilter, setSelectedBuildingClusterFilter] = React.useState<string>('all');
+  const [isClusterManagerOpen, setIsClusterManagerOpen] = React.useState(false);
+  const [newClusterInputName, setNewClusterInputName] = React.useState('');
   const [editingRoomId, setEditingRoomId] = React.useState<string | null>(null);
   const [editRoomName, setEditRoomName] = React.useState('');
-  const [editRoomCapacity, setEditRoomCapacity] = React.useState(40);
-  const [editRoomDevices, setEditRoomDevices] = React.useState(40);
+  const [editRoomCapacity, setEditRoomCapacity] = React.useState<number | ''>(40);
+  const [editRoomDevices, setEditRoomDevices] = React.useState<number | ''>(40);
   const [editRoomStatus, setEditRoomStatus] = React.useState<'occupied' | 'available' | 'maintenance'>('available');
   const [editRoomFloor, setEditRoomFloor] = React.useState('2nd Floor');
-  const [editRoomBuildingCluster, setEditRoomBuildingCluster] = React.useState<string>(BUILDING_CLUSTERS[0]);
+  const [editRoomBuildingCluster, setEditRoomBuildingCluster] = React.useState<string>('');
+  const [imagePreviewData, setImagePreviewData] = React.useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
+
+  // All active building clusters (from manual admin inputs + existing rooms)
+  const activeBuildingClusters = React.useMemo(() => {
+    const list: string[] = [];
+    (buildingClusters || []).forEach(c => {
+      if (c && !list.includes(c)) list.push(c);
+    });
+    labRooms.forEach(r => {
+      const b = r.buildingCluster || r.building;
+      if (b && !list.includes(b)) list.push(b);
+    });
+    return list;
+  }, [buildingClusters, labRooms]);
+
+  const handleAddCustomBuilding = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (!activeBuildingClusters.includes(trimmed)) {
+      const next = [...activeBuildingClusters, trimmed];
+      onUpdateBuildingClusters?.(next);
+      setNewClusterInputName('');
+      speakText(`Added college or building: ${trimmed}`, accessibility.readAloud);
+    }
+  };
+
+  const handleDeleteCustomBuilding = (name: string) => {
+    const next = activeBuildingClusters.filter(c => c !== name);
+    onUpdateBuildingClusters?.(next);
+    // Unassign cluster from any room currently linked to it
+    if (labRooms.some(r => r.buildingCluster === name || r.building === name)) {
+      const updatedRooms = labRooms.map(r => 
+        (r.buildingCluster === name || r.building === name) 
+          ? { ...r, buildingCluster: '', building: '' } 
+          : r
+      );
+      onUpdateLabRooms?.(updatedRooms);
+    }
+    if (selectedBuildingClusterFilter === name) {
+      setSelectedBuildingClusterFilter('all');
+    }
+    speakText(`Removed college or building: ${name}`, accessibility.readAloud);
+  };
   const [selectedArchivedTermForInspection, setSelectedArchivedTermForInspection] = React.useState<any | null>(null);
   const [hoveredTrendIndex, setHoveredTrendIndex] = React.useState<number | null>(null);
   const [hoveredEnrollmentIndex, setHoveredEnrollmentIndex] = React.useState<number | null>(null);
@@ -1505,42 +1549,63 @@ export default function DashboardAdmin({
   const handleAddRoom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRoomName.trim()) return;
+    
+    let assignedCluster = newRoomBuildingCluster.trim();
+    if (isAddingCustomBuildingInline && inlineNewBuildingName.trim()) {
+      assignedCluster = inlineNewBuildingName.trim();
+      handleAddCustomBuilding(assignedCluster);
+    } else if (!assignedCluster && activeBuildingClusters.length > 0) {
+      assignedCluster = activeBuildingClusters[0];
+    } else if (!assignedCluster) {
+      assignedCluster = 'Main Academic Wing';
+      handleAddCustomBuilding(assignedCluster);
+    }
+
+    const parsedCap = typeof newRoomCapacity === 'number' ? newRoomCapacity : parseInt(String(newRoomCapacity), 10) || 0;
+    const parsedDev = typeof newRoomDevices === 'number' ? newRoomDevices : parseInt(String(newRoomDevices), 10) || 0;
+
     const newRoom: LabRoom = {
       id: `lab-${Date.now()}`,
-      name: newRoomName,
-      capacity: newRoomCapacity,
+      name: newRoomName.trim(),
+      capacity: parsedCap,
       status: 'available',
       currentOccupancy: 0,
       activeClass: '',
-      devicesCount: newRoomDevices,
+      devicesCount: parsedDev,
       scannersActive: true,
       activeScannerLogs: [],
       floor: newRoomFloor,
-      buildingCluster: newRoomBuildingCluster || BUILDING_CLUSTERS[0],
-      building: newRoomBuildingCluster || BUILDING_CLUSTERS[0]
+      buildingCluster: assignedCluster,
+      building: assignedCluster
     };
     onUpdateLabRooms?.([...labRooms, newRoom]);
     setNewRoomName('');
     setIsAddingRoom(false);
+    setIsAddingCustomBuildingInline(false);
+    setInlineNewBuildingName('');
     speakText(`Laboratory room ${newRoom.name} successfully established in central registry`, accessibility.readAloud);
   };
 
   const handleSaveRoomEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRoomId) return;
+    const parsedCap = typeof editRoomCapacity === 'number' ? editRoomCapacity : parseInt(String(editRoomCapacity), 10) || 0;
+    const parsedDev = typeof editRoomDevices === 'number' ? editRoomDevices : parseInt(String(editRoomDevices), 10) || 0;
+    const cluster = editRoomBuildingCluster.trim() || (activeBuildingClusters[0] || 'Main Academic Wing');
+
     const updated = labRooms.map(rm => {
       if (rm.id === editingRoomId) {
         return {
           ...rm,
-          name: editRoomName,
-          capacity: editRoomCapacity,
-          devicesCount: editRoomDevices,
+          name: editRoomName.trim(),
+          capacity: parsedCap,
+          devicesCount: parsedDev,
           status: editRoomStatus,
           currentOccupancy: editRoomStatus === 'available' || editRoomStatus === 'maintenance' ? 0 : rm.currentOccupancy,
           activeClass: editRoomStatus === 'available' || editRoomStatus === 'maintenance' ? '' : rm.activeClass,
           floor: editRoomFloor,
-          buildingCluster: editRoomBuildingCluster,
-          building: editRoomBuildingCluster
+          buildingCluster: cluster,
+          building: cluster
         };
       }
       return rm;
@@ -2709,13 +2774,13 @@ export default function DashboardAdmin({
 
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
-                              <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Capacity</label>
+                              <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Capacity (Pax)</label>
                               <input 
                                 type="number" 
-                                min={1}
+                                min={0}
                                 value={editRoomCapacity}
-                                onChange={(e) => setEditRoomCapacity(Number(e.target.value))}
-                                className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200"
+                                onChange={(e) => setEditRoomCapacity(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
                                 required
                               />
                             </div>
@@ -2725,8 +2790,8 @@ export default function DashboardAdmin({
                                 type="number" 
                                 min={0}
                                 value={editRoomDevices}
-                                onChange={(e) => setEditRoomDevices(Number(e.target.value))}
-                                className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200"
+                                onChange={(e) => setEditRoomDevices(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
                                 required
                               />
                             </div>
@@ -3250,6 +3315,49 @@ export default function DashboardAdmin({
                                 <div className="p-3 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-900 text-[10px] text-zinc-600 dark:text-zinc-400 leading-normal italic mt-2">
                                   "{req.reason}"
                                 </div>
+
+                                {/* Excuse Attachment Document / Image with View & Save Lightbox */}
+                                {(req.attachmentImg || req.attachmentData || req.attachmentName) && (
+                                  <div 
+                                    onClick={() => {
+                                      const imgUrl = req.attachmentImg || req.attachmentData || '';
+                                      if (imgUrl) {
+                                        setImagePreviewData({
+                                          url: imgUrl,
+                                          title: req.excuseType || 'Medical / Excuse Certificate',
+                                          subtitle: `Student: ${req.studentName} (${req.studentId}) • ${relatedClass ? relatedClass.name : req.classId}`,
+                                          fileName: req.attachmentName || `excuse_${req.studentId || 'slip'}_${req.id}.png`
+                                        });
+                                      } else {
+                                        if (typeof window !== 'undefined' && (window as any).showToast) {
+                                          (window as any).showToast(`Document attached: ${req.attachmentName || 'Supporting Certificate'}`, "info");
+                                        }
+                                      }
+                                    }}
+                                    className="flex items-center gap-2.5 mt-2 p-2 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-xl cursor-pointer group transition-all"
+                                  >
+                                    {req.attachmentImg || req.attachmentData ? (
+                                      <img 
+                                        src={req.attachmentImg || req.attachmentData} 
+                                        alt="Certificate" 
+                                        className="w-10 h-10 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" 
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                                        📎
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate block">
+                                        📎 {req.attachmentName || 'Official Supporting Cert / Medical Slip'}
+                                      </span>
+                                      <span className="text-[8px] text-zinc-400 flex items-center gap-1 group-hover:text-emerald-500 transition-colors font-medium">
+                                        <Download className="w-2.5 h-2.5" /> Click to view & save image
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
 
                                 {!isBatchMode && (
                                   <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-100/40 dark:border-zinc-900/40 mt-1">
@@ -4574,36 +4682,9 @@ export default function DashboardAdmin({
                 </div>
               </div>
               
-              {/* Fast Offerings searching bar, View Mode Toggle and Register button */}
+              {/* Fast Offerings searching bar and Register button */}
               <div className="flex flex-wrap items-center gap-2 select-none w-full sm:w-auto">
-                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200/60 dark:border-zinc-800">
-                  <button
-                    type="button"
-                    onClick={() => setScheduleViewMode('grid')}
-                    className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                      scheduleViewMode === 'grid'
-                        ? 'bg-emerald-500 text-black shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                    }`}
-                  >
-                    <LayoutGrid className="w-3.5 h-3.5" />
-                    <span>Weekly Grid</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setScheduleViewMode('cards')}
-                    className={`px-3 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                      scheduleViewMode === 'cards'
-                        ? 'bg-emerald-500 text-black shadow-xs'
-                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100'
-                    }`}
-                  >
-                    <List className="w-3.5 h-3.5" />
-                    <span>Card List</span>
-                  </button>
-                </div>
-
-                <div className="relative flex-1 sm:w-56 select-none">
+                <div className="relative flex-1 sm:w-64 select-none">
                   <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                     <Search className="w-4 h-4 text-emerald-500" />
                   </span>
@@ -4659,31 +4740,8 @@ export default function DashboardAdmin({
             </div>
           </div>
 
-          {/* Grid Layout of Subjects grouped by code */}
-          {scheduleViewMode === 'grid' ? (
-            <WeeklyScheduleGrid
-              classes={classes}
-              userRole="admin"
-              enrollments={enrollments}
-              userProfile={userProfile}
-              searchQuery={adminClassSearchQuery}
-              onOpenSubjectDetails={(cls) => {
-                setSelectedClassDetail(cls);
-                setIsDetailModalOpen(true);
-              }}
-              onEditSubject={(cls) => {
-                setIsAdminClassFormOpen(true);
-                setAdminFormCode(cls.code);
-                setAdminFormName(cls.name);
-                setAdminFormStart(cls.startTime);
-                setAdminFormEnd(cls.endTime);
-                setAdminFormRoom(cls.room);
-                setAdminFormDays(cls.days);
-                setAdminFormFacultyName(cls.facultyName || '');
-              }}
-            />
-          ) : (
-          (() => {
+          {/* Offerings card list */}
+          {(() => {
             const todayIndex = new Date().getDay();
             const dayMap: Record<number, string> = {
               1: 'Mon',
@@ -4817,7 +4875,7 @@ export default function DashboardAdmin({
                 )}
               </div>
             );
-          })())}
+          })()}
         </motion.div>
       )}
 
@@ -5949,16 +6007,27 @@ export default function DashboardAdmin({
                 <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider mt-1 font-mono">Manage available rooms, capacities, and active scanner states</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                setIsAddingRoom(!isAddingRoom);
-                setEditingRoomId(null);
-                setNewRoomName('');
-              }}
-              className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-black text-[10.5px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95 self-start sm:self-auto"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[3]" /> Add New Room
-            </button>
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setIsClusterManagerOpen(true)}
+                className="py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 text-[10.5px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95"
+              >
+                <Building className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Colleges & Buildings</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingRoom(!isAddingRoom);
+                  setEditingRoomId(null);
+                  setNewRoomName('');
+                }}
+                className="py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-black text-[10.5px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5 shadow-md cursor-pointer transition-all active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" /> Add New Room
+              </button>
+            </div>
           </div>
 
           {/* Quick Metrics */}
@@ -5976,8 +6045,8 @@ export default function DashboardAdmin({
               <span className="text-xl font-mono font-black text-red-500">{labRooms.filter(r => r.status === 'occupied').length}</span>
             </div>
             <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-805 rounded-2xl">
-              <span className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 block mb-1">Under Maintenance</span>
-              <span className="text-xl font-mono font-black text-amber-500">{labRooms.filter(r => r.status === 'maintenance').length}</span>
+              <span className="text-[9px] uppercase font-bold tracking-widest text-zinc-400 block mb-1">Colleges / Buildings</span>
+              <span className="text-xl font-mono font-black text-amber-500">{activeBuildingClusters.length}</span>
             </div>
           </div>
 
@@ -5988,13 +6057,18 @@ export default function DashboardAdmin({
                 <div>
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#CC762A] flex items-center gap-1.5 font-mono">
                     <Building className="w-3.5 h-3.5 text-amber-500" />
-                    MSU Hierarchical Campus Room Registry
+                    Campus Colleges & Room Registry
                   </span>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">Organized by Academic Building Clusters & Wing Complexes</p>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Organized by Colleges, Academic Buildings & Laboratories</p>
                 </div>
-                <span className="text-[9px] font-mono text-zinc-450 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
-                  {labRooms.length} ACTIVE ROOM RECORDS
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-mono text-zinc-450 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
+                    {activeBuildingClusters.length} COLLEGES / BUILDINGS
+                  </span>
+                  <span className="text-[9px] font-mono text-zinc-450 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-lg">
+                    {labRooms.length} ROOMS
+                  </span>
+                </div>
               </div>
 
               {/* Building Cluster Filter Tabs */}
@@ -6008,10 +6082,10 @@ export default function DashboardAdmin({
                       : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-750'
                   }`}
                 >
-                  🏢 All Clusters ({labRooms.length})
+                  🏢 All ({labRooms.length})
                 </button>
-                {BUILDING_CLUSTERS.map(cluster => {
-                  const count = labRooms.filter(r => (r.buildingCluster || r.building || BUILDING_CLUSTERS[0]) === cluster).length;
+                {activeBuildingClusters.map(cluster => {
+                  const count = labRooms.filter(r => (r.buildingCluster || r.building) === cluster).length;
                   const shortName = cluster.split('(')[0].trim();
                   return (
                     <button
@@ -6033,13 +6107,76 @@ export default function DashboardAdmin({
                     </button>
                   );
                 })}
+                {labRooms.some(r => !r.buildingCluster && !r.building) && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBuildingClusterFilter('unassigned')}
+                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                      selectedBuildingClusterFilter === 'unassigned'
+                        ? 'bg-emerald-500 text-black shadow-xs font-black'
+                        : 'bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-750'
+                    }`}
+                  >
+                    <span>Unassigned</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-500">
+                      {labRooms.filter(r => !r.buildingCluster && !r.building).length}
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsClusterManagerOpen(true)}
+                  className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer border border-dashed border-emerald-500/50 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3 stroke-[3]" />
+                  <span>Add College / Building</span>
+                </button>
               </div>
 
               {/* Hierarchical Clusters Display */}
               <div className="space-y-6">
-                {(selectedBuildingClusterFilter === 'all' ? BUILDING_CLUSTERS : [selectedBuildingClusterFilter]).map(clusterName => {
-                  const clusterRooms = labRooms.filter(r => (r.buildingCluster || r.building || BUILDING_CLUSTERS[0]) === clusterName);
-                  if (clusterRooms.length === 0 && selectedBuildingClusterFilter === 'all') return null;
+                {(selectedBuildingClusterFilter === 'all' 
+                  ? activeBuildingClusters 
+                  : selectedBuildingClusterFilter === 'unassigned' 
+                    ? [] 
+                    : [selectedBuildingClusterFilter]
+                ).map(clusterName => {
+                  const clusterRooms = labRooms.filter(r => (r.buildingCluster || r.building) === clusterName);
+                  if (clusterRooms.length === 0 && selectedBuildingClusterFilter === 'all') {
+                    return (
+                      <div key={clusterName} className="p-4 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-200/80 dark:border-zinc-800/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs">🏛️</span>
+                            <div>
+                              <h3 className="text-xs font-black text-zinc-900 dark:text-zinc-100 tracking-tight">{clusterName}</h3>
+                              <p className="text-[9px] text-zinc-400 font-mono">0 Rooms assigned yet</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewRoomBuildingCluster(clusterName);
+                                setIsAddingRoom(true);
+                              }}
+                              className="px-2.5 py-1 text-[9.5px] font-bold bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-black rounded-lg transition-all cursor-pointer"
+                            >
+                              + Add Room to {clusterName.split('(')[0].trim()}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomBuilding(clusterName)}
+                              className="p-1.5 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                              title="Delete College / Building"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   const clusterCapacity = clusterRooms.reduce((acc, r) => acc + (r.capacity || 0), 0);
                   const clusterOccupied = clusterRooms.reduce((acc, r) => acc + (r.currentOccupancy || 0), 0);
@@ -6067,6 +6204,14 @@ export default function DashboardAdmin({
                           <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-850 text-zinc-600 dark:text-zinc-300 font-bold">
                             📡 {clusterScanners}/{clusterRooms.length} Scanners Active
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomBuilding(clusterName)}
+                            className="p-1 text-zinc-400 hover:text-red-500 rounded-lg hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Remove this college / building"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
@@ -6109,26 +6254,36 @@ export default function DashboardAdmin({
                                 </div>
 
                                 <div className="space-y-1">
-                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Building Cluster</label>
-                                  <select
-                                    value={editRoomBuildingCluster}
-                                    onChange={(e) => setEditRoomBuildingCluster(e.target.value)}
-                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
-                                  >
-                                    {BUILDING_CLUSTERS.map(c => (
-                                      <option key={c} value={c} className="bg-white dark:bg-zinc-950">{c}</option>
-                                    ))}
-                                  </select>
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Building / College</label>
+                                  {activeBuildingClusters.length > 0 ? (
+                                    <select
+                                      value={editRoomBuildingCluster}
+                                      onChange={(e) => setEditRoomBuildingCluster(e.target.value)}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                    >
+                                      {activeBuildingClusters.map(c => (
+                                        <option key={c} value={c} className="bg-white dark:bg-zinc-950">{c}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      placeholder="Type building / college name..."
+                                      value={editRoomBuildingCluster}
+                                      onChange={(e) => setEditRoomBuildingCluster(e.target.value)}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
+                                    />
+                                  )}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="space-y-1">
-                                    <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Capacity</label>
+                                    <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Capacity (Pax)</label>
                                     <input 
                                       type="number" 
-                                      min={1}
+                                      min={0}
                                       value={editRoomCapacity}
-                                      onChange={(e) => setEditRoomCapacity(Number(e.target.value))}
+                                      onChange={(e) => setEditRoomCapacity(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
                                       className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
                                       required
                                     />
@@ -6139,7 +6294,7 @@ export default function DashboardAdmin({
                                       type="number" 
                                       min={0}
                                       value={editRoomDevices}
-                                      onChange={(e) => setEditRoomDevices(Number(e.target.value))}
+                                      onChange={(e) => setEditRoomDevices(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
                                       className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
                                       required
                                     />
@@ -6266,7 +6421,7 @@ export default function DashboardAdmin({
                                       setEditRoomDevices(rm.devicesCount);
                                       setEditRoomStatus(rm.status);
                                       setEditRoomFloor(rm.floor || '2nd Floor');
-                                      setEditRoomBuildingCluster(rm.buildingCluster || rm.building || BUILDING_CLUSTERS[0]);
+                                      setEditRoomBuildingCluster(rm.buildingCluster || rm.building || '');
                                       setIsAddingRoom(false);
                                     }}
                                     className="bg-zinc-150 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 font-extrabold px-2.5 py-1 rounded-lg cursor-pointer"
@@ -6304,11 +6459,84 @@ export default function DashboardAdmin({
                   );
                 })}
 
-                {labRooms.length === 0 && (
-                  <div className="py-16 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
-                    <MapPin className="w-10 h-10 text-zinc-300 mx-auto mb-2 animate-bounce" />
-                    <p className="text-zinc-400 text-xs font-black uppercase tracking-wider font-sans">No rooms found in registry</p>
-                    <p className="text-[10px] text-zinc-450 mt-1">Deploy a new custom room registry using the top right button.</p>
+                {/* Unassigned rooms cluster block if any */}
+                {(selectedBuildingClusterFilter === 'all' || selectedBuildingClusterFilter === 'unassigned') && 
+                  labRooms.filter(r => !r.buildingCluster && !r.building).length > 0 && (
+                  <div className="p-4 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-200/80 dark:border-zinc-800/80 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-zinc-200/60 dark:border-zinc-800/80">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 font-bold text-xs">🏢</span>
+                        <div>
+                          <h3 className="text-xs font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Unassigned / Standalone Rooms</h3>
+                          <p className="text-[9px] text-zinc-400 font-mono">
+                            {labRooms.filter(r => !r.buildingCluster && !r.building).length} Rooms without College Assignment
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {labRooms.filter(r => !r.buildingCluster && !r.building).map(rm => (
+                        <div key={rm.id} className="p-3.5 rounded-xl border border-zinc-200/90 dark:border-zinc-805 bg-white dark:bg-zinc-900 hover:border-emerald-500/40 transition-all text-left space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100">{rm.name}</h4>
+                              <span className="text-[9px] font-mono text-zinc-400 block">{rm.floor || '2nd Floor'}</span>
+                            </div>
+                            <span className={`text-[8.5px] font-mono font-black uppercase px-2 py-0.5 rounded-full ${
+                              rm.status === 'available' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                              rm.status === 'occupied' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                              'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            }`}>
+                              {rm.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800 text-[10px]">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingRoomId(rm.id);
+                                  setEditRoomName(rm.name);
+                                  setEditRoomCapacity(rm.capacity);
+                                  setEditRoomDevices(rm.devicesCount);
+                                  setEditRoomStatus(rm.status);
+                                  setEditRoomFloor(rm.floor || '2nd Floor');
+                                  setEditRoomBuildingCluster('');
+                                  setIsAddingRoom(false);
+                                }}
+                                className="bg-zinc-150 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 font-extrabold px-2.5 py-1 rounded-lg cursor-pointer"
+                              >
+                                Edit & Assign
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRoom(rm.id, rm.name)}
+                                className="bg-red-500/10 hover:bg-red-500 text-red-550 hover:text-white font-extrabold px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeBuildingClusters.length === 0 && labRooms.length === 0 && (
+                  <div className="py-16 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl space-y-3">
+                    <Building className="w-10 h-10 text-zinc-300 mx-auto animate-bounce" />
+                    <div>
+                      <p className="text-zinc-400 text-xs font-black uppercase tracking-wider font-sans">No colleges or buildings registered</p>
+                      <p className="text-[10px] text-zinc-500 mt-1">Get started by creating your first College or Academic Building cluster.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsClusterManagerOpen(true)}
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer"
+                    >
+                      + Add New College / Building
+                    </button>
                   </div>
                 )}
               </div>
@@ -7133,9 +7361,10 @@ export default function DashboardAdmin({
                     <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Capacity (Pax)</label>
                     <input 
                       type="number" 
-                      min={1}
+                      min={0}
                       value={newRoomCapacity}
-                      onChange={(e) => setNewRoomCapacity(Number(e.target.value))}
+                      onChange={(e) => setNewRoomCapacity(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      placeholder="e.g. 40"
                       className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-800 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500 font-bold"
                       required
                     />
@@ -7146,7 +7375,8 @@ export default function DashboardAdmin({
                       type="number" 
                       min={0}
                       value={newRoomDevices}
-                      onChange={(e) => setNewRoomDevices(Number(e.target.value))}
+                      onChange={(e) => setNewRoomDevices(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                      placeholder="e.g. 40"
                       className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none text-zinc-800 dark:text-zinc-100 focus:ring-1 focus:ring-emerald-500 font-bold"
                       required
                     />
@@ -7154,18 +7384,39 @@ export default function DashboardAdmin({
                 </div>
 
                 <div className="space-y-1 text-left">
-                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Building Cluster (MSU Main)</label>
-                  <select
-                    value={newRoomBuildingCluster}
-                    onChange={(e) => setNewRoomBuildingCluster(e.target.value)}
-                    className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-zinc-800 dark:text-zinc-100"
-                  >
-                    {BUILDING_CLUSTERS.map(cluster => (
-                      <option key={cluster} value={cluster} className="bg-white dark:bg-zinc-950">
-                        {cluster}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Building / College (MSU Main)</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingCustomBuildingInline(!isAddingCustomBuildingInline)}
+                      className="text-[9px] text-emerald-500 hover:text-emerald-400 font-bold cursor-pointer"
+                    >
+                      {isAddingCustomBuildingInline ? 'Choose Existing' : '+ Type New Building'}
+                    </button>
+                  </div>
+                  {isAddingCustomBuildingInline || activeBuildingClusters.length === 0 ? (
+                    <input 
+                      type="text" 
+                      placeholder="e.g. College of Information and Computing Sciences, Science Complex..." 
+                      value={inlineNewBuildingName}
+                      onChange={(e) => setInlineNewBuildingName(e.target.value)}
+                      className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-zinc-800 dark:text-zinc-100"
+                      required={activeBuildingClusters.length === 0 || isAddingCustomBuildingInline}
+                    />
+                  ) : (
+                    <select
+                      value={newRoomBuildingCluster}
+                      onChange={(e) => setNewRoomBuildingCluster(e.target.value)}
+                      className="w-full text-xs p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 outline-none focus:ring-1 focus:ring-emerald-500 font-bold text-zinc-800 dark:text-zinc-100"
+                    >
+                      <option value="" disabled>Select building cluster</option>
+                      {activeBuildingClusters.map(cluster => (
+                        <option key={cluster} value={cluster} className="bg-white dark:bg-zinc-950">
+                          {cluster}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="space-y-1 text-left">
@@ -7204,6 +7455,17 @@ export default function DashboardAdmin({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Image Preview Lightbox with Save & Rotate Controls */}
+      <ImagePreviewModal
+        isOpen={!!imagePreviewData}
+        onClose={() => setImagePreviewData(null)}
+        imageUrl={imagePreviewData?.url || null}
+        title={imagePreviewData?.title}
+        subtitle={imagePreviewData?.subtitle}
+        fileName={imagePreviewData?.fileName}
+        readAloudEnabled={accessibility.readAloud}
+      />
 
     </div>
   );

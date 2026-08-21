@@ -124,39 +124,6 @@ const safeStorage = {
 };
 
 export default function App() {
-  // Synchronously purge old cache/demo data to guarantee a fresh zero-record start
-  if (typeof window !== 'undefined' && !safeStorage.getItem('cp_fresh_wipe_v11')) {
-    safeStorage.removeItem('cp_classes');
-    safeStorage.removeItem('cp_records');
-    safeStorage.removeItem('cp_notifications');
-    safeStorage.removeItem('cp_faculty_statuses');
-    safeStorage.removeItem('classpulse_student_leaves');
-    safeStorage.removeItem('cp_enrollments');
-    safeStorage.removeItem('cp_announcements');
-    safeStorage.removeItem('classpulse_registered_users');
-    safeStorage.removeItem('classpulse_registered_admins');
-    safeStorage.removeItem('classpulse_custom_passwords');
-    safeStorage.removeItem('classpulse_password_reset_requests');
-    safeStorage.removeItem('cp_lab_rooms');
-    safeStorage.removeItem('cp_offline_queue_count');
-    safeStorage.removeItem('cp_user');
-    safeStorage.removeItem('cp_screen');
-    safeStorage.removeItem('cp_chat_messages_v2');
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('cp_') || k.startsWith('classpulse_') || k.startsWith('firebase:'))) {
-          localStorage.removeItem(k);
-        }
-      }
-    } catch (_) {}
-    safeStorage.setItem('cp_fresh_wipe_v11', 'true');
-    // Wipe all Firestore collections asynchronously
-    wipeAllFirestoreAndLocalData().catch((err) => {
-      console.warn('Wipe all data error:', err);
-    });
-  }
-
   // Global App-level Toast System
   const [toast, setToast] = React.useState<{ message: string; type: 'success' | 'warning' | 'info' | 'error' } | null>(null);
 
@@ -559,6 +526,23 @@ export default function App() {
     return [];
   });
 
+  const [buildingClusters, setBuildingClusters] = React.useState<string[]>(() => {
+    const cached = safeStorage.getItem('cp_building_clusters');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error("Error parsing cp_building_clusters:", e);
+      }
+    }
+    return []; // Starts empty so admin can add buildings/colleges manually
+  });
+
+  React.useEffect(() => {
+    safeStorage.setItem('cp_building_clusters', JSON.stringify(buildingClusters));
+  }, [buildingClusters]);
+
   const [labRooms, setLabRooms] = React.useState<LabRoom[]>(() => {
     const cached = safeStorage.getItem('cp_lab_rooms');
     if (cached) {
@@ -567,7 +551,7 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((r: LabRoom) => ({
             ...r,
-            buildingCluster: r.buildingCluster || r.building || (r.name.includes('Sci') ? 'Science & Mathematics Complex' : r.name.includes('Eng') ? 'College of Engineering Wing' : 'CICS Complex (Information & Computing Sciences)')
+            buildingCluster: r.buildingCluster || r.building || ''
           }));
         }
       } catch (e) {
@@ -577,7 +561,7 @@ export default function App() {
     return [
       {
         id: 'lab-cics-1',
-        name: 'CICS Multimedia Lab 1 (Room 201)',
+        name: 'Multimedia Lab 1 (Room 201)',
         capacity: 45,
         status: 'available',
         currentOccupancy: 0,
@@ -586,11 +570,11 @@ export default function App() {
         scannersActive: true,
         activeScannerLogs: [],
         floor: '2nd Floor',
-        buildingCluster: 'CICS Complex (Information & Computing Sciences)'
+        buildingCluster: ''
       },
       {
         id: 'lab-cics-2',
-        name: 'CICS Software Eng. Lab 2 (Room 204)',
+        name: 'Software Eng. Lab 2 (Room 204)',
         capacity: 40,
         status: 'available',
         currentOccupancy: 0,
@@ -599,24 +583,11 @@ export default function App() {
         scannersActive: true,
         activeScannerLogs: [],
         floor: '2nd Floor',
-        buildingCluster: 'CICS Complex (Information & Computing Sciences)'
-      },
-      {
-        id: 'lab-cics-3',
-        name: 'CICS Cyber Lecture Hall 101',
-        capacity: 60,
-        status: 'available',
-        currentOccupancy: 0,
-        activeClass: '',
-        devicesCount: 20,
-        scannersActive: true,
-        activeScannerLogs: [],
-        floor: '1st Floor',
-        buildingCluster: 'CICS Complex (Information & Computing Sciences)'
+        buildingCluster: ''
       },
       {
         id: 'lab-sci-1',
-        name: 'Science Complex Physics Lab A',
+        name: 'Physics & Computing Lab A',
         capacity: 35,
         status: 'available',
         currentOccupancy: 0,
@@ -625,24 +596,11 @@ export default function App() {
         scannersActive: true,
         activeScannerLogs: [],
         floor: '3rd Floor',
-        buildingCluster: 'Science & Mathematics Complex'
-      },
-      {
-        id: 'lab-sci-2',
-        name: 'Chemistry Analytical Lab 302',
-        capacity: 30,
-        status: 'available',
-        currentOccupancy: 0,
-        activeClass: '',
-        devicesCount: 15,
-        scannersActive: true,
-        activeScannerLogs: [],
-        floor: '3rd Floor',
-        buildingCluster: 'Science & Mathematics Complex'
+        buildingCluster: ''
       },
       {
         id: 'lab-eng-1',
-        name: 'Engineering Wing CAD/CAM Studio',
+        name: 'CAD/CAM Studio & Workshop',
         capacity: 50,
         status: 'available',
         currentOccupancy: 0,
@@ -651,46 +609,7 @@ export default function App() {
         scannersActive: true,
         activeScannerLogs: [],
         floor: '1st Floor',
-        buildingCluster: 'College of Engineering Wing'
-      },
-      {
-        id: 'lab-eng-2',
-        name: 'Robotics & Electronics Workshop 105',
-        capacity: 30,
-        status: 'available',
-        currentOccupancy: 0,
-        activeClass: '',
-        devicesCount: 25,
-        scannersActive: true,
-        activeScannerLogs: [],
-        floor: '1st Floor',
-        buildingCluster: 'College of Engineering Wing'
-      },
-      {
-        id: 'lab-kf-1',
-        name: 'King Faisal Islamic Studies Amphitheater',
-        capacity: 80,
-        status: 'available',
-        currentOccupancy: 0,
-        activeClass: '',
-        devicesCount: 10,
-        scannersActive: true,
-        activeScannerLogs: [],
-        floor: '1st Floor',
-        buildingCluster: 'King Faisal Center for Islamic Studies'
-      },
-      {
-        id: 'lab-lib-1',
-        name: 'University Library IT Training Center',
-        capacity: 50,
-        status: 'available',
-        currentOccupancy: 0,
-        activeClass: '',
-        devicesCount: 50,
-        scannersActive: true,
-        activeScannerLogs: [],
-        floor: '2nd Floor',
-        buildingCluster: 'University Library & IT Center'
+        buildingCluster: ''
       }
     ];
   });
@@ -2644,6 +2563,8 @@ export default function App() {
                         onAddAttendanceRecord={handleAddAttendanceRecord}
                         labRooms={labRooms}
                         onUpdateLabRooms={handleUpdateLabRooms}
+                        buildingClusters={buildingClusters}
+                        onUpdateBuildingClusters={setBuildingClusters}
                       />
                     )}
 
@@ -2669,6 +2590,8 @@ export default function App() {
                         onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
                         labRooms={labRooms}
                         onUpdateLabRooms={handleUpdateLabRooms}
+                        buildingClusters={buildingClusters}
+                        onUpdateBuildingClusters={setBuildingClusters}
                         excuseLetters={excuseLetters}
                         onUpdateExcuseStatus={handleUpdateExcuseStatus}
                         onResetSystem={handleResetSystem}

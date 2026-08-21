@@ -1,15 +1,7 @@
 // MSU Main Campus Marawi City Institutional Helpers & Constants
 
-export const BUILDING_CLUSTERS = [
-  'CICS Complex (Information & Computing Sciences)',
-  'Science & Mathematics Complex',
-  'College of Engineering Wing',
-  'King Faisal Center for Islamic Studies',
-  'College of Education',
-  'University Library & IT Center',
-  'Social Hall & University Convocations',
-  'College of Business Administration & Accountancy'
-];
+// Default building clusters list starts empty so admin can manually add custom buildings & colleges
+export const BUILDING_CLUSTERS: string[] = [];
 
 export const EXCUSE_PRESET_TYPES = [
   'MSU University Infirmary Medical Slip',

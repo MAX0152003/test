@@ -17,6 +17,7 @@ import {
 import { speakText } from './AccessibilitySettings';
 import { motion, AnimatePresence } from 'motion/react';
 import { listenToMessages, saveMessageToFirestore } from '../lib/firestoreSync';
+import { ImagePreviewModal } from './ImagePreviewModal';
 
 interface MessagesProps {
   userProfile: UserProfile;
@@ -155,6 +156,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   const [activeContactId, setActiveContactId] = useState<string>('');
   const [inputText, setInputText] = useState('');
   const [userSearchText, setUserSearchText] = useState('');
+  const [imagePreviewData, setImagePreviewData] = useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
   const [isPeerTyping] = useState(false);
   const [typingPeerName] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1292,13 +1294,26 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
                           {/* Image Attachment wrapper */}
                           {m.attachmentImg && (
-                            <div className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 max-w-xs bg-zinc-100 dark:bg-zinc-900 group">
+                            <div 
+                              onClick={() => setImagePreviewData({
+                                url: m.attachmentImg!,
+                                title: `Image Attachment`,
+                                subtitle: `From ${m.senderName || 'Sender'} • ${m.timestamp || 'Chat'}`,
+                                fileName: `chat_image_${m.id || Date.now()}.png`
+                              })}
+                              className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 max-w-xs bg-zinc-100 dark:bg-zinc-900 group cursor-pointer shadow-sm hover:ring-2 hover:ring-emerald-500/50 transition-all"
+                            >
                               <img 
                                 src={m.attachmentImg} 
                                 alt="Attachment" 
-                                className="object-cover w-full max-h-48 transition-transform duration-300 hover:scale-105"
+                                className="object-cover w-full max-h-48 transition-transform duration-300 group-hover:scale-105"
                                 referrerPolicy="no-referrer"
                               />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-2 backdrop-blur-[2px]">
+                                <span className="px-2.5 py-1.5 rounded-lg bg-zinc-900/90 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg border border-zinc-700">
+                                  <Download className="w-3.5 h-3.5 text-emerald-400" /> View & Save
+                                </span>
+                              </div>
                             </div>
                           )}
 
@@ -1892,6 +1907,16 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
           {userProfile.role === 'admin' && mode === 'tickets' ? renderAdminChatArea() : renderChatArea()}
         </>
       )}
+      {/* Image Attachment Lightbox with Save Button */}
+      <ImagePreviewModal
+        isOpen={!!imagePreviewData}
+        onClose={() => setImagePreviewData(null)}
+        imageUrl={imagePreviewData?.url || null}
+        title={imagePreviewData?.title}
+        subtitle={imagePreviewData?.subtitle}
+        fileName={imagePreviewData?.fileName}
+        readAloudEnabled={accessibility.readAloud}
+      />
     </div>
   );
 }

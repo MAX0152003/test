@@ -13,6 +13,7 @@ import {
   DispatchedWarningEmail
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
+import { ImagePreviewModal } from './ImagePreviewModal';
 import { 
   Plus, 
   QrCode, 
@@ -45,7 +46,13 @@ import {
   Camera,
   UploadCloud,
   Settings,
-  CheckSquare
+  CheckSquare,
+  Timer,
+  Zap,
+  Play,
+  Square,
+  RotateCcw,
+  ChevronRight
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock from './AlarmClock';
@@ -56,7 +63,6 @@ import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import FacultyAttendanceTrendsChart from './FacultyAttendanceTrendsChart';
 import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
 import { 
-  BUILDING_CLUSTERS, 
   ACADEMIC_TERMS, 
   GRACE_PERIOD_OPTIONS, 
   DEFAULT_GRACE_PERIOD_MINUTES,
@@ -89,6 +95,8 @@ interface DashboardFacultyProps {
   onAddAttendanceRecord?: (record: Omit<AttendanceRecord, 'id'>) => void;
   labRooms?: LabRoom[];
   onUpdateLabRooms?: (rooms: LabRoom[]) => void;
+  buildingClusters?: string[];
+  onUpdateBuildingClusters?: (clusters: string[]) => void;
   selectedChatContact?: { id: string; name?: string; ts?: number };
 }
 
@@ -180,6 +188,127 @@ const checkDaysOverlapVal = (daysA: string[], daysB: string[]): boolean => {
   return expandedA.some(day => expandedB.includes(day));
 };
 
+export interface ScheduledClassProximity {
+  activeOrNearClass: ClassSession | null;
+  status: 'active_now' | 'starting_soon' | 'upcoming_later' | 'no_classes_today' | 'no_classes_scheduled';
+  minutesUntilStart: number | null;
+  nextUpcomingClass: ClassSession | null;
+  nextDayLabel?: string;
+}
+
+export const getFacultyClassScheduleProximity = (
+  classesList: ClassSession[], 
+  facultyId?: string, 
+  facultyName?: string,
+  thresholdMinutesBefore: number = 45
+): ScheduledClassProximity => {
+  if (!classesList || classesList.length === 0) {
+    return {
+      activeOrNearClass: null,
+      status: 'no_classes_scheduled',
+      minutesUntilStart: null,
+      nextUpcomingClass: null,
+    };
+  }
+
+  const facultyClasses = classesList.filter(c => {
+    if (!facultyId && !facultyName) return true;
+    if (facultyId && c.facultyId && c.facultyId === facultyId) return true;
+    if (facultyName && c.facultyName && c.facultyName.toLowerCase() === facultyName.toLowerCase()) return true;
+    return true; // fallback to include curriculum classes
+  });
+
+  const targetList = facultyClasses.length > 0 ? facultyClasses : classesList;
+
+  const now = new Date();
+  const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const currentDayIndex = now.getDay();
+  const todayLabel = dayLabels[currentDayIndex];
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Classes scheduled for today
+  const todayClasses = targetList.filter(c => {
+    const expanded = expandDaysToSpecificOnesVal(c.days);
+    return expanded.includes(todayLabel);
+  });
+
+  if (todayClasses.length > 0) {
+    // 1. Check if any class is ongoing right now
+    const ongoingClass = todayClasses.find(c => {
+      const startMins = parseTimeToMinutesVal(c.startTime);
+      const endMins = parseTimeToMinutesVal(c.endTime) || (startMins + 90);
+      return currentMinutes >= startMins && currentMinutes <= endMins;
+    });
+
+    if (ongoingClass) {
+      return {
+        activeOrNearClass: ongoingClass,
+        status: 'active_now',
+        minutesUntilStart: 0,
+        nextUpcomingClass: ongoingClass,
+      };
+    }
+
+    // 2. Check if any class is starting soon (within thresholdMinutesBefore)
+    const upcomingToday = todayClasses
+      .map(c => {
+        const startMins = parseTimeToMinutesVal(c.startTime);
+        const diff = startMins - currentMinutes;
+        return { classSession: c, diff };
+      })
+      .filter(item => item.diff > 0)
+      .sort((a, b) => a.diff - b.diff);
+
+    if (upcomingToday.length > 0) {
+      const nextClassItem = upcomingToday[0];
+      if (nextClassItem.diff <= thresholdMinutesBefore) {
+        return {
+          activeOrNearClass: nextClassItem.classSession,
+          status: 'starting_soon',
+          minutesUntilStart: nextClassItem.diff,
+          nextUpcomingClass: nextClassItem.classSession,
+        };
+      } else {
+        return {
+          activeOrNearClass: null,
+          status: 'upcoming_later',
+          minutesUntilStart: nextClassItem.diff,
+          nextUpcomingClass: nextClassItem.classSession,
+        };
+      }
+    }
+  }
+
+  // Find next upcoming class across future days
+  let nextUpcoming: ClassSession | null = null;
+  let nextDayStr = '';
+  for (let offset = 1; offset <= 7; offset++) {
+    const checkDayIndex = (currentDayIndex + offset) % 7;
+    const checkDayLabel = dayLabels[checkDayIndex];
+    const matching = targetList.filter(c => expandDaysToSpecificOnesVal(c.days).includes(checkDayLabel));
+    if (matching.length > 0) {
+      nextUpcoming = matching[0];
+      nextDayStr = checkDayLabel.toUpperCase();
+      break;
+    }
+  }
+
+  return {
+    activeOrNearClass: null,
+    status: todayClasses.length === 0 ? 'no_classes_today' : 'upcoming_later',
+    minutesUntilStart: null,
+    nextUpcomingClass: nextUpcoming || targetList[0] || null,
+    nextDayLabel: nextDayStr,
+  };
+};
+
+export const formatSecondsToMMSS = (totalSeconds: number): string => {
+  const safeSec = Math.max(0, Math.floor(totalSeconds));
+  const mins = Math.floor(safeSec / 60);
+  const secs = safeSec % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 export default function DashboardFaculty({
   activeScreen,
   setScreen,
@@ -205,7 +334,9 @@ export default function DashboardFaculty({
   onUpdateAttendanceRecord,
   onAddAttendanceRecord,
   labRooms = [],
-  onUpdateLabRooms
+  onUpdateLabRooms,
+  buildingClusters = [],
+  onUpdateBuildingClusters
 }: DashboardFacultyProps) {
   
   // Faculty selected lab room monitor state
@@ -222,6 +353,7 @@ export default function DashboardFaculty({
 
   // Excuse filter: 'pending' | 'valid' | 'invalid'
   const [excuseFilter, setExcuseFilter] = React.useState<'pending' | 'valid' | 'invalid'>('pending');
+  const [imagePreviewData, setImagePreviewData] = React.useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
 
   // Fast Class Search & Student Search states
   const [classSearchQuery, setClassSearchQuery] = React.useState('');
@@ -231,8 +363,12 @@ export default function DashboardFaculty({
     localStorage.setItem('classpulse_faculty_bulletins_hidden', String(isBulletinsHidden));
   }, [isBulletinsHidden]);
 
-  // Timer for QR code attendance simulation
-  const [timeLeft, setTimeLeft] = React.useState(300); // 5 minutes standard
+  // Customizable QR code duration and countdown state
+  const [qrDurationMinutes, setQrDurationMinutes] = React.useState<number>(15); // Default 15 minutes
+  const [customMinutesInput, setCustomMinutesInput] = React.useState<string>('15');
+  const [isCustomDurationOpen, setIsCustomDurationOpen] = React.useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = React.useState<number>(0); // Starts only when Generate is clicked
+  const [totalSessionDurationSeconds, setTotalSessionDurationSeconds] = React.useState<number>(900); // 15 mins in sec
   const [activeQRClass, setActiveQRClass] = React.useState<string>(() => {
     const now = new Date();
     const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -243,8 +379,12 @@ export default function DashboardFaculty({
     }) || classes[0];
     return matched?.id || '';
   });
-  const [qrToken, setQrToken] = React.useState('QR_KEY_' + Math.random().toString(36).substring(4, 10).toUpperCase());
+  const [qrToken, setQrToken] = React.useState<string>('STANDBY'); // Default STANDBY until Generate is clicked
   const [qrIntervalId, setQrIntervalId] = React.useState<any>(null);
+  
+  // Manual class override state when no scheduled class is active/near
+  const [isManualOverrideActive, setIsManualOverrideActive] = React.useState<boolean>(false);
+  const [manualOverrideClassId, setManualOverrideClassId] = React.useState<string>('');
 
   // Subject Monitoring active ID state
   const [selectedMonitoringClassId, setSelectedMonitoringClassId] = React.useState<string>(classes[0]?.id || '');
@@ -622,6 +762,18 @@ export default function DashboardFaculty({
   const [deleteConfirmClass, setDeleteConfirmClass] = React.useState<{ id: string; code: string } | null>(null);
   const [conflictConfirmData, setConflictConfirmData] = React.useState<{ action: () => void } | null>(null);
 
+  const activeBuildingClusters = React.useMemo(() => {
+    const list: string[] = [];
+    (buildingClusters || []).forEach(c => {
+      if (c && !list.includes(c)) list.push(c);
+    });
+    (labRooms || []).forEach(r => {
+      const b = r.buildingCluster || r.building;
+      if (b && !list.includes(b)) list.push(b);
+    });
+    return list;
+  }, [buildingClusters, labRooms]);
+
   const [formCode, setFormCode] = React.useState('');
   const [formName, setFormName] = React.useState('');
   const [formStart, setFormStart] = React.useState('09:00 AM');
@@ -630,7 +782,7 @@ export default function DashboardFaculty({
   const [formDays, setFormDays] = React.useState<string[]>(['MW']);
   const [formGracePeriod, setFormGracePeriod] = React.useState<number>(DEFAULT_GRACE_PERIOD_MINUTES);
   const [formAcademicTerm, setFormAcademicTerm] = React.useState<string>(ACADEMIC_TERMS[0]);
-  const [formBuildingCluster, setFormBuildingCluster] = React.useState<string>(BUILDING_CLUSTERS[0]);
+  const [formBuildingCluster, setFormBuildingCluster] = React.useState<string>('');
 
   // Profiles edit states
   const [profileName, setProfileName] = React.useState(userProfile.name);
@@ -725,6 +877,11 @@ export default function DashboardFaculty({
     setProfileAvatar(userProfile.avatar);
   }, [userProfile]);
 
+  // Proximity to scheduled class detection
+  const proximityInfo = React.useMemo(() => {
+    return getFacultyClassScheduleProximity(classes, userProfile?.id, userProfile?.name, 45);
+  }, [classes, userProfile]);
+
   // Interval timer for the broadcasted QR expiration count and automatic 15-sec rotation (Real-Time QR Codes!)
   React.useEffect(() => {
     let interval: any = null;
@@ -736,29 +893,25 @@ export default function DashboardFaculty({
         setTimeLeft(prev => {
           if (prev <= 1) {
             setQrToken('EXPIRED');
-            speakText("Broadcast session expired.", accessibility.readAloud);
+            speakText("Broadcast attendance session has expired.", accessibility.readAloud);
             return 0;
           }
           return prev - 1;
         });
       }, 1000);
 
-      // 2. Dynamic Real-time Token Rotation (rotates every 15 seconds to ensure robust, secure scanning)
+      // 2. Dynamic Real-time Token Rotation (rotates every 15 seconds to ensure robust, secure anti-proxy scanning)
       rotationInterval = setInterval(() => {
-        const now = new Date();
-        const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-        const todayLabel = dayLabels[now.getDay()];
-        const activeMatch = classes.find(c => {
-          const expanded = expandDaysToSpecificOnesVal(c.days);
-          return expanded.includes(todayLabel);
-        }) || classes.find(c => c.id === activeQRClass) || classes[0];
+        const targetClass = (isManualOverrideActive && manualOverrideClassId 
+          ? classes.find(c => c.id === manualOverrideClassId) 
+          : proximityInfo.activeOrNearClass) || classes.find(c => c.id === activeQRClass) || classes[0];
         
-        if (activeMatch) {
-          const generatedKey = 'CODE_' + activeMatch.code.toUpperCase() + '_' + Math.random().toString(36).substring(4, 9).toUpperCase();
+        if (targetClass) {
+          const generatedKey = 'CODE_' + targetClass.code.toUpperCase() + '_' + Math.random().toString(36).substring(4, 9).toUpperCase();
           
           // Propagate fresh security key rotation to parent class state
           onEditClass({
-            ...activeMatch,
+            ...targetClass,
             qrToken: generatedKey,
             qrGeneratedAt: Date.now()
           });
@@ -771,13 +924,66 @@ export default function DashboardFaculty({
       if (interval) clearInterval(interval);
       if (rotationInterval) clearInterval(rotationInterval);
     };
-  }, [activeScreen, timeLeft, qrToken, activeQRClass]);
+  }, [activeScreen, timeLeft, qrToken, activeQRClass, isManualOverrideActive, manualOverrideClassId, proximityInfo, classes]);
 
-  const handleCreateNewQrToken = () => {
-    setQrToken('QR_KEY_' + Math.random().toString(36).substring(4, 10).toUpperCase());
-    setTimeLeft(300); // Reset countdown timer
+  const handleStartQrSession = (targetClass: ClassSession) => {
+    if (!targetClass) return;
+
+    // Enforce "single generation per subject today"
+    if (targetClass.qrGeneratedAt) {
+      const lastGenDate = new Date(targetClass.qrGeneratedAt).toDateString();
+      const todayDate = new Date().toDateString();
+      if (lastGenDate === todayDate) {
+        if (typeof window !== 'undefined' && (window as any).showToast) {
+          (window as any).showToast(`QR session already generated once for ${targetClass?.code} today! Policy restricts to single generation daily.`, "error");
+        } else {
+          alert(`🚫 QR session has already been generated once for ${targetClass?.code} today! In compliance with class policy rules, you can only generate a QR session code one time.`);
+        }
+        speakText(`Attendance session already generated today for ${targetClass.code}`, accessibility.readAloud);
+        return;
+      }
+    }
+
+    const durationSeconds = Math.max(60, qrDurationMinutes * 60);
+    const generatedKey = 'CODE_' + targetClass.code.toUpperCase() + '_' + Math.random().toString(36).substring(4, 9).toUpperCase();
+    
+    // Propagate to App parent state
+    onEditClass({
+      ...targetClass,
+      qrToken: generatedKey,
+      qrGeneratedAt: Date.now()
+    });
+
+    setActiveQRClass(targetClass.id);
+    setQrToken(generatedKey);
+    setTimeLeft(durationSeconds);
+    setTotalSessionDurationSeconds(durationSeconds);
     onChangeFacultyStatus('in-class');
-    speakText("New attendance QR key generated. Status automatically set to In Class.", accessibility.readAloud);
+
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`Active Attendance QR Session started for ${targetClass.code} (${qrDurationMinutes} mins)!`, "success");
+    }
+    speakText(`Started ${qrDurationMinutes} minute QR attendance session for ${targetClass.name}. Status switched to In Class.`, accessibility.readAloud);
+  };
+
+  const handleStopQrSession = (targetClass: ClassSession) => {
+    setTimeLeft(0);
+    setQrToken('EXPIRED');
+    onChangeFacultyStatus('available');
+    speakText("Attendance QR session ended.", accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`QR session ended for ${targetClass.code}.`, "info");
+    }
+  };
+
+  const handleExtendQrSession = (extraMinutes = 5) => {
+    const extraSec = extraMinutes * 60;
+    setTimeLeft(prev => prev + extraSec);
+    setTotalSessionDurationSeconds(prev => prev + extraSec);
+    speakText(`Extended session time by ${extraMinutes} minutes.`, accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`Extended session by +${extraMinutes} minutes!`, "info");
+    }
   };
 
   const handleOpenEditForm = (cls: ClassSession) => {
@@ -790,7 +996,7 @@ export default function DashboardFaculty({
     setFormDays(cls.days);
     setFormGracePeriod(cls.gracePeriodMinutes ?? DEFAULT_GRACE_PERIOD_MINUTES);
     setFormAcademicTerm(cls.academicTerm ?? ACADEMIC_TERMS[0]);
-    setFormBuildingCluster(cls.buildingCluster ?? BUILDING_CLUSTERS[0]);
+    setFormBuildingCluster(cls.buildingCluster ?? activeBuildingClusters[0] ?? '');
     setIsFormOpen(true);
     speakText(`Editing class form for ${cls.name}`, accessibility.readAloud);
 
@@ -813,7 +1019,7 @@ export default function DashboardFaculty({
     setFormDays(['MW']);
     setFormGracePeriod(DEFAULT_GRACE_PERIOD_MINUTES);
     setFormAcademicTerm(ACADEMIC_TERMS[0]);
-    setFormBuildingCluster(BUILDING_CLUSTERS[0]);
+    setFormBuildingCluster(activeBuildingClusters[0] ?? '');
     setIsFormOpen(true);
     speakText("Opening add class schedule form", accessibility.readAloud);
 
@@ -1408,20 +1614,43 @@ export default function DashboardFaculty({
             <div className="lg:col-span-4 space-y-4">
               <AlarmClock readAloudEnabled={accessibility.readAloud} />
               
-              <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 text-left">
-                <h4 className="text-xs font-black text-zinc-805 dark:text-zinc-200 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                  <UserCheck className="w-4 h-4 text-emerald-500" />
-                  Direct QR Code Broadcasts
-                </h4>
-                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal mb-3">
-                  Open the QR generation pane to cast a secure attendance token. Students can scans dynamically to enroll.
+              <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 text-left space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-emerald-500" />
+                    Direct QR Attendance
+                  </h4>
+                  {proximityInfo.status === 'active_now' ? (
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full animate-pulse border border-emerald-500/30">
+                      In Class
+                    </span>
+                  ) : proximityInfo.status === 'starting_soon' ? (
+                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      Starting Soon
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono font-bold text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                      Standby
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal">
+                  {proximityInfo.activeOrNearClass ? (
+                    <>Active subject: <strong className="text-zinc-700 dark:text-zinc-200">{proximityInfo.activeOrNearClass.code}</strong> ({proximityInfo.activeOrNearClass.startTime} • Room {proximityInfo.activeOrNearClass.room})</>
+                  ) : proximityInfo.nextUpcomingClass ? (
+                    <>Next subject: <strong className="text-zinc-700 dark:text-zinc-200">{proximityInfo.nextUpcomingClass.code}</strong> {proximityInfo.nextDayLabel ? `on ${proximityInfo.nextDayLabel}` : `at ${proximityInfo.nextUpcomingClass.startTime}`}</>
+                  ) : (
+                    <>Open QR generation pane to configure a custom attendance token session.</>
+                  )}
                 </p>
+
                 <button
                   onClick={() => setScreen('qr-generator')}
                   type="button"
-                  className="w-full text-center py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl cursor-pointer transition-all active:scale-95"
+                  className="w-full text-center py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl cursor-pointer transition-all active:scale-95 shadow-xs"
                 >
-                  Open QR Generator
+                  {proximityInfo.activeOrNearClass ? 'Open Live QR Broadcast' : 'Open QR Generator'}
                 </button>
               </div>
 
@@ -1771,16 +2000,27 @@ export default function DashboardFaculty({
                         </select>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Building Cluster</label>
-                        <select
-                          value={formBuildingCluster}
-                          onChange={(e) => setFormBuildingCluster(e.target.value)}
-                          className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-medium"
-                        >
-                          {BUILDING_CLUSTERS.map(cluster => (
-                            <option key={cluster} value={cluster}>{cluster}</option>
-                          ))}
-                        </select>
+                        <label className="block text-xs font-bold text-zinc-455 dark:text-zinc-400 uppercase tracking-widest">Building / College</label>
+                        {activeBuildingClusters.length > 0 ? (
+                          <select
+                            value={formBuildingCluster}
+                            onChange={(e) => setFormBuildingCluster(e.target.value)}
+                            className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-medium"
+                          >
+                            <option value="">Unassigned / Standalone</option>
+                            {activeBuildingClusters.map(cluster => (
+                              <option key={cluster} value={cluster}>{cluster}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="e.g. CICS Complex or College of Engineering"
+                            value={formBuildingCluster}
+                            onChange={(e) => setFormBuildingCluster(e.target.value)}
+                            className="w-full text-xs p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-medium"
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -1883,206 +2123,450 @@ export default function DashboardFaculty({
                 onClick={() => setScreen('dashboard')} 
                 type="button"
                 className="flex items-center justify-center w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-350 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-zinc-50 dark:hover:bg-zinc-850 cursor-pointer transition-all active:scale-95 shadow-sm shrink-0 select-none mt-0.5"
-                title="Back"
+                title="Back to Dashboard"
               >
                 <ArrowLeft className="w-4 h-4 text-emerald-500" />
               </button>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
-                  <QrCode className="w-5.5 h-5.5 text-blue-600" />
-                  Dynamic Single-Use Attendance QR Generator
-                </h2>
-                <p className="text-xs text-zinc-400 mt-1">Generate real-time credentials or configure dynamic visual scan codes.</p>
-              </div>
-            </div>
-
-            {/* Auto-Detected Class Display */}
-            {(() => {
-              const matchedActive = classes.find(c => c.id === activeQRClass) || classes[0];
-              if (!matchedActive) return null;
-              
-              return (
-                <div className="mb-5 p-4.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 w-full border border-zinc-200 dark:border-zinc-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left">
-                  <div className="space-y-1">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-md font-bold">Auto-Detected Class</span>
-                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 pt-1">
-                      {matchedActive.code}: {matchedActive.name}
-                    </h3>
-                    <p className="text-[11px] text-zinc-400">Scheduled {matchedActive.startTime} • {matchedActive.room} ({matchedActive.days})</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-mono px-3 py-1 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-extrabold rounded-lg tracking-wide uppercase font-black">
-                      SYSTEM MATCHED
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
+                    <QrCode className="w-5.5 h-5.5 text-blue-600 dark:text-blue-400" />
+                    Dynamic Attendance QR Generator
+                  </h2>
+                  {proximityInfo.status === 'active_now' && (
+                    <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider rounded-md border border-emerald-500/30 animate-pulse">
+                      In Session
                     </span>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="space-y-4">
-
-              {/* QR Code matrix box representation */}
-              <div className="p-4 border border-zinc-200 dark:border-zinc-850 rounded-2xl flex flex-col items-center justify-center space-y-4 relative bg-zinc-50 dark:bg-zinc-950/30">
-                <div className="p-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg shadow-xs border border-zinc-200 dark:border-zinc-800">
-                  {qrToken && qrToken !== 'STANDBY' && qrToken !== 'EXPIRED' ? (
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=2&data=${encodeURIComponent(JSON.stringify({ classId: activeQRClass, qrToken: qrToken }))}`}
-                      alt="ClassPulse Active Session QR Code"
-                      className="w-40 h-40 rounded object-contain filter brightness-[0.92] contrast-125 dark:brightness-[0.78] dark:contrast-[1.10]"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-40 h-40 bg-zinc-150 dark:bg-zinc-900 flex flex-wrap p-2 rounded relative border border-zinc-200 dark:border-zinc-850 items-center justify-center">
-                      <div className="absolute inset-0 border border-emerald-500/20 rounded animate-pulse" />
-                      {/* Fake microcode block matrix grids */}
-                      <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute top-2 left-2" />
-                      <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute top-2 right-2" />
-                      <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute bottom-2 left-2" />
-                      <div className="absolute inset-8 border border-zinc-400 dark:border-zinc-650 flex items-center justify-center text-zinc-500 font-mono text-[9px] font-black uppercase text-center">
-                        STANDBY GENERATOR
-                      </div>
-                    </div>
+                  )}
+                  {proximityInfo.status === 'starting_soon' && (
+                    <span className="px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider rounded-md border border-amber-500/30">
+                      Starting Soon
+                    </span>
                   )}
                 </div>
-
-                <div className="text-center space-y-1">
-                  <span className="text-xs font-mono font-black tracking-widest px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-lg">
-                    {qrToken === 'STANDBY' ? 'READY - CLICK GENERATE' : qrToken}
-                  </span>
-                  
-                  {qrToken !== 'STANDBY' && qrToken !== 'EXPIRED' && (
-                    <div className="space-y-2">
-                      <div className="text-[11px] text-zinc-450 dark:text-zinc-400 font-semibold mt-3 flex items-center justify-center gap-1 bg-zinc-100 dark:bg-zinc-900 px-3 py-1 rounded-full border border-zinc-250 dark:border-zinc-850">
-                        <Clock className="w-3.5 h-3.5 text-blue-500 animate-[spin_4s_linear_infinite]" />
-                        Class Session Expires in: <span className="font-mono text-blue-500 dark:text-blue-400 font-black ml-1 text-xs">{timeLeft}s (30m countdown)</span>
-                      </div>
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const canvas = document.createElement('canvas');
-                          canvas.width = 350;
-                          canvas.height = 350;
-                          const ctx = canvas.getContext('2d');
-                          if (!ctx) return;
-                          
-                          ctx.fillStyle = '#0a0a0a';
-                          ctx.fillRect(0, 0, 350, 350);
-                          
-                          ctx.strokeStyle = '#10b981';
-                          ctx.lineWidth = 12;
-                          ctx.strokeRect(20, 20, 310, 310);
-                          
-                          ctx.fillStyle = '#ffffff';
-                          ctx.font = 'bold 16px "Inter", sans-serif';
-                          ctx.textAlign = 'center';
-                          ctx.fillText('CLASSPULSE OFFLINE PASS', 175, 55);
-                          
-                          ctx.fillStyle = '#10b981';
-                          ctx.font = '12px "JetBrains Mono", monospace';
-                          ctx.fillText(qrToken, 175, 305);
-                          
-                          const drawFinder = (cx: number, cy: number) => {
-                            ctx.fillStyle = '#10b981';
-                            ctx.fillRect(cx, cy, 32, 32);
-                            ctx.fillStyle = '#0a0a0a';
-                            ctx.fillRect(cx + 4, cy + 4, 24, 24);
-                            ctx.fillStyle = '#10b981';
-                            ctx.fillRect(cx + 8, cy + 8, 16, 16);
-                          };
-                          
-                          drawFinder(85, 85);
-                          drawFinder(85 + 180 - 32, 85);
-                          drawFinder(85, 85 + 180 - 32);
-                          
-                          ctx.fillStyle = '#ffffff';
-                          let seed = 0;
-                          for (let i = 0; i < qrToken.length; i++) {
-                            seed += qrToken.charCodeAt(i);
-                          }
-                          const cols = 21;
-                          const dot = 180 / cols;
-                          for (let r = 0; r < cols; r++) {
-                            for (let c = 0; c < cols; c++) {
-                              if ((r < 6 && c < 6) || (r < 6 && c > cols - 7) || (r > cols - 7 && c < 6)) {
-                                continue;
-                              }
-                              const val = Math.sin(r * 45.3 + c * 89.1 + seed);
-                              if (val > -0.15) {
-                                ctx.fillRect(85 + c * dot, 85 + r * dot, dot - 1, dot - 1);
-                              }
-                            }
-                          }
-                          
-                          const link = document.createElement('a');
-                          link.download = `ClassPulse_${qrToken}_offline.png`;
-                          link.href = canvas.toDataURL('image/png');
-                          link.click();
-                          speakText("Class token QR code exported as offline image file successfully.", accessibility.readAloud);
-                        }}
-                        className="py-1 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:text-emerald-500 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer w-full"
-                      >
-                        📥 Export / Download Offline QR Code
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Rules and Limits warning card */}
-              <div className="p-3.5 rounded-xl bg-orange-500/5 border border-orange-500/10 text-[10px] text-zinc-500 leading-relaxed font-semibold text-left">
-                ⚠️ <strong>Single-Use Security Enforcement:</strong> This system applies strict rules. Each subject can only generate ONE QR session code per day. Students scanning within the first 10 minutes are recorded as <strong>Present</strong>. Scans from 10 to 30 minutes are marked as <strong>Late</strong>. Beyond 30 minutes, the session key expires automatically.
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={() => {
-                    const now = new Date();
-                    const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-                    const todayLabel = dayLabels[now.getDay()];
-                    const activeMatch = classes.find(c => {
-                      const expanded = expandDaysToSpecificOnesVal(c.days);
-                      return expanded.includes(todayLabel);
-                    }) || classes.find(c => c.id === activeQRClass) || classes[0];
-                    
-                    if (!activeMatch) return;
-
-                    // Enforce "it can only generate one time in every subject today"
-                    if (activeMatch.qrGeneratedAt) {
-                      const lastGenDate = new Date(activeMatch.qrGeneratedAt).toDateString();
-                      const todayDate = new Date().toDateString();
-                      if (lastGenDate === todayDate) {
-                        if (typeof window !== 'undefined' && (window as any).showToast) {
-                          (window as any).showToast(`QR session already generated once for ${activeMatch?.code} today! Policy restricts to single generation daily.`, "error");
-                        } else {
-                          alert(`🚫 QR session has already been generated once for ${activeMatch?.code} today! In compliance with class policy rules, you can only generate a QR session code one time.`);
-                        }
-                        speakText(`Registration is already occupied for today`, accessibility.readAloud);
-                        return;
-                      }
-                    }
-
-                    const generatedKey = 'CODE_' + activeMatch.code.toUpperCase() + '_' + Math.random().toString(36).substring(4, 9).toUpperCase();
-                    
-                    // Propagate to App parent state
-                    onEditClass({
-                      ...activeMatch,
-                      qrToken: generatedKey,
-                      qrGeneratedAt: Date.now()
-                    });
-
-                    setQrToken(generatedKey);
-                    setTimeLeft(1800); // 30 minutes countdown (1800 seconds!)
-                    onChangeFacultyStatus('in-class');
-                    speakText(`Successfully initialized 30 minute QR session code for ${activeMatch.name}. Status automatically switched to In Class.`, accessibility.readAloud);
-                  }}
-                  type="button"
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95 shadow-md shadow-blue-500/10 text-center"
-                >
-                  Generate 30-Min Session Code
-                </button>
+                <p className="text-xs text-zinc-400 mt-0.5">Customizable broadcast session with auto-rotating security keys and real-time scanning.</p>
               </div>
             </div>
+
+            {/* CONDITIONAL DISPLAY: When no class is approaching and not in manual override */}
+            {!proximityInfo.activeOrNearClass && !isManualOverrideActive ? (
+              <div className="p-8 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-center space-y-6 max-w-xl mx-auto my-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl shadow-xs">
+                  <Clock className="w-8 h-8 animate-pulse" />
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full font-mono">
+                    STANDBY MODE
+                  </span>
+                  <h3 className="text-base font-black text-zinc-900 dark:text-zinc-100">
+                    No Scheduled Class Approaching
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-md mx-auto">
+                    The Dynamic QR Attendance Generator automatically activates when your scheduled subject window is near (within 45 minutes of class start).
+                  </p>
+                </div>
+
+                {/* Upcoming class preview if available */}
+                {proximityInfo.nextUpcomingClass && (
+                  <div className="p-4 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-left space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded">
+                        Next Scheduled Subject
+                      </span>
+                      {proximityInfo.minutesUntilStart !== null && proximityInfo.minutesUntilStart > 0 ? (
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                          Starts in {Math.floor(proximityInfo.minutesUntilStart / 60)}h {proximityInfo.minutesUntilStart % 60}m
+                        </span>
+                      ) : proximityInfo.nextDayLabel ? (
+                        <span className="text-[10px] font-bold text-zinc-400">
+                          Scheduled on {proximityInfo.nextDayLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="pt-1">
+                      <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100">
+                        {proximityInfo.nextUpcomingClass.code}: {proximityInfo.nextUpcomingClass.name}
+                      </h4>
+                      <p className="text-xs text-zinc-400">
+                        {proximityInfo.nextUpcomingClass.startTime} - {proximityInfo.nextUpcomingClass.endTime || 'End'} • Room {proximityInfo.nextUpcomingClass.room} ({proximityInfo.nextUpcomingClass.days})
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Advance override action */}
+                <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualOverrideActive(true);
+                      if (!manualOverrideClassId) {
+                        setManualOverrideClassId(proximityInfo.nextUpcomingClass?.id || classes[0]?.id || '');
+                      }
+                      speakText("Manual session setup activated. Choose any subject to start a custom attendance session.", accessibility.readAloud);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 transition-all cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-blue-500" />
+                    Early Session Setup / Manual Class Selector
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ACTIVE OR OVERRIDE QR GENERATOR VIEW */
+              (() => {
+                const targetSubject = (isManualOverrideActive && manualOverrideClassId 
+                  ? classes.find(c => c.id === manualOverrideClassId) 
+                  : proximityInfo.activeOrNearClass) || classes.find(c => c.id === activeQRClass) || classes[0];
+
+                if (!targetSubject) return null;
+
+                const isOngoing = proximityInfo.status === 'active_now';
+                const isSessionRunning = timeLeft > 0 && qrToken !== 'STANDBY' && qrToken !== 'EXPIRED';
+                const isSessionExpired = qrToken === 'EXPIRED';
+                const progressPercent = totalSessionDurationSeconds > 0 
+                  ? Math.max(0, Math.min(100, Math.round((timeLeft / totalSessionDurationSeconds) * 100))) 
+                  : 0;
+
+                return (
+                  <div className="space-y-6">
+                    {/* Active Subject Information Card */}
+                    <div className="p-4.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 w-full border border-zinc-200 dark:border-zinc-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-left shadow-xs">
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md font-bold">
+                            {isManualOverrideActive ? 'Manual Override Session' : 'Scheduled Subject'}
+                          </span>
+                          {isOngoing && (
+                            <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                              🟢 Class In Session Now
+                            </span>
+                          )}
+                          {!isOngoing && proximityInfo.minutesUntilStart !== null && proximityInfo.minutesUntilStart > 0 && !isManualOverrideActive && (
+                            <span className="text-[9px] font-black uppercase tracking-widest bg-amber-500/15 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-md border border-amber-500/20">
+                              ⏳ Starts in {proximityInfo.minutesUntilStart}m
+                            </span>
+                          )}
+                        </div>
+
+                        {isManualOverrideActive ? (
+                          <div className="pt-1 flex flex-col sm:flex-row sm:items-center gap-2">
+                            <label className="text-[11px] font-bold text-zinc-500">Subject:</label>
+                            <select
+                              value={manualOverrideClassId || targetSubject.id}
+                              onChange={(e) => setManualOverrideClassId(e.target.value)}
+                              disabled={isSessionRunning}
+                              className="text-xs font-bold p-1.5 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-300 dark:border-zinc-700 outline-none text-zinc-900 dark:text-zinc-100 disabled:opacity-60"
+                            >
+                              {classes.map(c => (
+                                <option key={c.id} value={c.id}>{c.code}: {c.name} ({c.startTime} • {c.room})</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsManualOverrideActive(false);
+                                setManualOverrideClassId('');
+                              }}
+                              disabled={isSessionRunning}
+                              className="text-[10px] text-zinc-500 hover:text-red-500 underline cursor-pointer disabled:opacity-40"
+                            >
+                              Reset to Auto-Detection
+                            </button>
+                          </div>
+                        ) : (
+                          <div>
+                            <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              {targetSubject.code}: {targetSubject.name}
+                            </h3>
+                            <p className="text-[11px] text-zinc-400 mt-0.5">
+                              Scheduled {targetSubject.startTime} - {targetSubject.endTime || 'End'} • Room {targetSubject.room} ({targetSubject.days})
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-mono px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 font-extrabold rounded-xl tracking-wide uppercase border border-blue-500/20">
+                          {isSessionRunning ? 'BROADCASTING' : 'READY TO START'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* CUSTOMIZABLE TIME LIMIT CONTROLLER */}
+                    <div className="p-4 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-left space-y-3 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Timer className="w-4 h-4 text-blue-500" />
+                          <span className="text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                            Customizable Session Time Limit
+                          </span>
+                        </div>
+                        <span className="text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2.5 py-0.5 rounded-lg border border-blue-500/20 font-mono">
+                          Duration: {qrDurationMinutes} Minutes
+                        </span>
+                      </div>
+
+                      {/* Duration Preset Buttons */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {[5, 10, 15, 30, 45, 60].map(mins => (
+                          <button
+                            key={mins}
+                            type="button"
+                            disabled={isSessionRunning}
+                            onClick={() => {
+                              setQrDurationMinutes(mins);
+                              setCustomMinutesInput(String(mins));
+                              setIsCustomDurationOpen(false);
+                            }}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                              qrDurationMinutes === mins && !isCustomDurationOpen
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'
+                            }`}
+                          >
+                            {mins} mins
+                          </button>
+                        ))}
+
+                        {/* Custom duration button */}
+                        <button
+                          type="button"
+                          disabled={isSessionRunning}
+                          onClick={() => setIsCustomDurationOpen(!isCustomDurationOpen)}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                            isCustomDurationOpen
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800'
+                          }`}
+                        >
+                          Custom...
+                        </button>
+                      </div>
+
+                      {/* Custom Input Field Drawer */}
+                      {isCustomDurationOpen && !isSessionRunning && (
+                        <div className="pt-2 flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
+                            Enter custom minutes:
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="180"
+                            value={customMinutesInput}
+                            onChange={(e) => {
+                              setCustomMinutesInput(e.target.value);
+                              const parsed = parseInt(e.target.value, 10);
+                              if (parsed && parsed >= 1 && parsed <= 180) {
+                                setQrDurationMinutes(parsed);
+                              }
+                            }}
+                            className="w-24 px-3 py-1 text-xs font-bold rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 outline-none"
+                          />
+                          <span className="text-xs text-zinc-400 font-semibold">(1 to 180 mins)</span>
+                        </div>
+                      )}
+
+                      {/* Policy summary info */}
+                      <div className="text-[10px] text-zinc-400 font-medium">
+                        ⏱️ Students scanning within the first 10 minutes are recorded as <strong>Present</strong>. Scans from 10 to {qrDurationMinutes} minutes are marked <strong>Late</strong>. Session automatically closes after {qrDurationMinutes} minutes.
+                      </div>
+                    </div>
+
+                    {/* QR CODE MATRIX & REAL-TIME CONTROLLER */}
+                    <div className="p-6 border border-zinc-200 dark:border-zinc-850 rounded-2xl flex flex-col items-center justify-center space-y-4 relative bg-zinc-50 dark:bg-zinc-950/40 shadow-xs">
+                      {/* QR Display */}
+                      <div className="p-2 bg-white dark:bg-zinc-900 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800">
+                        {isSessionRunning ? (
+                          <div className="relative">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=2&data=${encodeURIComponent(JSON.stringify({ classId: targetSubject.id, qrToken: qrToken }))}`}
+                              alt="ClassPulse Active Session QR Code"
+                              className="w-48 h-48 rounded-lg object-contain filter brightness-[0.95] contrast-125 dark:brightness-[0.85] dark:contrast-[1.10]"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-emerald-500 text-black text-[8px] font-black rounded uppercase tracking-wider shadow-xs animate-pulse">
+                              LIVE
+                            </div>
+                          </div>
+                        ) : isSessionExpired ? (
+                          <div className="w-48 h-48 bg-red-500/5 rounded-lg flex flex-col items-center justify-center p-4 text-center border border-red-500/20 space-y-2">
+                            <AlertCircle className="w-8 h-8 text-red-500" />
+                            <span className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-wider">
+                              Session Expired
+                            </span>
+                            <span className="text-[10px] text-zinc-400">
+                              The time limit for this attendance session has concluded.
+                            </span>
+                          </div>
+                        ) : (
+                          /* Standby placeholder */
+                          <div className="w-48 h-48 bg-zinc-150 dark:bg-zinc-900 flex flex-wrap p-2 rounded-lg relative border border-zinc-200 dark:border-zinc-850 items-center justify-center">
+                            <div className="absolute inset-0 border border-blue-500/20 rounded-lg animate-pulse" />
+                            <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute top-2 left-2" />
+                            <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute top-2 right-2" />
+                            <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute bottom-2 left-2" />
+                            <div className="absolute inset-8 border border-zinc-400 dark:border-zinc-650 flex items-center justify-center text-zinc-500 font-mono text-[9px] font-black uppercase text-center">
+                              STANDBY<br />READY TO GENERATE
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* State & Token text */}
+                      <div className="text-center space-y-2 w-full max-w-sm">
+                        <span className="text-xs font-mono font-black tracking-widest px-3 py-1 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-lg inline-block">
+                          {isSessionRunning ? qrToken : isSessionExpired ? 'SESSION EXPIRED' : `READY • CLICK GENERATE (${qrDurationMinutes}m LIMIT)`}
+                        </span>
+
+                        {/* Real-time progress bar & countdown timer */}
+                        {isSessionRunning && (
+                          <div className="space-y-2 pt-2">
+                            {/* Countdown badge */}
+                            <div className="text-xs text-zinc-600 dark:text-zinc-300 font-bold flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
+                              <Clock className="w-4 h-4 text-blue-500 animate-[spin_4s_linear_infinite]" />
+                              <span>Remaining Time:</span>
+                              <span className="font-mono text-blue-600 dark:text-blue-400 font-black text-sm">
+                                {formatSecondsToMMSS(timeLeft)}
+                              </span>
+                              <span className="text-[10px] text-zinc-400 font-normal">
+                                ({qrDurationMinutes}m limit)
+                              </span>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-1000 ${
+                                  progressPercent > 30 ? 'bg-blue-600' : progressPercent > 10 ? 'bg-amber-500' : 'bg-red-500 animate-pulse'
+                                }`}
+                                style={{ width: `${progressPercent}%` }}
+                              />
+                            </div>
+
+                            {/* Subtitle */}
+                            <p className="text-[10px] text-zinc-400 font-medium pt-1">
+                              🛡️ Security Key auto-refreshes every 15s to prevent proxy scanning.
+                            </p>
+
+                            {/* Actions: Extend or End */}
+                            <div className="grid grid-cols-2 gap-2 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => handleExtendQrSession(5)}
+                                className="py-2 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-800 transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                              >
+                                <Plus className="w-3.5 h-3.5 text-blue-500" />
+                                Extend +5m
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleStopQrSession(targetSubject)}
+                                className="py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold rounded-xl border border-red-500/20 transition-all cursor-pointer flex items-center justify-center gap-1 active:scale-95"
+                              >
+                                <Square className="w-3.5 h-3.5" />
+                                End Session
+                              </button>
+                            </div>
+
+                            {/* Offline PNG export */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = 350;
+                                canvas.height = 350;
+                                const ctx = canvas.getContext('2d');
+                                if (!ctx) return;
+                                
+                                ctx.fillStyle = '#0a0a0a';
+                                ctx.fillRect(0, 0, 350, 350);
+                                
+                                ctx.strokeStyle = '#10b981';
+                                ctx.lineWidth = 12;
+                                ctx.strokeRect(20, 20, 310, 310);
+                                
+                                ctx.fillStyle = '#ffffff';
+                                ctx.font = 'bold 16px "Inter", sans-serif';
+                                ctx.textAlign = 'center';
+                                ctx.fillText('CLASSPULSE OFFLINE PASS', 175, 55);
+                                
+                                ctx.fillStyle = '#10b981';
+                                ctx.font = '12px "JetBrains Mono", monospace';
+                                ctx.fillText(qrToken, 175, 305);
+                                
+                                const drawFinder = (cx: number, cy: number) => {
+                                  ctx.fillStyle = '#10b981';
+                                  ctx.fillRect(cx, cy, 32, 32);
+                                  ctx.fillStyle = '#0a0a0a';
+                                  ctx.fillRect(cx + 4, cy + 4, 24, 24);
+                                  ctx.fillStyle = '#10b981';
+                                  ctx.fillRect(cx + 8, cy + 8, 16, 16);
+                                };
+                                
+                                drawFinder(85, 85);
+                                drawFinder(85 + 180 - 32, 85);
+                                drawFinder(85, 85 + 180 - 32);
+                                
+                                ctx.fillStyle = '#ffffff';
+                                let seed = 0;
+                                for (let i = 0; i < qrToken.length; i++) {
+                                  seed += qrToken.charCodeAt(i);
+                                }
+                                const cols = 21;
+                                const dot = 180 / cols;
+                                for (let r = 0; r < cols; r++) {
+                                  for (let c = 0; c < cols; c++) {
+                                    if ((r < 6 && c < 6) || (r < 6 && c > cols - 7) || (r > cols - 7 && c < 6)) {
+                                      continue;
+                                    }
+                                    const val = Math.sin(r * 45.3 + c * 89.1 + seed);
+                                    if (val > -0.15) {
+                                      ctx.fillRect(85 + c * dot, 85 + r * dot, dot - 1, dot - 1);
+                                    }
+                                  }
+                                }
+                                
+                                const link = document.createElement('a');
+                                link.download = `ClassPulse_${qrToken}_offline.png`;
+                                link.href = canvas.toDataURL('image/png');
+                                link.click();
+                                speakText("Class token QR code exported as offline image file successfully.", accessibility.readAloud);
+                              }}
+                              className="py-1.5 px-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:text-emerald-500 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border border-zinc-200 dark:border-zinc-800 transition-colors cursor-pointer w-full mt-1"
+                            >
+                              📥 Export / Download Offline QR Code
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Single-Use Policy Rules reminder card */}
+                    <div className="p-3.5 rounded-xl bg-orange-500/5 border border-orange-500/10 text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed font-semibold text-left">
+                      ⚠️ <strong>Single-Use Daily Security Rule:</strong> Each subject can only generate ONE active QR session token per day. The timer countdown initiates strictly upon clicking Generate.
+                    </div>
+
+                    {/* PRIMARY ACTION BUTTON: Start Session & Generate QR Code */}
+                    {!isSessionRunning && (
+                      <div className="pt-2">
+                        <button
+                          onClick={() => handleStartQrSession(targetSubject)}
+                          type="button"
+                          className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer active:scale-95 shadow-md shadow-blue-500/20 text-center flex items-center justify-center gap-2"
+                        >
+                          <Play className="w-4 h-4 fill-white" />
+                          {isSessionExpired ? `Regenerate ${qrDurationMinutes}-Min Session Code` : `Start Session & Generate ${qrDurationMinutes}-Min QR Code`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
+            )}
           </div>
         </motion.div>
       )}
@@ -2651,9 +3135,45 @@ export default function DashboardFaculty({
                           <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 pl-4">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Filed Reason & Explanations</p>
                             <p className="text-xs text-zinc-700 dark:text-zinc-300 italic mt-1.5 font-sans leading-relaxed">"{letter.reason}"</p>
-                            {letter.attachmentName && (
-                              <div className="flex items-center gap-2 mt-3 p-2 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 rounded-xl w-fit cursor-pointer">
-                                <span className="text-[10px] text-emerald-500 font-mono">📎 {letter.attachmentName}</span>
+                            {(letter.attachmentImg || letter.attachmentData || letter.attachmentName) && (
+                              <div 
+                                onClick={() => {
+                                  const imgUrl = letter.attachmentImg || letter.attachmentData || '';
+                                  if (imgUrl) {
+                                    setImagePreviewData({
+                                      url: imgUrl,
+                                      title: letter.excuseType || 'Medical / Excuse Certificate',
+                                      subtitle: `Student: ${letter.studentName} (${letter.studentId}) • ${letter.className || letter.classId}`,
+                                      fileName: letter.attachmentName || `excuse_${letter.studentId || 'slip'}_${letter.id}.png`
+                                    });
+                                  } else {
+                                    if (typeof window !== 'undefined' && (window as any).showToast) {
+                                      (window as any).showToast(`Document attached: ${letter.attachmentName || 'Supporting Certificate'}`, "info");
+                                    }
+                                  }
+                                }}
+                                className="flex items-center gap-2.5 mt-3 p-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-xl cursor-pointer group transition-all w-fit max-w-full"
+                              >
+                                {letter.attachmentImg || letter.attachmentData ? (
+                                  <img 
+                                    src={letter.attachmentImg || letter.attachmentData} 
+                                    alt="Certificate" 
+                                    className="w-10 h-10 object-cover rounded-lg border border-emerald-500/30 group-hover:scale-105 transition-transform" 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                                    📎
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 truncate block">
+                                    📎 {letter.attachmentName || 'Supporting Certificate / Excuse Slip'}
+                                  </span>
+                                  <span className="text-[8px] text-zinc-400 flex items-center gap-1 group-hover:text-emerald-500 transition-colors font-medium">
+                                    <Download className="w-2.5 h-2.5" /> Click to view & save image
+                                  </span>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -3757,6 +4277,16 @@ export default function DashboardFaculty({
           </div>
         </div>
       )}
+      {/* Image Preview Lightbox with Save & Rotate Controls */}
+      <ImagePreviewModal
+        isOpen={!!imagePreviewData}
+        onClose={() => setImagePreviewData(null)}
+        imageUrl={imagePreviewData?.url || null}
+        title={imagePreviewData?.title}
+        subtitle={imagePreviewData?.subtitle}
+        fileName={imagePreviewData?.fileName}
+        readAloudEnabled={accessibility.readAloud}
+      />
     </div>
   );
 }

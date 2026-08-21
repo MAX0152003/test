@@ -1,5 +1,5 @@
 import React from 'react';
-import { QrCode, Smartphone, CheckCircle2, Copy, RefreshCw, X, ShieldCheck, Camera } from 'lucide-react';
+import { QrCode, Smartphone, CheckCircle2, Copy, RefreshCw, X, ShieldCheck, Camera, Clock, Timer, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { createSessionLinkInFirestore, listenToSessionLink, claimSessionLinkFromFirestore } from '../lib/firestoreSync';
 import { parseSessionToken } from '../lib/authUtils';
@@ -26,6 +26,11 @@ export default function AccountLinkQRModal({
   const [isClaimed, setIsClaimed] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
 
+  // Countdown timer state
+  const [timeLeftSeconds, setTimeLeftSeconds] = React.useState<number>(0);
+  const [totalDurationSeconds, setTotalDurationSeconds] = React.useState<number>(900); // 15 mins default
+  const [isExpired, setIsExpired] = React.useState<boolean>(false);
+
   // Scan state
   const [scanCodeInput, setScanCodeInput] = React.useState('');
   const [isScanning, setIsScanning] = React.useState(false);
@@ -39,9 +44,34 @@ export default function AccountLinkQRModal({
     }
   }, [isOpen, isOffline, activeTab]);
 
+  // Countdown timer effect
+  React.useEffect(() => {
+    if (!tokenData?.payload?.expiresAt || isClaimed) {
+      return;
+    }
+
+    const expiresAtMs = new Date(tokenData.payload.expiresAt).getTime();
+    const createdAtMs = tokenData.payload.createdAt ? new Date(tokenData.payload.createdAt).getTime() : expiresAtMs - 900000;
+    const duration = Math.max(60, Math.floor((expiresAtMs - createdAtMs) / 1000));
+    setTotalDurationSeconds(duration);
+
+    const calculateRemaining = () => {
+      const remaining = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+      setTimeLeftSeconds(remaining);
+      if (remaining <= 0) {
+        setIsExpired(true);
+      }
+    };
+
+    calculateRemaining();
+    const timer = setInterval(calculateRemaining, 1000);
+
+    return () => clearInterval(timer);
+  }, [tokenData, isClaimed]);
+
   // Listen to claims on desktop
   React.useEffect(() => {
-    if (!tokenData?.tokenId || isOffline) return;
+    if (!tokenData?.tokenId || isOffline || isExpired) return;
 
     const unsubscribe = listenToSessionLink(isOffline, tokenData.tokenId, (claimedData) => {
       setIsClaimed(true);
@@ -51,11 +81,12 @@ export default function AccountLinkQRModal({
     });
 
     return () => unsubscribe();
-  }, [tokenData?.tokenId, isOffline]);
+  }, [tokenData?.tokenId, isOffline, isExpired]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     setIsClaimed(false);
+    setIsExpired(false);
     const data = await createSessionLinkInFirestore(isOffline, userProfile);
     setTokenData(data);
     setIsGenerating(false);
@@ -99,15 +130,25 @@ export default function AccountLinkQRModal({
   if (!isOpen) return null;
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
-  const qrUrl = tokenData ? `${appUrl}?session_token=${tokenData.tokenId}` : '';
-  const qrImageSrc = qrUrl ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrUrl)}&color=059669` : '';
+  const qrUrl = tokenData && !isExpired ? `${appUrl}?session_token=${tokenData.tokenId}` : '';
+  const qrImageSrc = qrUrl && !isExpired ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrUrl)}&color=059669` : '';
 
   const handleCopyLink = () => {
-    if (!qrUrl) return;
+    if (!qrUrl || isExpired) return;
     navigator.clipboard.writeText(qrUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progressPercent = totalDurationSeconds > 0 
+    ? Math.max(0, Math.min(100, (timeLeftSeconds / totalDurationSeconds) * 100))
+    : 0;
 
   return (
     <AnimatePresence>
@@ -132,6 +173,7 @@ export default function AccountLinkQRModal({
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              title="Close Modal"
             >
               <X className="w-5 h-5" />
             </button>
@@ -179,8 +221,99 @@ export default function AccountLinkQRModal({
                       Session successfully transferred to your mobile device. You are now logged in as <strong>{userProfile?.name}</strong>.
                     </p>
                   </div>
+                ) : isExpired ? (
+                  /* Expired State Display */
+                  <div className="p-6 rounded-3xl bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/20 text-center space-y-4 animate-scale-in">
+                    <div className="w-16 h-16 rounded-3xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto shadow-sm">
+                      <ShieldAlert className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-rose-700 dark:text-rose-300">Session Token Expired</h4>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 max-w-xs mx-auto">
+                        To protect your account from unauthorized device access, this active link token has expired. Generate a fresh QR code to proceed.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={isGenerating}
+                      className="w-full py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      {isGenerating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      Generate New QR Code
+                    </button>
+                  </div>
                 ) : (
                   <>
+                    {/* Countdown Timer Badge */}
+                    <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-center gap-2">
+                        {timeLeftSeconds <= 30 ? (
+                          <span className="flex h-2.5 w-2.5 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                          </span>
+                        ) : timeLeftSeconds <= 120 ? (
+                          <span className="flex h-2.5 w-2.5 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                          </span>
+                        ) : (
+                          <span className="flex h-2.5 w-2.5 relative">
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                          </span>
+                        )}
+
+                        <div className="flex items-center gap-1.5 text-xs text-left">
+                          {timeLeftSeconds <= 30 ? (
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                          ) : timeLeftSeconds <= 120 ? (
+                            <Timer className="w-3.5 h-3.5 text-amber-500" />
+                          ) : (
+                            <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                          )}
+                          <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                            Token active:
+                          </span>
+                          <span
+                            className={`font-mono font-bold ${
+                              timeLeftSeconds <= 30
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : timeLeftSeconds <= 120
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            }`}
+                          >
+                            {formatCountdown(timeLeftSeconds)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleGenerate}
+                        disabled={isGenerating}
+                        className="text-[11px] font-semibold text-zinc-500 hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Renew Session Token"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isGenerating ? 'animate-spin' : ''}`} />
+                        <span>Renew</span>
+                      </button>
+                    </div>
+
+                    {/* Subtle Progress Bar */}
+                    <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-1 rounded-full overflow-hidden -mt-2">
+                      <div
+                        className={`h-full transition-all duration-1000 ${
+                          timeLeftSeconds <= 30
+                            ? 'bg-rose-500'
+                            : timeLeftSeconds <= 120
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+
+                    {/* QR Code Container */}
                     <div className="relative inline-block p-4 bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-md">
                       {isGenerating ? (
                         <div className="w-48 h-48 flex items-center justify-center text-zinc-400">
@@ -204,7 +337,7 @@ export default function AccountLinkQRModal({
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="flex items-center gap-2 pt-1">
                       <input
                         type="text"
                         readOnly
@@ -277,3 +410,4 @@ export default function AccountLinkQRModal({
     </AnimatePresence>
   );
 }
+

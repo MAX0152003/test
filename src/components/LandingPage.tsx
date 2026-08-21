@@ -82,7 +82,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
       {/* ========================================================================== */}
       {/* 📱 MOBILE-DEDICATED LANDING LAYOUT (Designed exclusively for phones < 1024px) */}
       {/* ========================================================================== */}
-      <div className="block lg:hidden w-full pb-24 text-left">
+      <div className="block lg:hidden w-full pb-12 text-left">
         
         {/* Mobile App Header */}
         <header id="mobile-landing-header" className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/90 dark:bg-zinc-950/90 border-b border-zinc-200/80 dark:border-zinc-800/80 px-4 py-3 flex items-center justify-between">
@@ -400,27 +400,6 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
             <p>© {new Date().getFullYear()} College of Computer Studies</p>
           </div>
 
-        </div>
-
-        {/* Fixed Mobile Bottom Action Dock */}
-        <div id="mobile-bottom-action-dock" className="fixed bottom-0 left-0 right-0 z-50 p-3 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border-t border-zinc-200/80 dark:border-zinc-800/80 flex items-center gap-2.5 shadow-2xl">
-          <button
-            id="dock-signin-btn"
-            type="button"
-            onClick={() => onEnterPortal('login')}
-            className="flex-1 py-3 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 text-xs font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-transform"
-          >
-            Sign In
-          </button>
-          <button
-            id="dock-launch-btn"
-            type="button"
-            onClick={() => onEnterPortal('register')}
-            className="flex-2 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-transform"
-          >
-            <span>Launch Portal</span>
-            <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-          </button>
         </div>
 
       </div>
