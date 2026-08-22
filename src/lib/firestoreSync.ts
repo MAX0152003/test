@@ -10,7 +10,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './googleAuth';
-import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry, FacultyStatus, LeaveRequest, Enrollment } from '../types';
+import { ClassSession, AttendanceRecord, ChatMessage, UserProfile, AuditLogEntry, FacultyStatus, LeaveRequest, Enrollment, ConsultationBooking } from '../types';
 import { normalizeUserIdentity, generateSessionToken } from './authUtils';
 
 /**
@@ -1039,6 +1039,23 @@ export async function saveExcuseLetterToFirestore(
 }
 
 /**
+ * Deletes an excuse letter from Firestore.
+ */
+export async function deleteExcuseLetterFromFirestore(
+  isOffline: boolean,
+  letterId: string
+): Promise<void> {
+  if (isOffline || !letterId) return;
+  const colPath = 'excuse_letters';
+  try {
+    await deleteDoc(doc(db, colPath, letterId));
+    console.log(`Excuse letter ${letterId} deleted from Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${colPath}/${letterId}`);
+  }
+}
+
+/**
  * Real-time listener for excuse letters from Firestore.
  * Ensures faculty and students across sessions receive excuse letters instantly.
  */
@@ -1072,6 +1089,95 @@ export function listenToExcuseLetters(
 }
 
 /**
+ * Sync consultation bookings from Firestore.
+ */
+export async function syncConsultationBookingsFromFirestore(
+  isOffline: boolean,
+  onSync: (bookings: ConsultationBooking[]) => void
+): Promise<void> {
+  if (isOffline) return;
+  const colPath = 'consultation_bookings';
+  try {
+    const querySnapshot = await getDocs(collection(db, colPath));
+    const bookings: ConsultationBooking[] = [];
+    querySnapshot.forEach((docSnap) => {
+      bookings.push(docSnap.data() as ConsultationBooking);
+    });
+    if (bookings.length > 0) {
+      onSync(bookings);
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, colPath);
+  }
+}
+
+/**
+ * Saves or updates a ConsultationBooking in Firestore.
+ */
+export async function saveConsultationBookingToFirestore(
+  isOffline: boolean,
+  bookingObj: ConsultationBooking
+): Promise<void> {
+  if (isOffline || !bookingObj || !bookingObj.id) return;
+  const colPath = 'consultation_bookings';
+  try {
+    await setDoc(doc(db, colPath, bookingObj.id), sanitizeForFirestore(bookingObj), { merge: true });
+    console.log(`Consultation booking ${bookingObj.id} saved to Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${colPath}/${bookingObj.id}`);
+  }
+}
+
+/**
+ * Deletes a ConsultationBooking from Firestore.
+ */
+export async function deleteConsultationBookingFromFirestore(
+  isOffline: boolean,
+  bookingId: string
+): Promise<void> {
+  if (isOffline || !bookingId) return;
+  const colPath = 'consultation_bookings';
+  try {
+    await deleteDoc(doc(db, colPath, bookingId));
+    console.log(`Consultation booking ${bookingId} deleted from Firestore.`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${colPath}/${bookingId}`);
+  }
+}
+
+/**
+ * Real-time listener for consultation bookings from Firestore.
+ */
+export function listenToConsultationBookings(
+  isOffline: boolean,
+  onSync: (bookings: ConsultationBooking[]) => void
+): () => void {
+  if (isOffline) return () => {};
+  const colPath = 'consultation_bookings';
+  try {
+    const unsubscribe = onSnapshot(
+      collection(db, colPath),
+      (snapshot) => {
+        const bookings: ConsultationBooking[] = [];
+        snapshot.forEach((docSnap) => {
+          bookings.push(docSnap.data() as ConsultationBooking);
+        });
+        if (bookings.length > 0) {
+          onSync(bookings);
+        }
+      },
+      (error) => {
+        console.warn("[Firestore] listenToConsultationBookings error caught:", error);
+      }
+    );
+    return unsubscribe;
+  } catch (error) {
+    console.warn("[Firestore] listenToConsultationBookings setup error:", error);
+    return () => {};
+  }
+}
+
+/**
  * Completely purges all Firestore collections and local storage data for a 100% fresh start.
  */
 export async function wipeAllFirestoreAndLocalData(): Promise<void> {
@@ -1083,6 +1189,7 @@ export async function wipeAllFirestoreAndLocalData(): Promise<void> {
     'enrollments',
     'faculty_statuses',
     'excuse_letters',
+    'consultation_bookings',
     'messages',
     'password_resets',
     'announcements',

@@ -64,7 +64,8 @@ import {
   Megaphone,
   LayoutGrid,
   List,
-  BellRing
+  BellRing,
+  UserPlus
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { 
@@ -528,6 +529,7 @@ export default function DashboardAdmin({
   const [selectedBuildingClusterFilter, setSelectedBuildingClusterFilter] = React.useState<string>('all');
   const [isClusterManagerOpen, setIsClusterManagerOpen] = React.useState(false);
   const [newClusterInputName, setNewClusterInputName] = React.useState('');
+  const [editingBuildingName, setEditingBuildingName] = React.useState<{ oldName: string; newName: string } | null>(null);
   const [editingRoomId, setEditingRoomId] = React.useState<string | null>(null);
   const [editRoomName, setEditRoomName] = React.useState('');
   const [editRoomCapacity, setEditRoomCapacity] = React.useState<number | ''>(40);
@@ -553,16 +555,50 @@ export default function DashboardAdmin({
   const handleAddCustomBuilding = (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    if (!activeBuildingClusters.includes(trimmed)) {
-      const next = [...activeBuildingClusters, trimmed];
+    const current = buildingClusters || [];
+    if (!current.includes(trimmed)) {
+      const next = [...current, trimmed];
       onUpdateBuildingClusters?.(next);
       setNewClusterInputName('');
       speakText(`Added college or building: ${trimmed}`, accessibility.readAloud);
+      if (typeof window !== 'undefined' && (window as any).showToast) {
+        (window as any).showToast(`College / Building Added: ${trimmed}`, "success");
+      }
+    } else {
+      if (typeof window !== 'undefined' && (window as any).showToast) {
+        (window as any).showToast(`"${trimmed}" is already registered.`, "info");
+      }
+    }
+  };
+
+  const handleRenameCustomBuilding = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    const current = buildingClusters || [];
+    const next = current.map(c => c === oldName ? trimmed : c);
+    if (!next.includes(trimmed)) {
+      next.push(trimmed);
+    }
+    onUpdateBuildingClusters?.(next);
+    // Update rooms with this cluster
+    const updatedRooms = labRooms.map(r => {
+      if (r.buildingCluster === oldName || r.building === oldName) {
+        return { ...r, buildingCluster: trimmed, building: trimmed };
+      }
+      return r;
+    });
+    onUpdateLabRooms?.(updatedRooms);
+    if (selectedBuildingClusterFilter === oldName) {
+      setSelectedBuildingClusterFilter(trimmed);
+    }
+    speakText(`Renamed building to ${trimmed}`, accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`Building Renamed: ${trimmed}`, "success");
     }
   };
 
   const handleDeleteCustomBuilding = (name: string) => {
-    const next = activeBuildingClusters.filter(c => c !== name);
+    const next = (buildingClusters || []).filter(c => c !== name);
     onUpdateBuildingClusters?.(next);
     // Unassign cluster from any room currently linked to it
     if (labRooms.some(r => r.buildingCluster === name || r.building === name)) {
@@ -577,6 +613,9 @@ export default function DashboardAdmin({
       setSelectedBuildingClusterFilter('all');
     }
     speakText(`Removed college or building: ${name}`, accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`College / Building Removed: ${name}`, "info");
+    }
   };
   const [selectedArchivedTermForInspection, setSelectedArchivedTermForInspection] = React.useState<any | null>(null);
   const [hoveredTrendIndex, setHoveredTrendIndex] = React.useState<number | null>(null);
@@ -1591,13 +1630,17 @@ export default function DashboardAdmin({
     if (!editingRoomId) return;
     const parsedCap = typeof editRoomCapacity === 'number' ? editRoomCapacity : parseInt(String(editRoomCapacity), 10) || 0;
     const parsedDev = typeof editRoomDevices === 'number' ? editRoomDevices : parseInt(String(editRoomDevices), 10) || 0;
-    const cluster = editRoomBuildingCluster.trim() || (activeBuildingClusters[0] || 'Main Academic Wing');
+    const cluster = editRoomBuildingCluster.trim();
+
+    if (cluster && !activeBuildingClusters.includes(cluster)) {
+      handleAddCustomBuilding(cluster);
+    }
 
     const updated = labRooms.map(rm => {
       if (rm.id === editingRoomId) {
         return {
           ...rm,
-          name: editRoomName.trim(),
+          name: editRoomName.trim() || rm.name,
           capacity: parsedCap,
           devicesCount: parsedDev,
           status: editRoomStatus,
@@ -1613,6 +1656,9 @@ export default function DashboardAdmin({
     onUpdateLabRooms?.(updated);
     setEditingRoomId(null);
     speakText("Laboratory room details successfully synchronized on academic grid", accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`Room "${editRoomName.trim()}" updated & assigned!`, "success");
+    }
   };
 
   const handleDeleteRoom = (id: string, name: string) => {
@@ -3147,51 +3193,28 @@ export default function DashboardAdmin({
                       </div>
 
                       {/* Quick Actions Grid for User Management & Semester Operations */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         <button
                           type="button"
                           onClick={() => {
-                            const names = ['Leonor Rivera', 'Andres Bonifacio', 'Marcelo Del Pilar', 'Emilio Jacinto', 'Apolinario Mabini'];
-                            const randomName = names[Math.floor(Math.random() * names.length)];
-                            const randomId = 'usr-' + Date.now();
-                            const randomUid = '2023-' + Math.floor(10000 + Math.random() * 90000);
-                            const randomEmail = `${randomName.toLowerCase().replace(' ', '.')}@msu.edu.ph`;
-                            const randomDept = ['Information Technology', 'Computer Science', 'Computer Engineering', 'Software Engineering'][Math.floor(Math.random() * 4)];
-                            
-                            const newUser: MockUser = {
-                              id: randomId,
-                              name: randomName,
-                              email: randomEmail,
-                              role: 'student',
-                              uid: randomUid,
-                              department: randomDept
-                            };
-
-                            setUsersList(prev => [...prev, newUser]);
-                            speakText(`Central roster logged registration record for new student ${randomName}.`, accessibility.readAloud);
-                            if (typeof window !== 'undefined' && (window as any).showToast) {
-                              (window as any).showToast(`Account Created & Verified: ${randomName}`, "success");
-                            }
+                            setIsUserFormOpen(true);
+                            setNewUserName('');
+                            setNewUserEmail('');
+                            setNewUserID('');
+                            setNewUserRole('student');
+                            setNewUserDep(departmentsList[0] || 'Information Technology');
+                            speakText("Opening manual user registration form", accessibility.readAloud);
                           }}
-                          className="py-2 px-3 border border-dashed border-zinc-200 hover:border-indigo-500 dark:border-zinc-800 dark:hover:border-indigo-500 hover:bg-indigo-500/5 text-[10px] font-black uppercase tracking-wider text-indigo-500 dark:text-indigo-400 rounded-xl transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
+                          className="py-2.5 px-3 border border-indigo-500/30 hover:border-indigo-500 hover:bg-indigo-500/10 text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 rounded-xl transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-xs"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Single User</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setCsvImportModalOpen(true)}
-                          className="py-2 px-3 border border-dashed border-emerald-500/40 hover:border-emerald-500 hover:bg-emerald-500/5 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 rounded-xl transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Bulk CSV Import</span>
+                          <UserPlus className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>+ Add User Manually</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setArchiveModalOpen(true)}
-                          className="py-2 px-3 border border-dashed border-amber-500/40 hover:border-amber-500 hover:bg-amber-500/5 text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 rounded-xl transition-all cursor-pointer inline-flex items-center justify-center gap-1.5"
+                          className="py-2.5 px-3 border border-amber-500/30 hover:border-amber-500 hover:bg-amber-500/10 text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 rounded-xl transition-all cursor-pointer inline-flex items-center justify-center gap-1.5 shadow-xs"
                         >
                           <Lock className="w-3.5 h-3.5 text-amber-500" />
                           <span>Close Term & Archive</span>
@@ -6475,50 +6498,184 @@ export default function DashboardAdmin({
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      {labRooms.filter(r => !r.buildingCluster && !r.building).map(rm => (
-                        <div key={rm.id} className="p-3.5 rounded-xl border border-zinc-200/90 dark:border-zinc-805 bg-white dark:bg-zinc-900 hover:border-emerald-500/40 transition-all text-left space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h4 className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100">{rm.name}</h4>
-                              <span className="text-[9px] font-mono text-zinc-400 block">{rm.floor || '2nd Floor'}</span>
+                      {labRooms.filter(r => !r.buildingCluster && !r.building).map(rm => {
+                        const isEditingThis = editingRoomId === rm.id;
+
+                        if (isEditingThis) {
+                          return (
+                            <form 
+                              key={rm.id}
+                              onSubmit={handleSaveRoomEdit} 
+                              className="p-3.5 rounded-xl border border-amber-500 bg-amber-500/[0.03] space-y-2.5 text-left animate-scale-up z-10 md:col-span-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="flex items-center justify-between pb-1 border-b border-zinc-200/50 dark:border-zinc-805">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-1 font-mono">
+                                  ⚙️ REVISE & ASSIGN ROOM TO COLLEGE / BUILDING
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingRoomId(null)}
+                                  className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 text-[10px] font-bold cursor-pointer"
+                                >
+                                  CANCEL
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block">Room Identifier Name</label>
+                                  <input 
+                                    type="text" 
+                                    value={editRoomName}
+                                    onChange={(e) => setEditRoomName(e.target.value)}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 focus:border-amber-500 font-bold"
+                                    required
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Assign to College / Academic Building</label>
+                                  {activeBuildingClusters.length > 0 ? (
+                                    <div className="flex gap-1.5">
+                                      <select
+                                        value={editRoomBuildingCluster}
+                                        onChange={(e) => setEditRoomBuildingCluster(e.target.value)}
+                                        className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                      >
+                                        <option value="">Select College / Building...</option>
+                                        {activeBuildingClusters.map(c => (
+                                          <option key={c} value={c} className="bg-white dark:bg-zinc-950">{c}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      placeholder="Type new College / Building name..."
+                                      value={editRoomBuildingCluster}
+                                      onChange={(e) => setEditRoomBuildingCluster(e.target.value)}
+                                      className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
+                                      required
+                                    />
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Capacity (Pax)</label>
+                                  <input 
+                                    type="number" 
+                                    min={0}
+                                    value={editRoomCapacity}
+                                    onChange={(e) => setEditRoomCapacity(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
+                                    required
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Workstations</label>
+                                  <input 
+                                    type="number" 
+                                    min={0}
+                                    value={editRoomDevices}
+                                    onChange={(e) => setEditRoomDevices(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 outline-none text-zinc-855 dark:text-zinc-200 font-bold"
+                                    required
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Located Floor</label>
+                                  <select
+                                    value={editRoomFloor}
+                                    onChange={(e) => setEditRoomFloor(e.target.value)}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                  >
+                                    <option value="1st Floor" className="bg-white dark:bg-zinc-950">1st Floor</option>
+                                    <option value="2nd Floor" className="bg-white dark:bg-zinc-950">2nd Floor</option>
+                                    <option value="3rd Floor" className="bg-white dark:bg-zinc-950">3rd Floor</option>
+                                    <option value="4th Floor" className="bg-white dark:bg-zinc-950">4th Floor</option>
+                                    <option value="5th Floor" className="bg-white dark:bg-zinc-950">5th Floor</option>
+                                  </select>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest block font-sans">Operational Status</label>
+                                  <select
+                                    value={editRoomStatus === 'maintenance' ? 'maintenance' : 'available'}
+                                    onChange={(e) => setEditRoomStatus(e.target.value as any)}
+                                    className="w-full text-[11px] p-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-250 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 outline-none font-sans font-bold"
+                                  >
+                                    <option value="available" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">Operational</option>
+                                    <option value="maintenance" className="bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">Maintenance Lockout</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end gap-1.5 pt-1.5 border-t border-zinc-200/40 dark:border-zinc-800">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingRoomId(null)}
+                                  className="px-3 py-1.5 text-[9px] uppercase font-bold border border-zinc-250 dark:border-zinc-800 rounded-lg text-zinc-500 cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="px-4 py-1.5 text-[9px] uppercase font-black bg-amber-500 hover:bg-amber-400 text-black rounded-lg cursor-pointer transition-all shadow-xs"
+                                >
+                                  Save & Assign Room
+                                </button>
+                              </div>
+                            </form>
+                          );
+                        }
+
+                        return (
+                          <div key={rm.id} className="p-3.5 rounded-xl border border-zinc-200/90 dark:border-zinc-805 bg-white dark:bg-zinc-900 hover:border-emerald-500/40 transition-all text-left space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100">{rm.name}</h4>
+                                <span className="text-[9px] font-mono text-zinc-400 block">{rm.floor || '2nd Floor'}</span>
+                              </div>
+                              <span className={`text-[8.5px] font-mono font-black uppercase px-2 py-0.5 rounded-full ${
+                                rm.status === 'available' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                rm.status === 'occupied' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                                'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                              }`}>
+                                {rm.status}
+                              </span>
                             </div>
-                            <span className={`text-[8.5px] font-mono font-black uppercase px-2 py-0.5 rounded-full ${
-                              rm.status === 'available' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                              rm.status === 'occupied' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
-                              'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                            }`}>
-                              {rm.status}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800 text-[10px]">
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingRoomId(rm.id);
-                                  setEditRoomName(rm.name);
-                                  setEditRoomCapacity(rm.capacity);
-                                  setEditRoomDevices(rm.devicesCount);
-                                  setEditRoomStatus(rm.status);
-                                  setEditRoomFloor(rm.floor || '2nd Floor');
-                                  setEditRoomBuildingCluster('');
-                                  setIsAddingRoom(false);
-                                }}
-                                className="bg-zinc-150 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 font-extrabold px-2.5 py-1 rounded-lg cursor-pointer"
-                              >
-                                Edit & Assign
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRoom(rm.id, rm.name)}
-                                className="bg-red-500/10 hover:bg-red-500 text-red-550 hover:text-white font-extrabold px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                              >
-                                Delete
-                              </button>
+                            <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800 text-[10px]">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingRoomId(rm.id);
+                                    setEditRoomName(rm.name);
+                                    setEditRoomCapacity(rm.capacity);
+                                    setEditRoomDevices(rm.devicesCount);
+                                    setEditRoomStatus(rm.status);
+                                    setEditRoomFloor(rm.floor || '2nd Floor');
+                                    setEditRoomBuildingCluster(activeBuildingClusters[0] || '');
+                                    setIsAddingRoom(false);
+                                  }}
+                                  className="bg-emerald-500/15 hover:bg-emerald-500 text-emerald-700 dark:text-emerald-300 hover:text-black font-extrabold px-2.5 py-1 rounded-lg cursor-pointer transition-all"
+                                >
+                                  Edit & Assign
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRoom(rm.id, rm.name)}
+                                  className="bg-red-500/10 hover:bg-red-500 text-red-550 hover:text-white font-extrabold px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -6990,101 +7147,6 @@ export default function DashboardAdmin({
         </div>
       )}
 
-      {/* Bulk CSV User Import Modal */}
-      {csvImportModalOpen && (
-        <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-3xl max-w-xl w-full text-left space-y-4 shadow-2xl relative animate-scale-up">
-            <button
-              onClick={() => setCsvImportModalOpen(false)}
-              className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-650 cursor-pointer p-1 rounded-full bg-zinc-100 dark:bg-zinc-900"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-3">
-              <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500">
-                <Download className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
-                  📥 Bulk CSV User Registration Import
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Upload or paste CSV rows to register incoming freshmen or faculty batches into Central Roster.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-extrabold text-zinc-700 dark:text-zinc-300">CSV Template Reference</span>
-                <button
-                  type="button"
-                  onClick={handleDownloadCsvTemplate}
-                  className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 font-black uppercase text-[10px] tracking-wider transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <Download className="w-3 h-3" /> Sample CSV File
-                </button>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Paste Raw CSV Lines (Name, Email, Role, ID, Dept)</label>
-                <textarea
-                  rows={4}
-                  value={csvRawText}
-                  onChange={(e) => handleParseCsvText(e.target.value)}
-                  placeholder="Juan Dela Cruz, juan@msu.edu.ph, student, 2025-0012, IT&#10;Maria Clara, maria@msu.edu.ph, faculty, FAC-102, CS"
-                  className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 font-mono text-xs text-zinc-800 dark:text-zinc-200 outline-none"
-                />
-              </div>
-
-              {csvParsedRows.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                    Parsed Candidates ({csvParsedRows.length} Valid Entries)
-                  </span>
-                  <div className="max-h-36 overflow-y-auto border border-zinc-150 dark:border-zinc-850 rounded-xl divide-y divide-zinc-100 dark:divide-zinc-900">
-                    {csvParsedRows.map((row, idx) => (
-                      <div key={idx} className="p-2 flex items-center justify-between text-[11px] font-mono">
-                        <div>
-                          <strong className="text-zinc-800 dark:text-zinc-200">{row.name}</strong> ({row.email})
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-[9px] uppercase font-bold">{row.role}</span>
-                          <span className="text-emerald-500 font-bold">Ready</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
-              <button
-                type="button"
-                onClick={() => setCsvImportModalOpen(false)}
-                className="px-4 py-2 text-xs font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCommitBulkCsvImport}
-                disabled={csvParsedRows.length === 0}
-                className={`px-4 py-2 text-xs font-extrabold uppercase tracking-wider rounded-xl transition-all cursor-pointer ${
-                  csvParsedRows.length > 0
-                    ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs'
-                    : 'bg-zinc-200 text-zinc-400 dark:bg-zinc-800 cursor-not-allowed'
-                }`}
-              >
-                Register Batch ({csvParsedRows.length})
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Semester Archiving Modal */}
       {archiveModalOpen && (
         <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -7466,6 +7528,218 @@ export default function DashboardAdmin({
         fileName={imagePreviewData?.fileName}
         readAloudEnabled={accessibility.readAloud}
       />
+
+      {/* Manage Colleges & Academic Buildings Modal */}
+      <AnimatePresence>
+        {isClusterManagerOpen && (
+          <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl max-w-xl w-full text-left space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            >
+              <button
+                type="button"
+                onClick={() => setIsClusterManagerOpen(false)}
+                className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 cursor-pointer p-1.5 rounded-full bg-zinc-100 dark:bg-zinc-900 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-3.5">
+                <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500">
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
+                    🏛️ Manage Colleges & Academic Buildings
+                  </h3>
+                  <p className="text-xs text-zinc-400 font-sans">
+                    Register, rename, and organize university colleges and lab facilities.
+                  </p>
+                </div>
+              </div>
+
+              {/* Add New Building / College Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (newClusterInputName.trim()) {
+                    handleAddCustomBuilding(newClusterInputName.trim());
+                  }
+                }}
+                className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 space-y-3"
+              >
+                <label className="text-[9.5px] font-black uppercase tracking-widest text-zinc-500 block">
+                  Add New College / Building
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. College of Information and Computing Sciences (CICS)"
+                    value={newClusterInputName}
+                    onChange={(e) => setNewClusterInputName(e.target.value)}
+                    className="flex-1 text-xs p-2.5 rounded-xl border border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-950 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-bold"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newClusterInputName.trim()}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
+                      newClusterInputName.trim()
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs'
+                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" /> Add
+                  </button>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[8.5px] font-black uppercase tracking-wider text-zinc-400 block font-mono">
+                    Suggested MSU Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'College of Information and Computing Sciences (CICS)',
+                      'Science Complex Building',
+                      'College of Engineering (COE)',
+                      'College of Natural Sciences and Mathematics (CNSM)',
+                      'College of Education',
+                      'University Administration Wing',
+                      'College of Business Administration'
+                    ].map((preset, idx) => {
+                      const isAlready = activeBuildingClusters.includes(preset);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={isAlready}
+                          onClick={() => handleAddCustomBuilding(preset)}
+                          className={`text-[9px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                            isAlready
+                              ? 'border-zinc-200 dark:border-zinc-850 text-zinc-400 bg-zinc-100 dark:bg-zinc-900 cursor-default opacity-60'
+                              : 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 active:scale-95'
+                          }`}
+                        >
+                          {isAlready ? `✓ ${preset}` : `+ ${preset}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </form>
+
+              {/* Active Buildings List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between pb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 font-mono">
+                    Registered Buildings ({activeBuildingClusters.length})
+                  </span>
+                </div>
+
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1 divide-y divide-zinc-100 dark:divide-zinc-900">
+                  {activeBuildingClusters.map((clusterName) => {
+                    const roomsCount = labRooms.filter(r => r.buildingCluster === clusterName || r.building === clusterName).length;
+                    const isRenaming = editingBuildingName?.oldName === clusterName;
+
+                    if (isRenaming) {
+                      return (
+                        <div key={clusterName} className="p-3 bg-amber-500/5 border border-amber-500/40 rounded-xl space-y-2">
+                          <label className="text-[8.5px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 block font-mono">
+                            Rename "{clusterName}"
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={editingBuildingName.newName}
+                              onChange={(e) => setEditingBuildingName({ ...editingBuildingName, newName: e.target.value })}
+                              className="flex-1 text-xs p-2 rounded-lg border border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 outline-none text-zinc-900 dark:text-zinc-100 font-bold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleRenameCustomBuilding(editingBuildingName.oldName, editingBuildingName.newName);
+                                setEditingBuildingName(null);
+                              }}
+                              className="px-3 py-1.5 bg-emerald-500 text-black text-xs font-black uppercase rounded-lg cursor-pointer"
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingBuildingName(null)}
+                              className="px-2.5 py-1.5 text-zinc-400 text-xs font-bold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={clusterName}
+                        className="p-3 rounded-xl border border-zinc-150 dark:border-zinc-850 bg-white dark:bg-zinc-900 flex items-center justify-between gap-3 text-left hover:border-zinc-300 dark:hover:border-zinc-700 transition-all"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-extrabold text-xs text-zinc-900 dark:text-zinc-100 truncate">
+                            {clusterName}
+                          </h4>
+                          <span className="text-[9.5px] text-zinc-400 font-mono">
+                            {roomsCount} {roomsCount === 1 ? 'Laboratory Room' : 'Laboratory Rooms'} assigned
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setEditingBuildingName({ oldName: clusterName, newName: clusterName })}
+                            className="px-2.5 py-1 rounded-lg text-[9.5px] font-extrabold uppercase bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 flex items-center gap-1 cursor-pointer transition-all"
+                            title="Rename Building"
+                          >
+                            <Edit className="w-3 h-3 text-amber-500" /> Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Remove "${clusterName}" from registered colleges/buildings? Any associated rooms will be moved to unassigned.`)) {
+                                handleDeleteCustomBuilding(clusterName);
+                              }
+                            }}
+                            className="px-2 py-1 rounded-lg text-[9.5px] font-extrabold uppercase bg-red-500/10 hover:bg-red-500 text-red-550 hover:text-white flex items-center gap-1 cursor-pointer transition-all"
+                            title="Remove Building"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {activeBuildingClusters.length === 0 && (
+                    <div className="py-8 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                      <p className="text-xs text-zinc-400 font-bold">No custom buildings registered yet. Add one above.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                <button
+                  type="button"
+                  onClick={() => setIsClusterManagerOpen(false)}
+                  className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer shadow-xs"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

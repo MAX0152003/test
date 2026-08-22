@@ -408,7 +408,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             name: c.facultyName,
             role: 'faculty',
             avatar: matchedT?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-            courseCode: c.code
+            courseCode: 'Faculty Member'
           });
         }
       });
@@ -428,24 +428,27 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
       list = Array.from(teachersMap.values());
     } else if (userProfile.role === 'faculty') {
-      // Faculty see students
+      // Faculty see students: strictly ONE contact entry per student regardless of how many subjects they are enrolled in
       const facultyId = userProfile.facultyId || 'fac-1';
       const myClasses = classes.filter(c => c.facultyId === facultyId || c.facultyName === userProfile.name);
       const myClassIds = myClasses.map(c => c.id);
       
-      const students = enrollments
+      const studentMap = new Map<string, any>();
+      enrollments
         .filter(e => myClassIds.includes(e.classId))
-        .map(e => {
-          const matchedS = dynPeople.find(p => p.id === e.studentId || p.name === e.studentName);
-          return {
-            id: e.studentId,
-            name: e.studentName,
-            role: 'student',
-            avatar: matchedS?.avatar || e.studentAvatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
-            courseCode: myClasses.find(c => c.id === e.classId)?.code || 'CS-101'
-          };
+        .forEach(e => {
+          if (!studentMap.has(e.studentId)) {
+            const matchedS = dynPeople.find(p => p.id === e.studentId || p.name === e.studentName);
+            studentMap.set(e.studentId, {
+              id: e.studentId,
+              name: e.studentName,
+              role: 'student',
+              avatar: matchedS?.avatar || e.studentAvatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
+              courseCode: 'Student'
+            });
+          }
         });
-      list = [...students];
+      list = Array.from(studentMap.values());
     } else if (userProfile.role === 'admin') {
       // Admins see all registered admins including current user!
       const registeredAdmins = dynPeople.filter(p => p.role === 'admin').map(p => ({
@@ -573,13 +576,18 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       }
     }
 
-    // Deduplicate
-    const seen = new Set();
+    // Deduplicate by ID and Name to ensure strictly ONE contact per person
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
     return list.filter(el => {
       if (!el || !el.id) return false;
-      const duplicate = seen.has(el.id);
-      seen.add(el.id);
-      return !duplicate;
+      const cleanName = (el.name || '').trim().toLowerCase();
+      if (seenIds.has(el.id) || (cleanName && seenNames.has(cleanName))) {
+        return false;
+      }
+      seenIds.add(el.id);
+      if (cleanName) seenNames.add(cleanName);
+      return true;
     });
   };
 
@@ -1434,18 +1442,59 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                     id="chat-file-image-attachment"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          setPendingImg(reader.result as string);
-                          setPendingLink(null);
-                          setPendingFile(null);
-                          setShowAttachmentMenu(false);
-                          speakText(`Successfully uploaded picture attachment: ${file.name}`, accessibility.readAloud);
-                        };
-                        reader.readAsDataURL(file);
+                        try {
+                          const compressImage = (f: File): Promise<string> => {
+                            return new Promise((resolve) => {
+                              const reader = new FileReader();
+                              reader.onload = (re) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                  const canvas = document.createElement('canvas');
+                                  let width = img.width;
+                                  let height = img.height;
+                                  const maxDim = 1000;
+                                  if (width > maxDim || height > maxDim) {
+                                    if (width > height) {
+                                      height = Math.round((height * maxDim) / width);
+                                      width = maxDim;
+                                    } else {
+                                      width = Math.round((width * maxDim) / height);
+                                      height = maxDim;
+                                    }
+                                  }
+                                  canvas.width = width;
+                                  canvas.height = height;
+                                  const ctx = canvas.getContext('2d');
+                                  if (ctx) {
+                                    ctx.drawImage(img, 0, 0, width, height);
+                                    const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+                                    resolve(dataUrl);
+                                  } else {
+                                    resolve(re.target?.result as string);
+                                  }
+                                };
+                                img.onerror = () => resolve(re.target?.result as string);
+                                img.src = re.target?.result as string;
+                              };
+                              reader.onerror = () => resolve('');
+                              reader.readAsDataURL(f);
+                            });
+                          };
+
+                          const compressedData = await compressImage(file);
+                          if (compressedData) {
+                            setPendingImg(compressedData);
+                            setPendingLink(null);
+                            setPendingFile(null);
+                            setShowAttachmentMenu(false);
+                            speakText(`Successfully attached picture: ${file.name}`, accessibility.readAloud);
+                          }
+                        } catch (err) {
+                          console.error("Image compression error:", err);
+                        }
                       }
                     }}
                   />

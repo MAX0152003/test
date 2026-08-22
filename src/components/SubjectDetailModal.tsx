@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ClassSession, Enrollment, AttendanceRecord, FacultyStatus } from '../types';
 import AttendanceGraph from './AttendanceGraph';
-import { X, Calendar, Clock, MapPin, User, Users, CheckCircle, Activity, Download, Search } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, User, Users, CheckCircle, Activity, Download, Search, Lock, Unlock, Trash2, AlertTriangle } from 'lucide-react';
 
 interface SubjectDetailModalProps {
   isOpen: boolean;
@@ -18,6 +18,8 @@ interface SubjectDetailModalProps {
   userRole?: 'student' | 'faculty' | 'admin';
   onEnrollSubject?: (classId: string) => void;
   onDropSubject?: (classId: string) => void;
+  onToggleCloseSubject?: (classId: string) => void;
+  onDeleteClass?: (classId: string) => void;
 }
 
 export default function SubjectDetailModal({
@@ -33,11 +35,14 @@ export default function SubjectDetailModal({
   studentEmail,
   userRole = 'student',
   onEnrollSubject,
-  onDropSubject
+  onDropSubject,
+  onToggleCloseSubject,
+  onDeleteClass
 }: SubjectDetailModalProps) {
   if (!isOpen || !cls) return null;
 
   const [rosterSearch, setRosterSearch] = React.useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
   const uEmail = (studentEmail || '').trim().toLowerCase();
   const uStuId = (studentId || '').trim().toLowerCase();
@@ -143,9 +148,21 @@ export default function SubjectDetailModal({
         {/* Header */}
         <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-850 mb-5">
           <div className="space-y-1">
-            <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-500 border border-emerald-500/10">
-              {cls.code} • Subject Profile
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-500 border border-emerald-500/10">
+                {cls.code} • Subject Profile
+              </span>
+              {cls.isClosed ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20">
+                  <Lock className="w-3 h-3" />
+                  Concluded (End of Term)
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Active Term
+                </span>
+              )}
+            </div>
             <h3 className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
               {cls.name}
             </h3>
@@ -157,6 +174,39 @@ export default function SubjectDetailModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Delete Confirmation Alert */}
+        {showDeleteConfirm && (
+          <div className="mb-5 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-3">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-black text-xs uppercase tracking-wider">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+              <span>Confirm Subject Removal</span>
+            </div>
+            <p className="text-xs text-zinc-700 dark:text-zinc-300">
+              Are you sure you want to permanently remove <strong>{cls.code}: {cls.name}</strong>? This will remove the subject from active registers.
+            </p>
+            <div className="flex items-center gap-2 justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteClass?.(cls.id);
+                  setShowDeleteConfirm(false);
+                  onClose();
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase hover:bg-red-700 cursor-pointer shadow-sm"
+              >
+                Permanently Delete Subject
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic content grid */}
         <div className="space-y-6">
@@ -418,6 +468,44 @@ export default function SubjectDetailModal({
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Unenroll Subject</span>
+              </button>
+            )}
+
+            {/* Faculty Subject Lifecycle Management Actions */}
+            {(userRole === 'faculty' || userRole === 'admin') && onToggleCloseSubject && (
+              <button
+                type="button"
+                onClick={() => onToggleCloseSubject(cls.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 border ${
+                  cls.isClosed
+                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                }`}
+                title={cls.isClosed ? 'Reopen subject for active attendance tracking' : 'Close subject at end of semester (stops check-ins)'}
+              >
+                {cls.isClosed ? (
+                  <>
+                    <Unlock className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Reopen Subject</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Close Subject (End Term)</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {(userRole === 'faculty' || userRole === 'admin') && onDeleteClass && !showDeleteConfirm && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                title="Remove or drop this subject completely"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                <span>Delete Subject</span>
               </button>
             )}
           </div>

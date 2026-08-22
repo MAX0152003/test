@@ -52,7 +52,9 @@ import {
   Play,
   Square,
   RotateCcw,
-  ChevronRight
+  ChevronRight,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock from './AlarmClock';
@@ -1095,6 +1097,30 @@ export default function DashboardFaculty({
     speakText(`Opening course detail modal for ${cls.name}`, accessibility.readAloud);
   };
 
+  const handleToggleCloseClass = (classId: string) => {
+    const target = classes.find(c => c.id === classId);
+    if (!target) return;
+    const willClose = !target.isClosed;
+    const updated: ClassSession = {
+      ...target,
+      isClosed: willClose,
+      facultyStatusUpdate: willClose ? 'closed' : 'none',
+      closedAt: willClose ? new Date().toISOString() : undefined,
+      lastUpdateTimestamp: Date.now()
+    };
+    onEditClass(updated);
+    if (selectedClassDetail?.id === classId) {
+      setSelectedClassDetail(updated);
+    }
+    const msg = willClose 
+      ? `Subject ${target.code} marked as concluded for the semester.`
+      : `Subject ${target.code} reopened for active semester attendance.`;
+    speakText(msg, accessibility.readAloud);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(msg, "info");
+    }
+  };
+
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1429,18 +1455,36 @@ export default function DashboardFaculty({
                             <div
                               key={cls.id}
                               onClick={() => handleOpenSubjectDetails(cls)}
-                              className="p-5 pl-7 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group hover:border-emerald-500/30"
+                              className={`p-5 pl-7 rounded-2xl border bg-white dark:bg-zinc-900 shadow-xs hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group ${
+                                cls.isClosed 
+                                  ? 'border-amber-500/40 opacity-90 hover:border-amber-500' 
+                                  : 'border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/30'
+                              }`}
                             >
                               {/* High elegance left-border ribbon accentuating the status */}
-                              <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500 transition-transform duration-300 group-hover:scale-y-110" />
+                              <div className={`absolute top-0 left-0 w-1.5 h-full transition-transform duration-300 group-hover:scale-y-110 ${
+                                cls.isClosed ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`} />
                               
-                              <span className="text-[9px] font-black tracking-widest px-2.5 py-1 rounded-md bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-bold uppercase">
-                                {cls.code}
-                              </span>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`text-[9px] font-black tracking-widest px-2.5 py-1 rounded-md font-bold uppercase ${
+                                  cls.isClosed
+                                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                    : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                }`}>
+                                  {cls.code}
+                                </span>
+
+                                {cls.isClosed && (
+                                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                                    <Lock className="w-2.5 h-2.5" /> Concluded
+                                  </span>
+                                )}
+                              </div>
                               
                               <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight mt-3 truncate">{cls.name}</h4>
                               
-                              <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 mt-5 pt-3 border-t border-zinc-100 dark:border-zinc-850">
+                              <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-850">
                                 <span className="flex items-center gap-1 font-semibold text-zinc-650 dark:text-zinc-350">
                                   <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                   {cls.startTime}
@@ -1448,6 +1492,39 @@ export default function DashboardFaculty({
                                 <span className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-500/10">
                                   <Users className="w-3.5 h-3.5 text-emerald-500" /> {enrolledCount} Students
                                 </span>
+                              </div>
+
+                              {/* Quick Management Toolbar */}
+                              <div className="flex items-center justify-between gap-1.5 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-850/80 text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleCloseClass(cls.id);
+                                  }}
+                                  className={`px-2 py-1 rounded-lg font-extrabold uppercase text-[9px] flex items-center gap-1 transition-all cursor-pointer ${
+                                    cls.isClosed
+                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                      : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                                  }`}
+                                  title={cls.isClosed ? 'Reopen subject' : 'Close subject (End of Semester)'}
+                                >
+                                  {cls.isClosed ? <Unlock className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+                                  <span>{cls.isClosed ? 'Reopen' : 'Close Term'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirmClass({ id: cls.id, code: cls.code });
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-extrabold uppercase text-[9px] flex items-center gap-1 transition-all cursor-pointer"
+                                  title="Delete/Drop Subject"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                  <span>Delete</span>
+                                </button>
                               </div>
                             </div>
                           );
@@ -2860,6 +2937,8 @@ export default function DashboardFaculty({
         facultyStatuses={facultyStatuses}
         isDark={accessibility.theme === 'dark'}
         userRole="faculty"
+        onToggleCloseSubject={handleToggleCloseClass}
+        onDeleteClass={onDeleteClass}
       />
 
       {/* Messages tab screen */}

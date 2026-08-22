@@ -13,12 +13,14 @@ export interface ClassSession {
   facultyId: string;
   credits?: number;
   gracePeriodMinutes?: number; // Custom lateness grace period (e.g. 5, 10, 15, 20, 30 mins)
-  facultyStatusUpdate?: 'none' | 'attend' | 'cancel' | 'late';
+  facultyStatusUpdate?: 'none' | 'attend' | 'cancel' | 'late' | 'closed';
   tempRoom?: string;
   lastUpdateTimestamp?: number;
   qrToken?: string;
   qrGeneratedAt?: number;
   academicTerm?: string;
+  isClosed?: boolean;
+  closedAt?: string;
 }
 
 export interface AttendanceRecord {
@@ -108,17 +110,45 @@ export interface LeaveRequest {
   id: string;
   studentId: string;
   studentName: string;
+  facultyId?: string;
+  facultyName?: string;
   classId: string;
   className: string;
+  classCode?: string;
   excuseType?: string; // e.g. 'MSU University Infirmary Medical Slip', 'Official University Athletic/Cultural Event', etc.
   startDate: string;
   endDate: string;
   reason: string;
   status: 'pending' | 'approved' | 'rejected' | 'valid' | 'invalid';
   createdAt: string;
+  reviewedAt?: string;
+  reviewerNotes?: string;
   attachmentName?: string;
   attachmentData?: string;
   attachmentImg?: string;
+}
+
+export interface ConsultationBooking {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentAvatar?: string;
+  studentEmail?: string;
+  facultyId: string;
+  facultyName: string;
+  classId?: string;
+  className?: string;
+  topic: string;
+  description?: string;
+  date: string; // YYYY-MM-DD
+  startTime: string;
+  endTime: string;
+  locationType: 'office' | 'online_meet' | 'in_person';
+  locationDetails?: string;
+  status: 'pending' | 'confirmed' | 'rescheduled' | 'cancelled' | 'completed';
+  facultyNotes?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ScannerLog {
