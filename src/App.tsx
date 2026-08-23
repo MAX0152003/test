@@ -12,7 +12,8 @@ import {
   Announcement,
   LeaveRequest,
   LabRoom,
-  ViewDensity
+  ViewDensity,
+  ConsultationBooking
 } from './types';
 import { 
   syncClassesFromFirestore,
@@ -27,11 +28,16 @@ import {
   listenToFacultyStatuses,
   syncExcuseLettersFromFirestore,
   saveExcuseLetterToFirestore,
+  deleteExcuseLetterFromFirestore,
   listenToExcuseLetters,
   syncEnrollmentsFromFirestore,
   saveEnrollmentToFirestore,
   deleteEnrollmentFromFirestore,
   listenToEnrollments,
+  syncConsultationBookingsFromFirestore,
+  saveConsultationBookingToFirestore,
+  deleteConsultationBookingFromFirestore,
+  listenToConsultationBookings,
   listenToClasses,
   listenToAttendance,
   listenToRegisteredUsers,
@@ -420,6 +426,18 @@ export default function App() {
     return [];
   });
 
+  const [consultationBookings, setConsultationBookings] = React.useState<ConsultationBooking[]>(() => {
+    const cached = safeStorage.getItem('classpulse_consultation_bookings');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
@@ -459,6 +477,10 @@ export default function App() {
   React.useEffect(() => {
     safeStorage.setItem('classpulse_student_leaves', JSON.stringify(excuseLetters));
   }, [excuseLetters]);
+
+  React.useEffect(() => {
+    safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(consultationBookings));
+  }, [consultationBookings]);
 
   const [accessibility, setAccessibility] = React.useState<AccessibilityConfig>(() => {
     const cached = safeStorage.getItem('cp_accessibility');
@@ -688,6 +710,10 @@ export default function App() {
       setExcuseLetters(fetchedLetters);
       safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
     });
+    syncConsultationBookingsFromFirestore(false, (fetchedBookings) => {
+      setConsultationBookings(fetchedBookings);
+      safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(fetchedBookings));
+    });
     syncEnrollmentsFromFirestore(false, (fetchedEnrollments) => {
       setEnrollments(fetchedEnrollments);
       safeStorage.setItem('cp_enrollments', JSON.stringify(fetchedEnrollments));
@@ -710,6 +736,10 @@ export default function App() {
       setExcuseLetters(fetchedLetters);
       safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
     });
+    const unsubConsultations = listenToConsultationBookings(false, (fetchedBookings) => {
+      setConsultationBookings(fetchedBookings);
+      safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(fetchedBookings));
+    });
     const unsubEnrollments = listenToEnrollments(false, (fetchedEnrollments) => {
       setEnrollments(fetchedEnrollments);
       safeStorage.setItem('cp_enrollments', JSON.stringify(fetchedEnrollments));
@@ -723,6 +753,7 @@ export default function App() {
       unsubAttendance();
       unsubFaculty();
       unsubExcuses();
+      unsubConsultations();
       unsubEnrollments();
       unsubUsers();
       unsubCreds();
@@ -752,6 +783,10 @@ export default function App() {
         syncExcuseLettersFromFirestore(false, (fetchedLetters) => {
           setExcuseLetters(fetchedLetters);
           safeStorage.setItem('classpulse_student_leaves', JSON.stringify(fetchedLetters));
+        }),
+        syncConsultationBookingsFromFirestore(false, (fetchedBookings) => {
+          setConsultationBookings(fetchedBookings);
+          safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(fetchedBookings));
         }),
         syncEnrollmentsFromFirestore(false, (fetchedEnrollments) => {
           setEnrollments(fetchedEnrollments);
@@ -1007,15 +1042,6 @@ export default function App() {
   // Register Background Notification Service Worker on app load
   React.useEffect(() => {
     registerAlarmServiceWorker();
-    
-    // Auto-check system notification permission if enabled in preferences
-    const scheduleAlarmsPref = safeStorage.getItem('cp_pref_schedule_alarms') !== 'false';
-    if (scheduleAlarmsPref && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      const timer = setTimeout(() => {
-        requestSystemNotificationPermission().catch(() => {});
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
   }, []);
 
   // Continuous background schedule alarm monitor (runs every 10s like a built-in alarm clock)
@@ -1929,6 +1955,24 @@ export default function App() {
     setNotifications(prev => [newNotif, ...prev]);
   };
 
+  const handleEditExcuseLetter = (updated: LeaveRequest) => {
+    setExcuseLetters(prev => {
+      const next = prev.map(l => l.id === updated.id ? updated : l);
+      safeStorage.setItem('classpulse_student_leaves', JSON.stringify(next));
+      return next;
+    });
+    saveExcuseLetterToFirestore(isOffline, updated).catch(err => console.error("Firestore update excuse error:", err));
+  };
+
+  const handleDeleteExcuseLetter = (id: string) => {
+    setExcuseLetters(prev => {
+      const next = prev.filter(l => l.id !== id);
+      safeStorage.setItem('classpulse_student_leaves', JSON.stringify(next));
+      return next;
+    });
+    deleteExcuseLetterFromFirestore(isOffline, id).catch(err => console.error("Firestore delete excuse error:", err));
+  };
+
   // Shared Excuse Status validation Action (Reviewed by faculty)
   const handleUpdateExcuseStatus = (id: string, status: 'pending' | 'valid' | 'invalid' | 'approved' | 'rejected') => {
     const finalStatus = status === 'approved' || status === 'valid' ? 'valid' : status === 'rejected' || status === 'invalid' ? 'invalid' : 'pending';
@@ -2013,6 +2057,62 @@ export default function App() {
         setNotifications(prev => [newNotif, ...prev]);
       }
     }
+  };
+
+  // Shared Consultation Booking Handlers
+  const handleAddConsultationBooking = (booking: ConsultationBooking) => {
+    setConsultationBookings(prev => [booking, ...prev.filter(b => b.id !== booking.id)]);
+    safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify([booking, ...consultationBookings.filter(b => b.id !== booking.id)]));
+    saveConsultationBookingToFirestore(isOffline, booking).catch(err => console.error("Firestore save consultation error:", err));
+
+    const newNotif: AppNotification = {
+      id: 'notif-cb-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+      title: 'Consultation Booked',
+      message: `Consultation request submitted with ${booking.facultyName || 'Faculty'} on ${booking.date} at ${booking.startTime || booking.timeSlot || 'scheduled time'}.`,
+      timestamp: 'Just Now',
+      type: 'info',
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  };
+
+  const handleUpdateConsultationBookingStatus = (id: string, status: 'confirmed' | 'declined' | 'completed' | 'cancelled', notes?: string) => {
+    let updatedBooking: ConsultationBooking | undefined;
+    setConsultationBookings(prev => prev.map(b => {
+      if (b.id === id) {
+        updatedBooking = { ...b, status, ...(notes !== undefined ? { notes } : {}), updatedAt: new Date().toISOString() };
+        return updatedBooking;
+      }
+      return b;
+    }));
+    const target = updatedBooking || consultationBookings.find(b => b.id === id);
+    if (target) {
+      const persisted: ConsultationBooking = { ...target, status, ...(notes !== undefined ? { notes } : {}), updatedAt: new Date().toISOString() };
+      safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(consultationBookings.map(b => b.id === id ? persisted : b)));
+      saveConsultationBookingToFirestore(isOffline, persisted).catch(err => console.error("Firestore update consultation error:", err));
+
+      const newNotif: AppNotification = {
+        id: 'notif-cb-stat-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+        title: `Consultation ${status.toUpperCase()}`,
+        message: `Consultation session with ${target.facultyName} on ${target.date} has been marked ${status}.`,
+        timestamp: 'Just Now',
+        type: status === 'confirmed' ? 'success' : status === 'declined' ? 'alert' : 'info',
+        read: false
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+      if (status === 'confirmed') {
+        speakText(`Consultation confirmed with ${target.facultyName}`, accessibility.readAloud);
+      }
+    }
+  };
+
+  const handleDeleteConsultationBooking = (id: string) => {
+    setConsultationBookings(prev => {
+      const next = prev.filter(b => b.id !== id);
+      safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(next));
+      return next;
+    });
+    deleteConsultationBookingFromFirestore(isOffline, id).catch(err => console.error("Firestore delete consultation error:", err));
   };
 
   const handleClearAllNotifications = () => {
@@ -2109,7 +2209,14 @@ export default function App() {
                 return 0;
               }
             })()}
-            pendingExcuseCount={excuseLetters.filter(e => e.status === 'pending').length}
+            pendingExcuseCount={
+              user.role === 'student'
+                ? excuseLetters.filter(e => 
+                    (e.studentId === user.studentId || e.studentName === user.name || e.studentId === user.id || e.studentEmail === user.email) && 
+                    e.status === 'pending'
+                  ).length
+                : excuseLetters.filter(e => e.status === 'pending').length
+            }
             accessibility={accessibility}
           />
 
@@ -2511,8 +2618,14 @@ export default function App() {
                           el.studentId === user.id
                         )}
                         onAddExcuseLetter={handleAddExcuseLetter}
+                        onEditExcuseLetter={handleEditExcuseLetter}
+                        onDeleteExcuseLetter={handleDeleteExcuseLetter}
                         onDropSubject={handleDropSubject}
                         onEnrollSubject={handleEnrollSubject}
+                        consultationBookings={consultationBookings}
+                        onAddConsultationBooking={handleAddConsultationBooking}
+                        onUpdateConsultationBookingStatus={handleUpdateConsultationBookingStatus}
+                        onDeleteConsultationBooking={handleDeleteConsultationBooking}
                       />
                     )}
 
@@ -2565,6 +2678,10 @@ export default function App() {
                         onUpdateLabRooms={handleUpdateLabRooms}
                         buildingClusters={buildingClusters}
                         onUpdateBuildingClusters={setBuildingClusters}
+                        consultationBookings={consultationBookings}
+                        onAddConsultationBooking={handleAddConsultationBooking}
+                        onUpdateConsultationBookingStatus={handleUpdateConsultationBookingStatus}
+                        onDeleteConsultationBooking={handleDeleteConsultationBooking}
                       />
                     )}
 

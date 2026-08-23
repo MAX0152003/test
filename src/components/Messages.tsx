@@ -12,7 +12,8 @@ import {
   ExternalLink,
   ArrowLeft,
   LifeBuoy,
-  PlusCircle
+  PlusCircle,
+  CalendarClock
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,6 +30,7 @@ interface MessagesProps {
   setScreen?: (screen: string) => void;
   initialContactId?: string | { id: string; name?: string; ts?: number };
   isOffline?: boolean;
+  onOpenConsultations?: (facultyId?: string) => void;
 }
 
 interface EnrichedChatMessage extends ChatMessage {
@@ -106,7 +108,7 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
   return result;
 };
 
-export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen, initialContactId, isOffline: propIsOffline }: MessagesProps) {
+export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen, initialContactId, isOffline: propIsOffline, onOpenConsultations }: MessagesProps) {
   const isOfflineMode = propIsOffline ?? (typeof window !== 'undefined' && localStorage.getItem('cp_offline') === 'true');
 
   const myId = userProfile.id || (userProfile as any).uid || (userProfile.role === 'student' 
@@ -1253,6 +1255,24 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
               </div>
                          {/* Header Action Panel status indicator */}
               <div className="flex items-center gap-2">
+                {activeMeta && !(activeMeta as any).isChannel && (activeMeta.role === 'faculty' || (activeMeta as any).facultyId || (activeMeta as any).dept?.toLowerCase().includes('faculty') || (activeMeta as any).dept?.toLowerCase().includes('college')) && userProfile.role === 'student' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      speakText(`Opening consultation booking with ${activeMeta.name}`, accessibility.readAloud);
+                      if (onOpenConsultations) {
+                        onOpenConsultations(activeMeta.id || (activeMeta as any).facultyId);
+                      } else if (setScreen) {
+                        setScreen('consultations');
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/25 transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                    title={`Book 1-on-1 academic consultation with ${activeMeta.name}`}
+                  >
+                    <CalendarClock className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Book Consultation</span>
+                  </button>
+                )}
                 <div className={`hidden sm:flex items-center gap-1.5 font-mono text-[9px] uppercase font-bold px-2.5 py-1 rounded-xl ${
                   isGoogleChatActive ? 'text-sky-500 bg-sky-500/10' : 'text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-910'
                 }`}>

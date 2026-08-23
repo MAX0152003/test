@@ -25,7 +25,7 @@ import {
   HelpCircle,
   ExternalLink
 } from 'lucide-react';
-import { ConsultationBooking, ClassSession, UserProfile, Role } from '../types';
+import { ConsultationBooking, ClassSession, UserProfile, Role, FacultyStatus } from '../types';
 import { speakText } from './AccessibilitySettings';
 
 interface ConsultationsViewProps {
@@ -38,6 +38,10 @@ interface ConsultationsViewProps {
   onDeleteBooking: (id: string) => void;
   onOpenChatWithUser?: (contactId: string) => void;
   readAloudEnabled?: boolean;
+  facultyStatuses?: FacultyStatus[];
+  initialFacultyId?: string;
+  autoOpenBookModal?: boolean;
+  onBack?: () => void;
 }
 
 const TIME_SLOTS = [
@@ -76,7 +80,11 @@ export default function ConsultationsView({
   onUpdateBookingStatus,
   onDeleteBooking,
   onOpenChatWithUser,
-  readAloudEnabled = false
+  readAloudEnabled = false,
+  facultyStatuses = [],
+  initialFacultyId,
+  autoOpenBookModal = false,
+  onBack
 }: ConsultationsViewProps) {
   const isFaculty = role === 'faculty';
   const isStudent = role === 'student';
@@ -84,7 +92,7 @@ export default function ConsultationsView({
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'confirmed' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+  const [isBookModalOpen, setIsBookModalOpen] = useState(autoOpenBookModal);
   const [selectedBookingDetail, setSelectedBookingDetail] = useState<ConsultationBooking | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
 
@@ -93,7 +101,7 @@ export default function ConsultationsView({
   const [selectedDateFilter, setSelectedDateFilter] = useState<string | null>(null);
 
   // Booking Form State
-  const [formFacultyId, setFormFacultyId] = useState('');
+  const [formFacultyId, setFormFacultyId] = useState(initialFacultyId || '');
   const [formFacultyName, setFormFacultyName] = useState('');
   const [formClassId, setFormClassId] = useState('');
   const [formDate, setFormDate] = useState(() => {
@@ -109,9 +117,11 @@ export default function ConsultationsView({
   const [formNotes, setFormNotes] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Available Faculty list derived from classes
+  // Available Faculty list derived from classes and facultyStatuses
   const availableFaculty = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; email: string; department: string }>();
+    const map = new Map<string, { id: string; name: string; email: string; department: string; room?: string; status?: string }>();
+    
+    // 1. From classes
     classes.forEach(c => {
       const facId = c.facultyId || `fac-${c.facultyName?.toLowerCase().replace(/\s+/g, '-') || 'general'}`;
       const facName = c.facultyName || 'Faculty Member';
@@ -120,20 +130,72 @@ export default function ConsultationsView({
           id: facId,
           name: facName,
           email: `${facName.toLowerCase().replace(/[^a-z]/g, '.')}@msu.edu.ph`,
-          department: c.buildingCluster || 'College of Computer Studies'
+          department: c.buildingCluster || 'College of Computer Studies',
+          room: c.room || 'Faculty Hall'
         });
       }
     });
+
+    // 2. From facultyStatuses
+    facultyStatuses.forEach(fs => {
+      if (fs.id && !map.has(fs.id)) {
+        map.set(fs.id, {
+          id: fs.id,
+          name: fs.name,
+          email: `${fs.name.toLowerCase().replace(/[^a-z]/g, '.')}@msu.edu.ph`,
+          department: 'Academic Faculty',
+          room: fs.room || 'Consultation Office 303',
+          status: fs.status
+        });
+      } else if (fs.id && map.has(fs.id)) {
+        const existing = map.get(fs.id)!;
+        existing.status = fs.status;
+        if (fs.room) existing.room = fs.room;
+      }
+    });
+
+    // 3. Fallback mock faculty if empty
+    if (map.size === 0) {
+      map.set('fac-1', {
+        id: 'fac-1',
+        name: 'Dr. Ahmad Khan',
+        email: 'ahmad.khan@msu.edu.ph',
+        department: 'Computer Science & AI',
+        room: 'Consultation Room 303'
+      });
+      map.set('fac-2', {
+        id: 'fac-2',
+        name: 'Prof. Maria Santos',
+        email: 'maria.santos@msu.edu.ph',
+        department: 'Information Technology',
+        room: 'Lab 402'
+      });
+    }
+
     return Array.from(map.values());
-  }, [classes]);
+  }, [classes, facultyStatuses]);
 
   // Set default faculty for booking
   React.useEffect(() => {
-    if (availableFaculty.length > 0 && !formFacultyId) {
+    if (initialFacultyId) {
+      const match = availableFaculty.find(f => f.id === initialFacultyId || f.name.toLowerCase().includes(initialFacultyId.toLowerCase()));
+      if (match) {
+        setFormFacultyId(match.id);
+        setFormFacultyName(match.name);
+        if (match.room) setFormLocation(match.room);
+      }
+    } else if (availableFaculty.length > 0 && !formFacultyId) {
       setFormFacultyId(availableFaculty[0].id);
       setFormFacultyName(availableFaculty[0].name);
+      if (availableFaculty[0].room) setFormLocation(availableFaculty[0].room);
     }
-  }, [availableFaculty, formFacultyId]);
+  }, [availableFaculty, formFacultyId, initialFacultyId]);
+
+  React.useEffect(() => {
+    if (autoOpenBookModal) {
+      setIsBookModalOpen(true);
+    }
+  }, [autoOpenBookModal]);
 
   // Bookings filtered for the current user
   const relevantBookings = useMemo(() => {

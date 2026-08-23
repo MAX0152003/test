@@ -73,6 +73,10 @@ export interface FacultyStatus {
   avatar: string;
   status: 'available' | 'in-class' | 'unavailable';
   room?: string;
+  untilTime?: string;
+  currentClassEndTime?: string;
+  currentClassName?: string;
+  currentClassCode?: string;
 }
 
 export interface Enrollment {
@@ -110,6 +114,7 @@ export interface LeaveRequest {
   id: string;
   studentId: string;
   studentName: string;
+  studentEmail?: string;
   facultyId?: string;
   facultyName?: string;
   classId: string;
@@ -120,7 +125,8 @@ export interface LeaveRequest {
   endDate: string;
   reason: string;
   status: 'pending' | 'approved' | 'rejected' | 'valid' | 'invalid';
-  createdAt: string;
+  createdAt?: string;
+  appliedAt?: string;
   reviewedAt?: string;
   reviewerNotes?: string;
   attachmentName?: string;
@@ -138,16 +144,21 @@ export interface ConsultationBooking {
   facultyName: string;
   classId?: string;
   className?: string;
+  classCode?: string;
   topic: string;
   description?: string;
+  notes?: string;
+  mode?: 'in-person' | 'online' | string;
+  location?: string;
   date: string; // YYYY-MM-DD
   startTime: string;
   endTime: string;
-  locationType: 'office' | 'online_meet' | 'in_person';
+  locationType?: 'office' | 'online_meet' | 'in_person';
   locationDetails?: string;
-  status: 'pending' | 'confirmed' | 'rescheduled' | 'cancelled' | 'completed';
+  timeSlot?: string;
+  status: 'pending' | 'confirmed' | 'rescheduled' | 'cancelled' | 'completed' | 'declined';
   facultyNotes?: string;
-  createdAt: string;
+  createdAt: string | number;
   updatedAt?: string;
 }
 

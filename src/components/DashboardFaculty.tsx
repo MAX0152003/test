@@ -63,6 +63,7 @@ import Messages from './Messages';
 import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import FacultyAttendanceTrendsChart from './FacultyAttendanceTrendsChart';
+import ConsultationsView from './ConsultationsView';
 import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
 import { 
   ACADEMIC_TERMS, 
@@ -71,6 +72,7 @@ import {
   EXCUSE_PRESET_TYPES, 
   isFridayPrayerWindow 
 } from '../lib/msuUtils';
+import { ConsultationBooking } from '../types';
 
 interface DashboardFacultyProps {
   activeScreen: string;
@@ -100,6 +102,10 @@ interface DashboardFacultyProps {
   buildingClusters?: string[];
   onUpdateBuildingClusters?: (clusters: string[]) => void;
   selectedChatContact?: { id: string; name?: string; ts?: number };
+  consultationBookings?: ConsultationBooking[];
+  onAddConsultationBooking?: (booking: ConsultationBooking) => void;
+  onUpdateConsultationBookingStatus?: (id: string, status: 'confirmed' | 'declined' | 'completed' | 'cancelled', notes?: string) => void;
+  onDeleteConsultationBooking?: (id: string) => void;
 }
 
 const parseTimeToMinutesVal = (timeStr: string) => {
@@ -338,7 +344,11 @@ export default function DashboardFaculty({
   labRooms = [],
   onUpdateLabRooms,
   buildingClusters = [],
-  onUpdateBuildingClusters
+  onUpdateBuildingClusters,
+  consultationBookings = [],
+  onAddConsultationBooking,
+  onUpdateConsultationBookingStatus,
+  onDeleteConsultationBooking
 }: DashboardFacultyProps) {
   
   // Faculty selected lab room monitor state
@@ -2959,6 +2969,34 @@ export default function DashboardFaculty({
             setScreen={setScreen}
             onBack={() => setScreen('dashboard')}
             initialContactId={selectedChatContact}
+            onOpenConsultations={() => setScreen('consultations')}
+          />
+        </motion.div>
+      )}
+
+      {/* Consultations View screen for Faculty */}
+      {activeScreen === 'consultations' && (
+        <motion.div
+          key="consultations"
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -50 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full space-y-6 text-left animate-fade-in"
+        >
+          <ConsultationsView
+            role="faculty"
+            userProfile={userProfile}
+            classes={classes}
+            bookings={consultationBookings || []}
+            facultyStatuses={facultyStatuses}
+            onAddBooking={onAddConsultationBooking || (() => {})}
+            onUpdateBookingStatus={onUpdateConsultationBookingStatus || (() => {})}
+            onDeleteBooking={onDeleteConsultationBooking || (() => {})}
+            onOpenChatWithUser={(contactId) => {
+              setScreen('messages', { id: contactId, ts: Date.now() });
+            }}
+            readAloudEnabled={accessibility.readAloud}
           />
         </motion.div>
       )}

@@ -10,12 +10,14 @@ import {
   Lock,
   LayoutDashboard,
   CalendarDays,
+  CalendarClock,
   Scan,
   MessageSquare,
   Bell,
   UserCircle,
   Users,
   Inbox,
+  FileText,
   Download,
   LogOut
 } from 'lucide-react';
@@ -32,6 +34,7 @@ interface SidebarProps {
   unreadNotifications: number;
   unreadMessages?: number;
   pendingExcuseCount?: number;
+  pendingConsultationCount?: number;
   accessibility: AccessibilityConfig;
   isOffline?: boolean;
 }
@@ -46,6 +49,7 @@ export default function Sidebar({
   unreadNotifications,
   unreadMessages = 0,
   pendingExcuseCount = 0,
+  pendingConsultationCount = 0,
   accessibility,
   isOffline = false
 }: SidebarProps) {
@@ -156,6 +160,8 @@ export default function Sidebar({
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { id: 'schedule', label: 'My Schedule', icon: CalendarDays },
               { id: 'attendance', label: 'Attendance Scan', icon: Scan },
+              { id: 'consultations', label: 'Consultations', icon: CalendarClock, badge: pendingConsultationCount },
+              { id: 'excuse-letters', label: 'Excuse Letters', icon: FileText, badge: pendingExcuseCount },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages },
               { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifications },
             ]
@@ -177,6 +183,7 @@ export default function Sidebar({
               { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
               { id: 'schedule-editor', label: 'My Classes', icon: CalendarDays },
               { id: 'qr-generator', label: 'Attendance QR', icon: Scan },
+              { id: 'consultations', label: 'Consultations', icon: CalendarClock, badge: pendingConsultationCount },
               { id: 'students-monitoring', label: 'Students Directory', icon: Users },
               { id: 'excuse-inbox', label: 'Excuse Inbox', icon: Inbox, badge: pendingExcuseCount },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages },
@@ -201,6 +208,7 @@ export default function Sidebar({
               { id: 'resets', label: 'Password Resets', icon: Lock, badge: pendingResetsCount },
               { id: 'users', label: 'Users Directory', icon: Users },
               { id: 'schedule-editor', label: 'Schedules', icon: CalendarDays },
+              { id: 'consultations', label: 'Consultations', icon: CalendarClock, badge: pendingConsultationCount },
               { id: 'rooms', label: 'Rooms Directory', icon: MapPin },
               { id: 'reports', label: 'Reports Export', icon: Download },
               { id: 'tickets', label: 'Help Tickets', icon: HelpCircle, badge: pendingTicketsCount },
