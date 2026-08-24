@@ -298,7 +298,10 @@ export default function FacultyAttendanceTrendsChart({
               axisLine={false}
               tick={{ fill: isDark ? '#a1a1aa' : '#71717a', fontSize: 10 }}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              content={<CustomTooltip />} 
+              cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }}
+            />
             <Legend
               verticalAlign="top"
               align="right"

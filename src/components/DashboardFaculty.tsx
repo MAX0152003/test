@@ -365,6 +365,7 @@ export default function DashboardFaculty({
 
   // Excuse filter: 'pending' | 'valid' | 'invalid'
   const [excuseFilter, setExcuseFilter] = React.useState<'pending' | 'valid' | 'invalid'>('pending');
+  const [editingExcuseId, setEditingExcuseId] = React.useState<string | null>(null);
   const [imagePreviewData, setImagePreviewData] = React.useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
 
   // Fast Class Search & Student Search states
@@ -3048,10 +3049,14 @@ export default function DashboardFaculty({
                   {pendingCount > 0 && onUpdateExcuseStatus && (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         const pendingLetters = excuseLetters.filter(l => l.status === 'pending');
-                        pendingLetters.forEach(l => onUpdateExcuseStatus(l.id, 'valid'));
+                        if (pendingLetters.length === 0) return;
+                        await Promise.all(pendingLetters.map(l => Promise.resolve(onUpdateExcuseStatus(l.id, 'valid'))));
                         speakText(`Approved all ${pendingLetters.length} pending excuse letters in batch.`, accessibility.readAloud);
+                        if (typeof window !== 'undefined' && (window as any).showToast) {
+                          (window as any).showToast(`Batch approved ${pendingLetters.length} pending excuse letters.`, 'success');
+                        }
                       }}
                       className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-95 flex items-center gap-2 shadow-sm self-start sm:self-auto"
                     >
@@ -3315,39 +3320,141 @@ export default function DashboardFaculty({
                             </div>
 
                             {onUpdateExcuseStatus && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onUpdateExcuseStatus(letter.id, 'valid');
-                                    speakText(`Approved excuse letter for ${letter.studentName}. Attendance converted to Excused.`, accessibility.readAloud);
-                                  }}
-                                  title="Approve request and immediately convert attendance to Excused"
-                                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 ${
-                                    isValid
-                                      ? 'bg-emerald-500 text-black shadow-sm font-black'
-                                      : 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                                  }`}
-                                >
-                                  <Check className="w-4 h-4 stroke-[3]" />
-                                  Approve
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    onUpdateExcuseStatus(letter.id, 'invalid');
-                                    speakText(`Rejected excuse letter for ${letter.studentName}.`, accessibility.readAloud);
-                                  }}
-                                  title="Reject request"
-                                  className={`px-3.5 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 ${
-                                    isInvalid
-                                      ? 'bg-red-500 text-white shadow-sm font-black'
-                                      : 'bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20'
-                                  }`}
-                                >
-                                  <X className="w-4 h-4 stroke-[3]" />
-                                  Reject
-                                </button>
+                              <div>
+                                {isPending ? (
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdateExcuseStatus(letter.id, 'valid');
+                                        speakText(`Approved excuse letter for ${letter.studentName}. Attendance converted to Excused.`, accessibility.readAloud);
+                                        if (typeof window !== 'undefined' && (window as any).showToast) {
+                                          (window as any).showToast(`Approved excuse for ${letter.studentName}. Marked as Declared Valid!`, "success");
+                                        }
+                                      }}
+                                      title="Approve request and immediately convert attendance to Excused"
+                                      className="px-3.5 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 bg-emerald-500 hover:bg-emerald-400 text-black"
+                                    >
+                                      <Check className="w-4 h-4 stroke-[3]" />
+                                      Approve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdateExcuseStatus(letter.id, 'invalid');
+                                        speakText(`Rejected excuse letter for ${letter.studentName}.`, accessibility.readAloud);
+                                        if (typeof window !== 'undefined' && (window as any).showToast) {
+                                          (window as any).showToast(`Rejected excuse for ${letter.studentName}. Marked as Declared Invalid.`, "info");
+                                        }
+                                      }}
+                                      title="Reject request"
+                                      className="px-3.5 py-2 rounded-xl text-xs font-black uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20"
+                                    >
+                                      <X className="w-4 h-4 stroke-[3]" />
+                                      Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    {editingExcuseId === letter.id ? (
+                                      <div className="flex flex-wrap items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 animate-fade-in">
+                                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 px-2 font-mono uppercase">Change Decision:</span>
+                                        {isValid ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                onUpdateExcuseStatus(letter.id, 'invalid');
+                                                setEditingExcuseId(null);
+                                                speakText(`Decision updated to Invalid for ${letter.studentName}.`, accessibility.readAloud);
+                                                if (typeof window !== 'undefined' && (window as any).showToast) {
+                                                  (window as any).showToast(`Excuse for ${letter.studentName} updated to Declared Invalid.`, "info");
+                                                }
+                                              }}
+                                              className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-red-500 hover:bg-red-600 text-white cursor-pointer flex items-center gap-1 transition-all shadow-xs active:scale-95"
+                                              title="Change decision to Rejected / Invalid"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                              Mark Invalid / Reject
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                onUpdateExcuseStatus(letter.id, 'pending');
+                                                setEditingExcuseId(null);
+                                                speakText(`Reset excuse to Pending review for ${letter.studentName}.`, accessibility.readAloud);
+                                                if (typeof window !== 'undefined' && (window as any).showToast) {
+                                                  (window as any).showToast(`Excuse for ${letter.studentName} returned to Pending Review.`, "info");
+                                                }
+                                              }}
+                                              className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 cursor-pointer flex items-center gap-1 transition-all active:scale-95"
+                                              title="Reset back to Pending review"
+                                            >
+                                              <RotateCcw className="w-3.5 h-3.5" />
+                                              Reset to Pending
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                onUpdateExcuseStatus(letter.id, 'valid');
+                                                setEditingExcuseId(null);
+                                                speakText(`Decision updated to Approved Valid for ${letter.studentName}.`, accessibility.readAloud);
+                                                if (typeof window !== 'undefined' && (window as any).showToast) {
+                                                  (window as any).showToast(`Excuse for ${letter.studentName} updated to Declared Valid!`, "success");
+                                                }
+                                              }}
+                                              className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer flex items-center gap-1 transition-all shadow-xs active:scale-95"
+                                              title="Change decision to Approved / Valid"
+                                            >
+                                              <Check className="w-3.5 h-3.5" />
+                                              Mark Valid / Approve
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                onUpdateExcuseStatus(letter.id, 'pending');
+                                                setEditingExcuseId(null);
+                                                speakText(`Reset excuse to Pending review for ${letter.studentName}.`, accessibility.readAloud);
+                                                if (typeof window !== 'undefined' && (window as any).showToast) {
+                                                  (window as any).showToast(`Excuse for ${letter.studentName} returned to Pending Review.`, "info");
+                                                }
+                                              }}
+                                              className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 cursor-pointer flex items-center gap-1 transition-all active:scale-95"
+                                              title="Reset back to Pending review"
+                                            >
+                                              <RotateCcw className="w-3.5 h-3.5" />
+                                              Reset to Pending
+                                            </button>
+                                          </>
+                                        )}
+                                        <button
+                                          type="button"
+                                          onClick={() => setEditingExcuseId(null)}
+                                          className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 cursor-pointer transition-all"
+                                          title="Cancel edit"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingExcuseId(letter.id);
+                                          speakText(`Editing decision for ${letter.studentName}. Choose new status.`, accessibility.readAloud);
+                                        }}
+                                        title="Edit excuse letter decision"
+                                        className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase cursor-pointer flex items-center gap-1.5 transition-all shadow-xs active:scale-95 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5 text-blue-500" />
+                                        Edit
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

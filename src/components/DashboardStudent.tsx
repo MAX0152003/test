@@ -53,7 +53,10 @@ import {
   Zap,
   SlidersHorizontal,
   CalendarClock,
-  Filter
+  Filter,
+  History,
+  Check,
+  RotateCcw
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock, { triggerNativeChime } from './AlarmClock';
@@ -299,6 +302,28 @@ export default function DashboardStudent({
   const [isScanning, setIsScanning] = React.useState(false);
   const [isCameraLoading, setIsCameraLoading] = React.useState(false);
   const [scanResult, setScanResult] = React.useState<{ success: boolean; message: string } | null>(null);
+  const [attendanceSubTab, setAttendanceSubTab] = React.useState<'scanner' | 'history'>('scanner');
+  const [isSuccessFlashing, setIsSuccessFlashing] = React.useState(false);
+  const [autoCloseCountdown, setAutoCloseCountdown] = React.useState<number | null>(null);
+
+  // Auto-dismiss countdown timer for successful attendance scans
+  React.useEffect(() => {
+    if (autoCloseCountdown === null) return;
+
+    if (autoCloseCountdown > 0) {
+      const timer = setTimeout(() => {
+        setAutoCloseCountdown(prev => (prev !== null && prev > 1 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (autoCloseCountdown === 0) {
+      // Auto close overlay and resume scanner if on scanner tab
+      setScanResult(null);
+      setAutoCloseCountdown(null);
+      if (activeScreen === 'attendance' && attendanceSubTab === 'scanner') {
+        startLiveCamera();
+      }
+    }
+  }, [autoCloseCountdown, activeScreen, attendanceSubTab]);
 
   // Anti-Screenshot and Attendance Fraud Prevention state
   const [showScreenshotWarning, setShowScreenshotWarning] = React.useState(false);
@@ -752,6 +777,28 @@ export default function DashboardStudent({
       }
       html5QrCodeRef.current = null;
     }
+
+    // Explicitly stop all video MediaStream tracks in DOM to free camera hardware
+    try {
+      const container = document.getElementById("live-qr-reader");
+      if (container) {
+        const videos = container.querySelectorAll('video');
+        videos.forEach((v: HTMLVideoElement) => {
+          if (v.srcObject && 'getTracks' in (v.srcObject as MediaStream)) {
+            (v.srcObject as MediaStream).getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch (err) {}
+            });
+            v.srcObject = null;
+          }
+          v.pause();
+        });
+      }
+    } catch (e) {
+      // Non-blocking cleanup
+    }
+
     setIsScanning(false);
     setIsCameraLoading(false);
   };
@@ -857,6 +904,8 @@ export default function DashboardStudent({
       if (!matchedClass) {
         playWarningChime();
         triggerHapticFeedback([120, 60, 120]);
+        setAutoCloseCountdown(null);
+        setIsSuccessFlashing(false);
         setScanResult({
           success: false,
           message: `Unrecognized token: "${decodedText.substring(0, 40)}${decodedText.length > 40 ? '...' : ''}". Match the active rotation keys from your professor.`
@@ -871,8 +920,15 @@ export default function DashboardStudent({
       const status = Math.random() > 0.85 ? 'late' : 'present';
       onRecordAttendance(matchedClass.id, status);
 
+      // Trigger subtle screen flash / check-mark visual animation on camera viewfinder
+      setIsSuccessFlashing(true);
+      setTimeout(() => setIsSuccessFlashing(false), 1600);
+
       playSuccessChime();
       triggerHapticFeedback([60, 30, 90]);
+
+      // Start 5-second auto-close / scan again countdown
+      setAutoCloseCountdown(5);
 
       setScanResult({
         success: true,
@@ -885,6 +941,8 @@ export default function DashboardStudent({
     } catch (err: any) {
       playWarningChime();
       triggerHapticFeedback([120, 60, 120]);
+      setAutoCloseCountdown(null);
+      setIsSuccessFlashing(false);
       setScanResult({
         success: false,
         message: `Scanning error: ${err?.message || 'Unknown processing error'}`
@@ -2005,13 +2063,13 @@ export default function DashboardStudent({
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
-                              <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase">
+                              <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase inline-block">
                                 {cls.code}
                               </span>
-                              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1.5 sm:mt-2 tracking-tight truncate max-w-[130px] sm:max-w-[170px]">{cls.name}</h4>
+                              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1.5 sm:mt-2 tracking-tight truncate">{cls.name}</h4>
                             </div>
                             <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
                                 isEnrolled 
                                   ? 'bg-blue-600 text-white font-extrabold shadow-sm' 
                                   : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-500'
@@ -2020,7 +2078,7 @@ export default function DashboardStudent({
                               </span>
 
                               {isEnrolled && (
-                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${standingColor}`}>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md whitespace-nowrap ${standingColor}`}>
                                   {standingLabel}
                                 </span>
                               )}
@@ -2033,7 +2091,7 @@ export default function DashboardStudent({
                                     e.stopPropagation();
                                     setStudentDeleteConfirm({ id: cls.id, code: cls.code, name: cls.name });
                                   }}
-                                  className="p-1 h-6 w-6 mt-1 flex items-center justify-center rounded-md bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-0 group-hover/card:opacity-100 animate-fade-in"
+                                  className="p-1 h-6 w-6 mt-1 flex items-center justify-center rounded-md bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-80 sm:opacity-0 group-hover/card:opacity-100 animate-fade-in"
                                   title="Delete/drop subject"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -2048,7 +2106,7 @@ export default function DashboardStudent({
                                     e.stopPropagation();
                                     onEnrollSubject(cls.id);
                                   }}
-                                  className="mt-1.5 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all"
+                                  className="mt-1.5 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all whitespace-nowrap"
                                   title="Enroll in this subject"
                                 >
                                   Enroll Now
@@ -2183,240 +2241,492 @@ export default function DashboardStudent({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
+          className="w-full space-y-5 text-left animate-fade-in"
         >
-          <div className="space-y-6 text-left">
-            <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850 pb-4">
-              <button 
-                onClick={() => setScreen('dashboard')} 
-                type="button"
-                className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
-                title="Back"
-              >
-                <ArrowLeft className="w-4 h-4 text-emerald-500" />
-              </button>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
-                  <Scan className="w-5 h-5 text-emerald-500" />
-                  Live Attendance Scantool
-                </h2>
-                <p className="text-xs text-zinc-400 mt-1">Position your camera viewpoint or use dynamic 1-tap check-in to record attendance.</p>
-              </div>
-            </div>
+          {(() => {
+            // Filter last 5 successful check-ins specifically for this student
+            const myRecentScans = attendanceRecords
+              .filter(r => 
+                (r.studentId === userProfile.studentId || r.studentId === userProfile.id || r.studentName === userProfile.name || (!r.studentId && userProfile.role === 'student')) &&
+                (r.status === 'present' || r.status === 'late' || r.status === 'excused')
+              )
+              .sort((a, b) => {
+                const timeA = new Date(`${a.date} ${a.time || '00:00'}`).getTime() || 0;
+                const timeB = new Date(`${b.date} ${b.time || '00:00'}`).getTime() || 0;
+                return timeB - timeA;
+              })
+              .slice(0, 5);
 
-            {/* Active Session Card Banner */}
-            {(() => {
-              const detected = getDetectedClass();
-              if (!detected) return null;
-              return (
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-left flex items-center justify-between gap-3 max-w-sm mx-auto">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-emerald-500 text-black shrink-0">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono font-black uppercase text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/15">
-                          {detected.code}
-                        </span>
-                        <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">
-                          {detected.name}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        Room {detected.room} • {detected.startTime} - {detected.endTime}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
-                    LIVE NOW
-                  </span>
-                </div>
-              );
-            })()}
-
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-4 max-w-sm mx-auto">
-              <div className="space-y-4 animate-fade-in">
-                {/* Real Camera Viewport */}
-                <div className="relative rounded-2xl bg-zinc-950 w-full h-[290px] sm:h-[310px] overflow-hidden border border-zinc-250 dark:border-zinc-800 transition-all duration-300 flex flex-col justify-between shadow-xl">
-                  {/* Camera Feed Target Container */}
-                  <div id="live-qr-reader" className="w-full h-[290px] sm:h-[310px] bg-zinc-950 overflow-hidden relative"></div>
-
-                  {/* iOS & Mobile Tap-to-Start Live Camera Direct Gesture Overlay */}
-                  {!isScanning && !isCameraLoading && (
-                    <div 
-                      onClick={startLiveCamera}
-                      className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950/85 hover:bg-zinc-950/75 transition-colors cursor-pointer text-center p-4 group"
-                    >
-                      <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-active:scale-95 transition-transform shadow-[0_0_30px_rgba(16,185,129,0.5)]">
-                        <Camera className="w-8 h-8 animate-pulse" />
-                      </div>
-                      <span className="mt-3 text-xs font-black uppercase tracking-wider text-emerald-400">
-                        Tap to Launch Live Camera
-                      </span>
-                      <span className="text-[10px] text-zinc-400 mt-1 max-w-[220px]">
-                        Point camera at professor's rotating QR code
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Active QR Scanner Feed Loading Skeleton */}
-                  {isCameraLoading && (
-                    <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center text-center p-6 z-20 space-y-4">
-                      <div className="w-12 h-12 rounded-full border-4 border-emerald-500/10 border-t-emerald-500 animate-spin" />
-                      <div className="space-y-1">
-                        <p className="text-xs font-black text-emerald-500 uppercase tracking-widest font-mono animate-pulse">Initializing Camera...</p>
-                        <p className="text-[10px] text-zinc-400 max-w-xs font-sans">Awaiting secure webcam permissions.</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Standard HUD Overlay with a framing grid */}
-                  <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10 bg-gradient-to-t from-black/50 via-transparent to-black/50 overflow-hidden">
-                    
-                    {/* Semi-transparent diagonal secure anti-screenshot watermarks */}
-                    <div className="absolute inset-0 grid grid-cols-2 gap-4 rotate-[-15deg] scale-125 opacity-20 pointer-events-none select-none">
-                      {Array.from({ length: 8 }).map((_, i) => (
-                        <div key={i} className="text-[7.5px] font-mono text-emerald-400 font-extrabold uppercase tracking-widest leading-relaxed whitespace-nowrap p-4 select-none">
-                          SECURE ATTENDANCE • {userProfile.name.toUpperCase()} ({userProfile.studentId || userProfile.id}) • DO NOT SCREENSHOT • IP SECURED
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-between items-start z-10">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-black text-[9px] font-black tracking-widest uppercase shadow flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
-                        {isScanning ? 'LIVE CAMERA ACTIVE' : 'CAMERA STANDBY'}
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded bg-red-500/80 text-white text-[8px] font-mono font-bold tracking-wider">
-                          SCREENSHOT PROHIBITED
-                        </span>
-                        <div className={`w-2.5 h-2.5 rounded-full ${
-                          isScanning ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-500'
-                        }`}></div>
-                      </div>
-                    </div>
-                    
-                    {/* Interactive frame sights */}
-                    <div className="mx-auto my-auto w-44 h-44 border-2 border-dashed border-emerald-500/50 rounded-2xl relative flex items-center justify-center z-10">
-                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-emerald-400"></div>
-                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-emerald-400"></div>
-                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-emerald-400"></div>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-emerald-400"></div>
-                      {isScanning && (
-                        <div className="w-full h-0.5 bg-emerald-500 shadow-md absolute shadow-emerald-500/80 animate-[bounce_2.5s_infinite]" />
-                      )}
-                    </div>
-
-                    <p className="text-center text-[10px] font-mono tracking-widest py-1 rounded backdrop-blur-xs z-10 text-emerald-400 bg-zinc-900/80">
-                      CENTER CLASS QR CODE IN FRAME
-                    </p>
+            return (
+              <div className="space-y-5 text-left">
+                <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850 pb-4">
+                  <button 
+                    onClick={() => setScreen('dashboard')} 
+                    type="button"
+                    className="p-2 rounded-xl text-zinc-600 dark:text-zinc-350 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
+                    title="Back"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-emerald-500" />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tight flex items-center gap-2">
+                      <Scan className="w-5 h-5 text-emerald-500" />
+                      Live Attendance Scantool
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-1">Scan rotating QR codes or review your recent recorded course check-in ledger.</p>
                   </div>
                 </div>
 
+                {/* Sub-Tabs: Live Scanner vs. Scan History */}
+                <div className="flex items-center gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-sm mx-auto shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttendanceSubTab('scanner');
+                      startLiveCamera();
+                    }}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      attendanceSubTab === 'scanner'
+                        ? 'bg-emerald-500 text-black font-black shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>QR Scanner</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttendanceSubTab('history');
+                      stopLiveCamera();
+                    }}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      attendanceSubTab === 'history'
+                        ? 'bg-emerald-500 text-black font-black shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>Scan History ({myRecentScans.length})</span>
+                  </button>
+                </div>
 
-                {cameraError && (
+                {/* TAB 1: LIVE QR SCANNER */}
+                {attendanceSubTab === 'scanner' && (
                   <div className="space-y-4">
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400 text-left">
-                      <p className="font-extrabold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-red-500" /> Frame Connection Warning</p>
-                      <p className="text-zinc-500 dark:text-zinc-300 font-medium leading-relaxed mt-1 text-[11px]">
-                        {cameraError} Verify that webcam permissions are approved in your browser settings.
-                      </p>
-                    </div>
+                    {/* Active Session Card Banner */}
+                    {(() => {
+                      const detected = getDetectedClass();
+                      if (!detected) return null;
+                      return (
+                        <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-left flex items-center justify-between gap-3 max-w-sm mx-auto">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-emerald-500 text-black shrink-0">
+                              <Sparkles className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-mono font-black uppercase text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/15">
+                                  {detected.code}
+                                </span>
+                                <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200">
+                                  {detected.name}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                Room {detected.room} • {detected.startTime} - {detected.endTime}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                            LIVE NOW
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    <form onSubmit={(e) => e.preventDefault()} className="space-y-4 max-w-sm mx-auto">
+                      <div className="space-y-4 animate-fade-in">
+                        {/* Real Camera Viewport */}
+                        <div className="relative rounded-2xl bg-zinc-950 w-full h-[290px] sm:h-[310px] overflow-hidden border border-zinc-250 dark:border-zinc-800 transition-all duration-300 flex flex-col justify-between shadow-xl">
+                          {/* Camera Feed Target Container */}
+                          <div id="live-qr-reader" className="w-full h-[290px] sm:h-[310px] bg-zinc-950 overflow-hidden relative"></div>
+
+                          {/* Subtle Visual Screen Flash & Animated Checkmark on Attendance Recorded */}
+                          <AnimatePresence>
+                            {isSuccessFlashing && (
+                              <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="absolute inset-0 z-30 bg-emerald-500/35 backdrop-blur-[2px] border-4 border-emerald-400 flex flex-col items-center justify-center pointer-events-none"
+                              >
+                                <motion.div
+                                  initial={{ scale: 0.2, opacity: 0 }}
+                                  animate={{ scale: [0.2, 1.25, 1], opacity: 1 }}
+                                  exit={{ scale: 0.8, opacity: 0 }}
+                                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                                  className="w-20 h-20 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-[0_0_60px_rgba(16,185,129,0.95)]"
+                                >
+                                  <Check className="w-12 h-12 stroke-[3.5]" />
+                                </motion.div>
+                                <motion.span
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: 0.15 }}
+                                  className="mt-3 text-xs font-black uppercase tracking-widest text-white bg-black/80 px-3.5 py-1 rounded-full font-mono shadow-lg border border-emerald-400/60"
+                                >
+                                  CHECK-IN RECORDED
+                                </motion.span>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          {/* iOS & Mobile Tap-to-Start Live Camera Direct Gesture Overlay */}
+                          {!isScanning && !isCameraLoading && (
+                            <div 
+                              onClick={startLiveCamera}
+                              className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950/85 hover:bg-zinc-950/75 transition-colors cursor-pointer text-center p-4 group"
+                            >
+                              <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-active:scale-95 transition-transform shadow-[0_0_30px_rgba(16,185,129,0.5)]">
+                                <Camera className="w-8 h-8 animate-pulse" />
+                              </div>
+                              <span className="mt-3 text-xs font-black uppercase tracking-wider text-emerald-400">
+                                Tap to Launch Live Camera
+                              </span>
+                              <span className="text-[10px] text-zinc-400 mt-1 max-w-[220px]">
+                                Point camera at professor's rotating QR code
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Active QR Scanner Feed Loading Skeleton */}
+                          {isCameraLoading && (
+                            <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center text-center p-6 z-20 space-y-4">
+                              <div className="w-12 h-12 rounded-full border-4 border-emerald-500/10 border-t-emerald-500 animate-spin" />
+                              <div className="space-y-1">
+                                <p className="text-xs font-black text-emerald-500 uppercase tracking-widest font-mono animate-pulse">Initializing Camera...</p>
+                                <p className="text-[10px] text-zinc-400 max-w-xs font-sans">Awaiting secure webcam permissions.</p>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Standard HUD Overlay with a framing grid */}
+                          <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10 bg-gradient-to-t from-black/50 via-transparent to-black/50 overflow-hidden">
+                            
+                            {/* Semi-transparent diagonal secure anti-screenshot watermarks */}
+                            <div className="absolute inset-0 grid grid-cols-2 gap-4 rotate-[-15deg] scale-125 opacity-20 pointer-events-none select-none">
+                              {Array.from({ length: 8 }).map((_, i) => (
+                                <div key={i} className="text-[7.5px] font-mono text-emerald-400 font-extrabold uppercase tracking-widest leading-relaxed whitespace-nowrap p-4 select-none">
+                                  SECURE ATTENDANCE • {userProfile.name.toUpperCase()} ({userProfile.studentId || userProfile.id}) • DO NOT SCREENSHOT • IP SECURED
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="flex justify-between items-start z-10">
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-500 text-black text-[9px] font-black tracking-widest uppercase shadow flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
+                                {isScanning ? 'LIVE CAMERA ACTIVE' : 'CAMERA STANDBY'}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 rounded bg-red-500/80 text-white text-[8px] font-mono font-bold tracking-wider">
+                                  SCREENSHOT PROHIBITED
+                                </span>
+                                <div className={`w-2.5 h-2.5 rounded-full ${
+                                  isScanning ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-500'
+                                }`}></div>
+                              </div>
+                            </div>
+                            
+                            {/* Interactive frame sights */}
+                            <div className="mx-auto my-auto w-44 h-44 border-2 border-dashed border-emerald-500/50 rounded-2xl relative flex items-center justify-center z-10">
+                              <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-emerald-400"></div>
+                              <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-emerald-400"></div>
+                              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-emerald-400"></div>
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-emerald-400"></div>
+                              {isScanning && (
+                                <div className="w-full h-0.5 bg-emerald-500 shadow-md absolute shadow-emerald-500/80 animate-[bounce_2.5s_infinite]" />
+                              )}
+                            </div>
+
+                            <p className="text-center text-[10px] font-mono tracking-widest py-1 rounded backdrop-blur-xs z-10 text-emerald-400 bg-zinc-900/80">
+                              CENTER CLASS QR CODE IN FRAME
+                            </p>
+                          </div>
+                        </div>
+
+                        {cameraError && (
+                          <div className="space-y-4">
+                            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-600 dark:text-red-400 text-left">
+                              <p className="font-extrabold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-red-500" /> Frame Connection Warning</p>
+                              <p className="text-zinc-500 dark:text-zinc-300 font-medium leading-relaxed mt-1 text-[11px]">
+                                {cameraError} Verify that webcam permissions are approved in your browser settings.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2.5">
+                          {isScanning ? (
+                            <button
+                              type="button"
+                              onClick={stopLiveCamera}
+                              className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all shadow-xs"
+                            >
+                              Stop Live Camera
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startLiveCamera}
+                              className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all shadow-xs flex items-center justify-center gap-1.5"
+                            >
+                              <Camera className="w-4 h-4" />
+                              <span>Start Camera Scanner</span>
+                            </button>
+                          )}
+
+                          {/* Direct Camera Photo Snapshot / File QR Scan Option */}
+                          <label className="flex-1 py-3 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-zinc-200 dark:border-zinc-700">
+                            <Scan className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <span>Scan from Photo</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              capture="environment" 
+                              onChange={handleQrPhotoUpload} 
+                              className="hidden" 
+                            />
+                          </label>
+                        </div>
+
+                        {/* Fallback Manual Secret Code Entry */}
+                        <div className="pt-4 border-t border-zinc-200 dark:border-zinc-850 space-y-2 mt-4">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-wider">
+                              Can't scan? Enter session passcode
+                            </label>
+                            <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                              example: {classes[0]?.qrToken || 'QR_KEY_X82KA'}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              id="manual-session-passcode-input"
+                              placeholder="Enter session passcode (e.g. QR_KEY_...)"
+                              className="flex-1 px-4 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 outline-none font-mono font-bold uppercase placeholder:normal-case text-zinc-800 dark:text-zinc-200 shadow-xs"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById('manual-session-passcode-input') as HTMLInputElement;
+                                if (input && input.value.trim()) {
+                                  handleDecodedText(input.value.trim());
+                                } else {
+                                  if (typeof window !== 'undefined' && (window as any).showToast) {
+                                    (window as any).showToast("Please enter a valid session key.", "warning");
+                                  }
+                                }
+                              }}
+                              className="px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-100 text-xs font-bold uppercase tracking-wider cursor-pointer active:scale-95 transition-all rounded-xl border border-zinc-200 dark:border-zinc-700"
+                            >
+                              Verify Code
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    </form>
+
+                    {/* Scan results info overlay with Auto-Dismiss / Scan Again Controls */}
+                    {scanResult && (
+                      <div className={`mt-5 p-4 rounded-2xl border flex flex-col gap-3 text-left max-w-sm mx-auto shadow-md ${
+                        scanResult.success 
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                          : 'bg-red-500/10 border-red-500/30 text-red-500'
+                      }`}>
+                        <div className="flex items-start gap-3">
+                          {scanResult.success ? <CheckCircle className="w-5 h-5 shrink-0 mt-0.5 text-emerald-400" /> : <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-red-400" />}
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-black uppercase tracking-wider">
+                                {scanResult.success ? 'Attendance Verified & Recorded' : 'Scan Refused'}
+                              </h4>
+                              {scanResult.success && autoCloseCountdown !== null && (
+                                <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full animate-pulse">
+                                  Auto-closing: {autoCloseCountdown}s
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs opacity-95 leading-relaxed mt-1 text-zinc-800 dark:text-zinc-200">{scanResult.message}</p>
+                          </div>
+                        </div>
+
+                        {/* Visual auto-close progress bar */}
+                        {scanResult.success && autoCloseCountdown !== null && (
+                          <div className="w-full bg-emerald-500/20 h-1.5 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-400 rounded-full transition-all duration-1000 ease-linear"
+                              style={{ width: `${(autoCloseCountdown / 5) * 100}%` }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Interactive Scan Again / Dismiss Buttons */}
+                        <div className="flex items-center gap-2 pt-1">
+                          {scanResult.success ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setScanResult(null);
+                                  setAutoCloseCountdown(null);
+                                  startLiveCamera();
+                                }}
+                                className="flex-1 py-2 px-3 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Scan Another Now</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setScanResult(null);
+                                  setAutoCloseCountdown(null);
+                                }}
+                                className="py-2 px-3 bg-zinc-200/80 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all active:scale-95"
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setScanResult(null);
+                                startLiveCamera();
+                              }}
+                              className="w-full py-2 px-3 bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all active:scale-95"
+                            >
+                              Retry Scan
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div className="flex gap-2.5">
-                  {isScanning ? (
-                    <button
-                      type="button"
-                      onClick={stopLiveCamera}
-                      className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all shadow-xs"
-                    >
-                      Stop Live Camera
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={startLiveCamera}
-                      className="flex-1 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all shadow-xs flex items-center justify-center gap-1.5"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>Start Camera Scanner</span>
-                    </button>
-                  )}
+                {/* TAB 2: SCAN HISTORY (LAST 5 SUCCESSFUL CHECK-INS) */}
+                {attendanceSubTab === 'history' && (
+                  <div className="space-y-4 max-w-sm mx-auto">
+                    {myRecentScans.length === 0 ? (
+                      <div className="p-8 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 text-center space-y-3">
+                        <div className="w-12 h-12 rounded-full bg-zinc-200/60 dark:bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
+                          <History className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">No Scan History Recorded</h4>
+                          <p className="text-xs text-zinc-400 mt-1">Your recent verified attendance check-ins will appear here.</p>
+                        </div>
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttendanceSubTab('scanner');
+                              startLiveCamera();
+                            }}
+                            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-95 shadow-xs"
+                          >
+                            Launch QR Scanner
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Last 5 Successful Check-ins</span>
+                          <span className="text-[10px] font-mono text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            Verified Records
+                          </span>
+                        </div>
 
-                  {/* Direct Camera Photo Snapshot / File QR Scan Option */}
-                  <label className="flex-1 py-3 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-black uppercase tracking-wider cursor-pointer text-center select-none active:scale-95 transition-all flex items-center justify-center gap-1.5 border border-zinc-200 dark:border-zinc-700">
-                    <Scan className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Scan from Photo</span>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      capture="environment" 
-                      onChange={handleQrPhotoUpload} 
-                      className="hidden" 
-                    />
-                  </label>
-                </div>
+                        <div className="space-y-2.5">
+                          {myRecentScans.map((rec) => {
+                            const clsInfo = classes.find(c => c.id === rec.classId || c.code === rec.classCode);
+                            const isPresent = rec.status === 'present';
+                            const isLate = rec.status === 'late';
 
-                {/* Fallback Manual Secret Code Entry */}
-                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-850 space-y-2 mt-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-wider">
-                      Can't scan? Enter session passcode
-                    </label>
-                    <span className="text-[9px] font-mono text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      example: {classes[0]?.qrToken || 'QR_KEY_X82KA'}
-                    </span>
+                            return (
+                              <div
+                                key={rec.id}
+                                className="p-3.5 rounded-2xl bg-white dark:bg-zinc-900/60 border border-zinc-200/90 dark:border-zinc-800/90 shadow-xs space-y-2.5 transition-all hover:border-emerald-500/40"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[10px] font-mono font-black uppercase text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/15 shrink-0">
+                                        {rec.classCode || clsInfo?.code || 'CLASS'}
+                                      </span>
+                                      <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 truncate">
+                                        {rec.className || clsInfo?.name || 'Class Session'}
+                                      </h4>
+                                    </div>
+                                    <p className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                                      <span>Room {clsInfo?.room || 'Assigned Hall'}</span>
+                                      <span>•</span>
+                                      <span className="truncate">{clsInfo?.facultyName || 'Instructor'}</span>
+                                    </p>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase tracking-wider shrink-0 flex items-center gap-1 ${
+                                    isPresent 
+                                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' 
+                                      : isLate 
+                                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30' 
+                                      : 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                                  }`}>
+                                    {isPresent ? <CheckCircle2 className="w-3 h-3" /> : isLate ? <Clock className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                    {rec.status}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-850 text-[10px] text-zinc-400 font-mono">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3 text-zinc-400" />
+                                    {rec.date} • {rec.time || '08:00 AM'}
+                                  </span>
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                    <Check className="w-3 h-3" />
+                                    QR Scanned
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttendanceSubTab('scanner');
+                              startLiveCamera();
+                            }}
+                            className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2 shadow-xs"
+                          >
+                            <Camera className="w-4 h-4" />
+                            <span>Scan Another Class</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      id="manual-session-passcode-input"
-                      placeholder="Enter session passcode (e.g. QR_KEY_...)"
-                      className="flex-1 px-4 py-2.5 text-xs bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 focus:border-emerald-500 outline-none font-mono font-bold uppercase placeholder:normal-case text-zinc-800 dark:text-zinc-200 shadow-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const input = document.getElementById('manual-session-passcode-input') as HTMLInputElement;
-                        if (input && input.value.trim()) {
-                          handleDecodedText(input.value.trim());
-                        } else {
-                          if (typeof window !== 'undefined' && (window as any).showToast) {
-                            (window as any).showToast("Please enter a valid session key.", "warning");
-                          }
-                        }
-                      }}
-                      className="px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-100 text-xs font-bold uppercase tracking-wider cursor-pointer active:scale-95 transition-all rounded-xl border border-zinc-200 dark:border-zinc-700"
-                    >
-                      Verify Code
-                    </button>
-                  </div>
-                </div>
-
+                )}
               </div>
-            </form>
-
-            {/* Scan results info overlay */}
-            {scanResult && (
-              <div className={`mt-5 p-4 rounded-xl border flex gap-3 text-left ${
-                scanResult.success 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                  : 'bg-red-500/10 border-red-500/30 text-red-500'
-              }`}>
-                {scanResult.success ? <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />}
-                <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider">{scanResult.success ? 'Capture Success' : 'Scan Refused'}</h4>
-                  <p className="text-xs opacity-90 leading-relaxed mt-0.5">{scanResult.message}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Historical Check-ins card lists hidden as requested */}
+            );
+          })()}
         </motion.div>
       )}
 
@@ -2810,7 +3120,7 @@ export default function DashboardStudent({
               </button>
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100">Personal Information Profile</h2>
-                <p className="text-xs text-zinc-400 mt-1">Manage and inspect your student registry profile details and biometric check-in logs.</p>
+                <p className="text-xs text-zinc-400 mt-1">Manage and inspect your student registry profile details and attendance check-in logs.</p>
               </div>
             </div>
             

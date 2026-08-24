@@ -91,7 +91,7 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
                 </span>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                Experience ultra-fast biometric camera scanning, background offline sync, and instant class notifications.
+                Experience ultra-fast QR camera scanning, background offline sync, and instant class notifications.
               </p>
             </div>
           </div>

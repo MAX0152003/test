@@ -5,8 +5,9 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 export const app = initializeApp(firebaseConfig);
 
-// FIXED: Hardcoding your exact database ID here forces both mobile and desktop to always look at the same space
-export const db = getFirestore(app, "ai-studio-classpulse20-2d99fc9f-395e-42ed-a65f-49548e77000e");
+// Use configured database ID if provided, otherwise default instance
+const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId || "ai-studio-classpulse20-2d99fc9f-395e-42ed-a65f-49548e77000e";
+export const db = getFirestore(app, firestoreDbId);
 
 export const auth = getAuth(app);
 
@@ -86,11 +87,10 @@ async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
+    // Firestore operates in offline cache mode when connectivity is intermittent
+    if (error instanceof Error && (error.message.includes('offline') || error.message.includes('unavailable'))) {
+      console.info("[Firestore] Operating with offline cache and background synchronization.");
     }
   }
 }
-testConnection().catch((err) => {
-  console.warn("Firestore connection check info:", err);
-});
+testConnection();

@@ -386,7 +386,10 @@ export default function StudentWeeklyAttendanceChart({
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              content={<CustomTooltip />} 
+              cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }}
+            />
             <Legend 
               verticalAlign="top" 
               align="right"

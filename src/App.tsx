@@ -92,7 +92,19 @@ import {
   Scan,
   MessageSquare,
   QrCode,
-  CheckCircle
+  CheckCircle,
+  Clock,
+  Sparkles,
+  GraduationCap,
+  Building2,
+  Filter,
+  Check,
+  FileText,
+  Layers,
+  ArrowRight,
+  Trash2,
+  History,
+  RotateCcw
 } from 'lucide-react';
 
 // Safe Local Storage Wrapper to prevent app crashes due to QuotaExceededError or browser iframe restrictions
@@ -440,7 +452,54 @@ export default function App() {
 
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchDeptOnly, setSearchDeptOnly] = React.useState<boolean>(() => {
+    return safeStorage.getItem('cp_search_dept_only') === 'true';
+  });
+  const [recentSearches, setRecentSearches] = React.useState<string[]>(() => {
+    const cached = safeStorage.getItem('cp_recent_searches');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return ['CS-101', 'Dr. Ahmad Khan', 'Room 303', 'Schedule'];
+  });
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleAddRecentSearch = (term: string) => {
+    const clean = term.trim();
+    if (!clean) return;
+    setRecentSearches(prev => {
+      const filtered = prev.filter(item => item.toLowerCase() !== clean.toLowerCase());
+      const next = [clean, ...filtered].slice(0, 6);
+      safeStorage.setItem('cp_recent_searches', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleRemoveRecentSearch = (term: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setRecentSearches(prev => {
+      const next = prev.filter(item => item !== term);
+      safeStorage.setItem('cp_recent_searches', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleClearAllRecentSearches = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setRecentSearches([]);
+    safeStorage.setItem('cp_recent_searches', JSON.stringify([]));
+  };
+
+  const handleToggleDeptFilter = () => {
+    setSearchDeptOnly(prev => {
+      const next = !prev;
+      safeStorage.setItem('cp_search_dept_only', String(next));
+      return next;
+    });
+  };
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent | TouchEvent) => {
@@ -937,25 +996,46 @@ export default function App() {
     }
   }, [attendanceRecords, enrollments, classes]);
 
-  // Automatically analyze and detect if non-maintenance rooms are occupied or available
+  // Automatically calculate each room's occupancy and status based on active classes and enrolled students
   React.useEffect(() => {
     let changed = false;
-    const normalized = labRooms.map(rm => {
+    const updated = labRooms.map(rm => {
       if (rm.status === 'maintenance') {
         return rm;
       }
-      const isOccupied = rm.currentOccupancy > 0 || (typeof rm.activeClass === 'string' && rm.activeClass.trim() !== '');
-      const correctStatus = isOccupied ? 'occupied' : 'available';
-      if (rm.status !== correctStatus) {
+      
+      const rmNameNorm = (rm.name || '').toLowerCase().trim();
+      const matchingClasses = classes.filter(cls => {
+        const clsRoom = (cls.tempRoom || cls.room || '').toLowerCase().trim();
+        return clsRoom && (clsRoom === rmNameNorm || clsRoom.includes(rmNameNorm) || rmNameNorm.includes(clsRoom));
+      });
+
+      // Calculate total active enrolled students in this room
+      const enrolledCount = enrollments.filter(e => {
+        if (e.deletedByStudent) return false;
+        return matchingClasses.some(c => c.id === e.classId);
+      }).length;
+
+      const activeClassLabel = matchingClasses.length > 0 ? matchingClasses.map(c => c.code).join(', ') : '';
+      const isOccupied = enrolledCount > 0 || activeClassLabel !== '';
+      const newStatus = isOccupied ? 'occupied' : 'available';
+
+      if (rm.currentOccupancy !== enrolledCount || rm.activeClass !== activeClassLabel || rm.status !== newStatus) {
         changed = true;
-        return { ...rm, status: correctStatus };
+        return {
+          ...rm,
+          currentOccupancy: enrolledCount,
+          activeClass: activeClassLabel,
+          status: newStatus as 'occupied' | 'available'
+        };
       }
       return rm;
     });
+
     if (changed) {
-      setLabRooms(normalized);
+      setLabRooms(updated);
     }
-  }, [labRooms]);
+  }, [classes, enrollments, labRooms]);
 
   React.useEffect(() => {
     safeStorage.setItem('cp_lab_rooms', JSON.stringify(labRooms));
@@ -1439,6 +1519,32 @@ export default function App() {
         speakText(`Resumed class enrollment for ${matchedClass.name}`, accessibility.readAloud);
       }
     } else if (user && user.role === 'student') {
+      // Check room capacity limit to prevent overloading
+      const matchedRoom = labRooms.find(r => {
+        const rName = (r.name || '').toLowerCase();
+        const cRoom = (matchedClass.tempRoom || matchedClass.room || '').toLowerCase();
+        return cRoom && (rName.includes(cRoom) || cRoom.includes(rName) || r.id === matchedClass.room);
+      });
+      const roomCapacity = matchedRoom?.capacity || 40;
+      const currentEnrolledCount = enrollments.filter(e => e.classId === classId && !e.deletedByStudent).length;
+
+      if (currentEnrolledCount >= roomCapacity) {
+        const overloadNotif: AppNotification = {
+          id: 'notif-cap-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+          title: 'Class Capacity Full',
+          message: `Enrollment locked: ${matchedClass.code} (${matchedClass.name}) has reached maximum room capacity of ${roomCapacity} enrolled students for room ${matchedClass.room}. Overloading is restricted.`,
+          timestamp: 'Just Now',
+          type: 'warning',
+          read: false
+        };
+        setNotifications(prev => [overloadNotif, ...prev]);
+        speakText(`Cannot enroll. Room capacity of ${roomCapacity} students reached for ${matchedClass.name}.`, accessibility.readAloud);
+        if (typeof window !== 'undefined' && (window as any).showToast) {
+          (window as any).showToast(`⚠️ Class Full: Room ${matchedClass.room} capacity (${roomCapacity} seats) reached.`, "warning");
+        }
+        return;
+      }
+
       const newEnrolID = 'enr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
       const newEnrollmentRecord: Enrollment = {
         id: newEnrolID,
@@ -1655,6 +1761,32 @@ export default function App() {
         speakText(`Resumed class enrollment for ${matchedClass.name}`, accessibility.readAloud);
       }
     } else if (user && user.role === 'student') {
+      // Check room capacity limit to prevent overloading
+      const matchedRoom = labRooms.find(r => {
+        const rName = (r.name || '').toLowerCase();
+        const cRoom = (matchedClass.tempRoom || matchedClass.room || '').toLowerCase();
+        return cRoom && (rName.includes(cRoom) || cRoom.includes(rName) || r.id === matchedClass.room);
+      });
+      const roomCapacity = matchedRoom?.capacity || 40;
+      const currentEnrolledCount = enrollments.filter(e => e.classId === classId && !e.deletedByStudent).length;
+
+      if (currentEnrolledCount >= roomCapacity) {
+        const overloadNotif: AppNotification = {
+          id: 'notif-cap-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+          title: 'Class Capacity Full',
+          message: `Enrollment locked: ${matchedClass.code} (${matchedClass.name}) has reached maximum room capacity of ${roomCapacity} enrolled students for room ${matchedClass.room}. Overloading is restricted.`,
+          timestamp: 'Just Now',
+          type: 'warning',
+          read: false
+        };
+        setNotifications(prev => [overloadNotif, ...prev]);
+        speakText(`Cannot enroll. Room capacity of ${roomCapacity} students reached for ${matchedClass.name}.`, accessibility.readAloud);
+        if (typeof window !== 'undefined' && (window as any).showToast) {
+          (window as any).showToast(`⚠️ Class Full: Room ${matchedClass.room} capacity (${roomCapacity} seats) reached.`, "warning");
+        }
+        return;
+      }
+
       const newEnrolID = 'enr-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
       const newEnrollmentRecord: Enrollment = {
         id: newEnrolID,
@@ -2275,7 +2407,7 @@ export default function App() {
                 ref={searchContainerRef} 
                 className={`transition-all duration-300 mx-1.5 sm:mx-2 relative z-[100] ${
                   isSearchOpen 
-                    ? 'w-full max-w-full sm:max-w-sm md:max-w-md' 
+                    ? 'w-full max-w-full sm:max-w-md md:max-w-lg' 
                     : 'flex-1 max-w-xs sm:max-w-sm md:max-w-md'
                 }`}
               >
@@ -2284,7 +2416,7 @@ export default function App() {
                     <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none shrink-0" />
                     <input
                       type="text"
-                      placeholder="Search..."
+                      placeholder={searchDeptOnly ? `Search in ${user?.department || 'My Department'}...` : "Search courses, faculty, rooms, views... (⌘K)"}
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
@@ -2295,6 +2427,11 @@ export default function App() {
                         setIsSearchOpen(true);
                         setIsMobileBarVisible(false);
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && searchQuery.trim()) {
+                          handleAddRecentSearch(searchQuery.trim());
+                        }
+                      }}
                       className="w-full pl-8 pr-7 py-1.5 sm:py-1 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/70 dark:bg-zinc-900/70 backdrop-blur-md text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
                     />
                     {searchQuery ? (
@@ -2302,6 +2439,7 @@ export default function App() {
                         type="button"
                         onClick={() => setSearchQuery('')}
                         className="absolute right-2 p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer"
+                        title="Clear search input"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -2343,33 +2481,342 @@ export default function App() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.97 }}
                         transition={{ type: "spring", damping: 25, stiffness: 350 }}
-                        className="absolute top-full left-0 right-0 mt-2 z-[100] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-left max-h-[70vh]"
+                        className="absolute top-full left-0 right-0 mt-2 z-[100] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-left max-h-[75vh]"
                       >
-                        <div className="max-h-[60vh] overflow-y-auto p-2.5 space-y-2.5 custom-scrollbar text-left">
-                          {(() => {
-                            const navMatches = [
-                              { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard },
-                              { id: 'schedule', title: 'Schedule', icon: CalendarDays },
-                              { id: 'attendance', title: 'Attendance Scan', icon: Scan },
-                              { id: 'inbox', title: 'Messages', icon: MessageSquare },
-                              { id: 'notifications', title: 'Notifications', icon: Bell },
-                              { id: 'help', title: 'Help Center', icon: HelpCircle },
-                              { id: 'settings', title: 'Settings', icon: Settings },
-                              { id: 'profile', title: 'Profile', icon: UserCircle }
-                            ].filter(item => !searchQuery || item.title.toLowerCase().includes(searchQuery.toLowerCase()));
+                        {/* 1. Filter Scope Toggle Bar: All Campus vs. My Department */}
+                        {(() => {
+                          const userDeptName = user?.department || (user?.role === 'student' ? 'Information Technology' : user?.role === 'faculty' ? 'Computer Science' : 'Academic Registrar');
+                          const deptShort = userDeptName.split(' ')[0];
 
-                            const matchedClasses = classes.filter(cls => 
-                              !searchQuery || 
-                              cls.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              cls.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                              (cls.facultyName && cls.facultyName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                              (cls.room && cls.room.toLowerCase().includes(searchQuery.toLowerCase()))
-                            );
+                          return (
+                            <div className="px-3 pt-2.5 pb-2 border-b border-zinc-100 dark:border-zinc-900 bg-zinc-50/70 dark:bg-zinc-900/40 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-bold text-zinc-500 dark:text-zinc-400 shrink-0">
+                                <Filter className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span className="hidden xs:inline">Filter Scope:</span>
+                                <span className="xs:hidden">Scope:</span>
+                              </div>
+                              <div className="flex items-center bg-zinc-200/70 dark:bg-zinc-800/80 p-0.5 rounded-xl text-[10.5px] sm:text-[11px] max-w-full overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchDeptOnly(false);
+                                    safeStorage.setItem('cp_search_dept_only', 'false');
+                                    speakText("Searching all campus courses and faculty", accessibility.readAloud);
+                                  }}
+                                  className={`px-2 sm:px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0 ${
+                                    !searchDeptOnly
+                                      ? 'bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white shadow-xs'
+                                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                                  }`}
+                                >
+                                  <Building2 className="w-3 h-3 text-zinc-400 shrink-0" />
+                                  <span>All Campus</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchDeptOnly(true);
+                                    safeStorage.setItem('cp_search_dept_only', 'true');
+                                    speakText(`Filtering search to your department: ${deptShort}`, accessibility.readAloud);
+                                    if (typeof window !== 'undefined' && (window as any).showToast) {
+                                      (window as any).showToast(`Filtering by your department: ${userDeptName}`, 'info');
+                                    }
+                                  }}
+                                  className={`px-2 sm:px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap max-w-[140px] sm:max-w-none ${
+                                    searchDeptOnly
+                                      ? 'bg-emerald-500 text-black shadow-xs font-black'
+                                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                                  }`}
+                                  title={`Only search within ${userDeptName}`}
+                                >
+                                  <GraduationCap className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">My Dept ({deptShort})</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Scrollable Results & Category Options */}
+                        <div className="max-h-[62vh] overflow-y-auto p-3 space-y-3 custom-scrollbar text-left">
+                          {(() => {
+                            const userDeptName = user?.department || (user?.role === 'student' ? 'Information Technology' : user?.role === 'faculty' ? 'Computer Science' : 'Academic Registrar');
+                            const deptWords = userDeptName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+
+                            // Match helper for Department filtering
+                            const isDeptMatch = (cls: ClassSession) => {
+                              if (!searchDeptOnly) return true;
+                              const code = (cls.code || '').toLowerCase();
+                              const name = (cls.name || '').toLowerCase();
+                              const faculty = (cls.facultyName || '').toLowerCase();
+                              const cluster = (cls.buildingCluster || '').toLowerCase();
+
+                              if (deptWords.some(w => code.includes(w) || name.includes(w) || faculty.includes(w) || cluster.includes(w))) return true;
+                              
+                              // Check standard prefix matching for CS, IT, CICS, CCS, ENG, MATH
+                              const deptNorm = userDeptName.toLowerCase();
+                              if (deptNorm.includes('technology') || deptNorm.includes('it')) {
+                                if (code.startsWith('it') || code.startsWith('ite') || code.startsWith('cs') || code.startsWith('cc')) return true;
+                              } else if (deptNorm.includes('computer') || deptNorm.includes('cs')) {
+                                if (code.startsWith('cs') || code.startsWith('cc') || code.startsWith('it')) return true;
+                              }
+                              return false;
+                            };
+
+                            const isFacultyDeptMatch = (fac: FacultyStatus) => {
+                              if (!searchDeptOnly) return true;
+                              const name = (fac.name || '').toLowerCase();
+                              const dept = ((fac as any).department || '').toLowerCase();
+                              const deptNorm = userDeptName.toLowerCase();
+                              if (dept && (dept.includes(deptNorm) || deptNorm.includes(dept))) return true;
+                              if (deptWords.some(w => name.includes(w) || dept.includes(w))) return true;
+                              // Match if faculty teaches any course in the user's department
+                              return classes.some(c => (c.facultyId === fac.id || (c.facultyName && c.facultyName.toLowerCase() === name)) && isDeptMatch(c));
+                            };
+
+                            const navMatches = [
+                              { id: 'dashboard', title: 'Dashboard', icon: LayoutDashboard, desc: 'Overview & status cards' },
+                              { id: 'schedule', title: 'Class Schedule', icon: CalendarDays, desc: 'Enrolled subjects & timetable' },
+                              { id: 'attendance', title: 'Attendance Scan', icon: Scan, desc: 'Scan QR check-in & logs' },
+                              { id: 'inbox', title: user?.role === 'student' ? 'Excuse Letters & Messages' : 'Excuse Inbox & Chat', icon: MessageSquare, desc: 'Official excuse letters' },
+                              { id: 'notifications', title: 'Notifications', icon: Bell, desc: 'System alerts & announcements' },
+                              { id: 'help', title: 'Help Center', icon: HelpCircle, desc: 'Guides & student FAQs' },
+                              { id: 'settings', title: 'Settings', icon: Settings, desc: 'Theme, sound & preferences' },
+                              { id: 'profile', title: 'My Profile', icon: UserCircle, desc: 'User credentials & department' }
+                            ].filter(item => !searchQuery.trim() || item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.desc.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                            const matchedClasses = classes.filter(cls => {
+                              const matchesDept = isDeptMatch(cls);
+                              if (!matchesDept) return false;
+                              if (!searchQuery.trim()) return true;
+                              const q = searchQuery.toLowerCase();
+                              return (
+                                cls.code.toLowerCase().includes(q) ||
+                                cls.name.toLowerCase().includes(q) ||
+                                (cls.facultyName && cls.facultyName.toLowerCase().includes(q)) ||
+                                (cls.room && cls.room.toLowerCase().includes(q)) ||
+                                (cls.days && cls.days.some(d => d.toLowerCase().includes(q)))
+                              );
+                            });
+
+                            const matchedFaculty = facultyStatuses.filter(fac => {
+                              const matchesDept = isFacultyDeptMatch(fac);
+                              if (!matchesDept) return false;
+                              if (!searchQuery.trim()) return false; // Only show faculty under active search query
+                              const q = searchQuery.toLowerCase();
+                              return (
+                                fac.name.toLowerCase().includes(q) ||
+                                (fac.room && fac.room.toLowerCase().includes(q)) ||
+                                ((fac as any).department && ((fac as any).department.toLowerCase().includes(q)))
+                              );
+                            });
+
+                            // Suggested categories list
+                            const suggestedCategories = [
+                              {
+                                id: 'cat-dept',
+                                label: `My Department (${userDeptName.split(' ')[0]})`,
+                                icon: GraduationCap,
+                                color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+                                action: () => {
+                                  setSearchDeptOnly(true);
+                                  safeStorage.setItem('cp_search_dept_only', 'true');
+                                  setSearchQuery(userDeptName.split(' ')[0]);
+                                  handleAddRecentSearch(userDeptName.split(' ')[0]);
+                                }
+                              },
+                              {
+                                id: 'cat-schedule',
+                                label: 'Class Schedules',
+                                icon: CalendarDays,
+                                color: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
+                                action: () => {
+                                  setActiveScreen('schedule');
+                                  setIsSearchOpen(false);
+                                  setIsMobileBarVisible(true);
+                                  handleAddRecentSearch('Class Schedules');
+                                }
+                              },
+                              {
+                                id: 'cat-faculty',
+                                label: 'Faculty Directory',
+                                icon: Users,
+                                color: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+                                action: () => {
+                                  setActiveScreen(user?.role === 'student' ? 'dashboard' : 'dashboard');
+                                  setSearchQuery('Dr.');
+                                  handleAddRecentSearch('Faculty Directory');
+                                }
+                              },
+                              {
+                                id: 'cat-scan',
+                                label: 'Attendance QR Scan',
+                                icon: Scan,
+                                color: 'text-purple-500 bg-purple-500/10 border-purple-500/20',
+                                action: () => {
+                                  setActiveScreen('attendance');
+                                  setIsSearchOpen(false);
+                                  setIsMobileBarVisible(true);
+                                  handleAddRecentSearch('Attendance QR Scan');
+                                }
+                              },
+                              {
+                                id: 'cat-excuse',
+                                label: 'Excuse Letters',
+                                icon: FileText,
+                                color: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
+                                action: () => {
+                                  setActiveScreen('inbox');
+                                  setIsSearchOpen(false);
+                                  setIsMobileBarVisible(true);
+                                  handleAddRecentSearch('Excuse Letters');
+                                }
+                              },
+                              {
+                                id: 'cat-rooms',
+                                label: 'Rooms & Laboratories',
+                                icon: Building2,
+                                color: 'text-cyan-500 bg-cyan-500/10 border-cyan-500/20',
+                                action: () => {
+                                  setSearchQuery('Room');
+                                  handleAddRecentSearch('Rooms & Labs');
+                                }
+                              }
+                            ];
 
                             return (
                               <>
+                                {/* 2. RECENT SEARCHES (When query is empty or user is browsing) */}
+                                {!searchQuery.trim() && recentSearches.length > 0 && (
+                                  <div className="space-y-1.5 pb-2">
+                                    <div className="flex items-center justify-between px-1">
+                                      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                                        <Clock className="w-3 h-3 text-zinc-400" />
+                                        <span>Recent Searches</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={handleClearAllRecentSearches}
+                                        className="text-[10px] font-bold text-zinc-400 hover:text-red-500 cursor-pointer flex items-center gap-1 transition-colors"
+                                        title="Clear search history"
+                                      >
+                                        <Trash2 className="w-2.5 h-2.5" />
+                                        Clear All
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                      {recentSearches.map((term, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200 border border-zinc-200/70 dark:border-zinc-800/70 transition-all cursor-pointer group"
+                                          onClick={() => {
+                                            setSearchQuery(term);
+                                            handleAddRecentSearch(term);
+                                          }}
+                                        >
+                                          <History className="w-3 h-3 text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                                          <span>{term}</span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleRemoveRecentSearch(term, e)}
+                                            className="p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-100 rounded cursor-pointer"
+                                            title="Remove term"
+                                          >
+                                            <X className="w-2.5 h-2.5" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 3. SUGGESTED CATEGORIES (When query is empty) */}
+                                {!searchQuery.trim() && (
+                                  <div className="space-y-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                                    <div className="flex items-center gap-1.5 px-1 text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                                      <Sparkles className="w-3 h-3 text-amber-500" />
+                                      <span>Suggested Categories</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                      {suggestedCategories.map(cat => {
+                                        const CatIcon = cat.icon;
+                                        return (
+                                          <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={cat.action}
+                                            className="p-2 rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-zinc-50/50 dark:bg-zinc-900/40 hover:bg-zinc-100 dark:hover:bg-zinc-850 hover:border-emerald-500/30 text-left flex items-center gap-2 transition-all cursor-pointer group"
+                                          >
+                                            <div className={`p-1.5 rounded-lg border shrink-0 ${cat.color}`}>
+                                              <CatIcon className="w-3.5 h-3.5" />
+                                            </div>
+                                            <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                                              {cat.label}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 4. MATCHED FACULTY INSTRUCTORS (When searching) */}
+                                {matchedFaculty.length > 0 && (
+                                  <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                                    <p className="px-2 text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                                      Faculty & Instructors ({matchedFaculty.length})
+                                    </p>
+                                    <div className="grid grid-cols-1 gap-1">
+                                      {matchedFaculty.map(fac => (
+                                        <button
+                                          key={fac.id}
+                                          type="button"
+                                          onClick={() => {
+                                            handleAddRecentSearch(fac.name);
+                                            setActiveScreen(user?.role === 'student' ? 'dashboard' : 'dashboard');
+                                            setIsSearchOpen(false);
+                                            setIsMobileBarVisible(true);
+                                            setSearchQuery('');
+                                          }}
+                                          className="w-full px-2.5 py-2 rounded-xl hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer border border-transparent hover:border-emerald-500/20"
+                                        >
+                                          <div className="flex items-center gap-2.5 min-w-0">
+                                            <img
+                                              src={fac.avatar}
+                                              alt={fac.name}
+                                              className="w-7 h-7 rounded-full object-cover shrink-0 border border-zinc-200 dark:border-zinc-800"
+                                              referrerPolicy="no-referrer"
+                                            />
+                                            <div className="min-w-0">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 truncate">
+                                                  {fac.name}
+                                                </span>
+                                                <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded-full uppercase ${
+                                                  fac.status === 'available'
+                                                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                                    : fac.status === 'in-class'
+                                                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                                                    : 'bg-zinc-500/15 text-zinc-500 border border-zinc-500/30'
+                                                }`}>
+                                                  {fac.status}
+                                                </span>
+                                              </div>
+                                              <p className="text-[10px] text-zinc-400 truncate">
+                                                {fac.room || 'Faculty Office'} • {(fac as any).department || 'Academic Faculty'}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <ArrowRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-emerald-500 transition-transform group-hover:translate-x-0.5 shrink-0" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 5. NAVIGATION VIEWS */}
                                 {navMatches.length > 0 && (
-                                  <div className="space-y-1">
+                                  <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-900">
                                     <p className="px-2 text-[10px] font-black uppercase tracking-wider text-zinc-400">Navigation Views</p>
                                     <div className="grid grid-cols-1 gap-0.5">
                                       {navMatches.map(item => {
@@ -2379,17 +2826,26 @@ export default function App() {
                                             key={item.id}
                                             type="button"
                                             onClick={() => {
+                                              handleAddRecentSearch(item.title);
                                               setActiveScreen(item.id);
                                               setIsSearchOpen(false);
                                               setIsMobileBarVisible(true);
                                               setSearchQuery('');
                                             }}
-                                            className="w-full px-2.5 py-2 rounded-lg hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center gap-2.5 transition-colors group cursor-pointer"
+                                            className="w-full px-2.5 py-2 rounded-xl hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center justify-between gap-2.5 transition-colors group cursor-pointer"
                                           >
-                                            <div className="p-1 rounded-md bg-zinc-100 dark:bg-zinc-900 group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
-                                              <IconComponent className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 group-hover:text-black" />
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                              <div className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 group-hover:bg-emerald-500 group-hover:text-black transition-colors shrink-0">
+                                                <IconComponent className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 group-hover:text-black" />
+                                              </div>
+                                              <div className="min-w-0">
+                                                <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                                                  {item.title}
+                                                </span>
+                                                <p className="text-[10px] text-zinc-400 truncate">{item.desc}</p>
+                                              </div>
                                             </div>
-                                            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">{item.title}</span>
+                                            <ArrowRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-emerald-500 transition-transform group-hover:translate-x-0.5 shrink-0" />
                                           </button>
                                         );
                                       })}
@@ -2397,28 +2853,41 @@ export default function App() {
                                   </div>
                                 )}
 
+                                {/* 6. MATCHED COURSES & CLASSES */}
                                 {matchedClasses.length > 0 && (
                                   <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-900">
-                                    <p className="px-2 text-[10px] font-black uppercase tracking-wider text-zinc-400">Classes & Courses ({matchedClasses.length})</p>
+                                    <div className="flex items-center justify-between px-2">
+                                      <p className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                                        Classes & Courses ({matchedClasses.length})
+                                      </p>
+                                      {searchDeptOnly && (
+                                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                                          {userDeptName.split(' ')[0]} Dept Filter
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="grid grid-cols-1 gap-0.5">
-                                      {matchedClasses.map(cls => (
+                                      {matchedClasses.slice(0, 10).map(cls => (
                                         <button
                                           key={cls.id}
                                           type="button"
                                           onClick={() => {
+                                            handleAddRecentSearch(cls.code);
                                             setActiveScreen('schedule');
                                             setIsSearchOpen(false);
                                             setIsMobileBarVisible(true);
                                             setSearchQuery('');
                                           }}
-                                          className="w-full px-2.5 py-2 rounded-lg hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
+                                          className="w-full px-2.5 py-2 rounded-xl hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
                                         >
                                           <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 truncate">
                                               <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 font-mono shrink-0">{cls.code}</span>
                                               <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 truncate">{cls.name}</span>
                                             </div>
-                                            <p className="text-[10px] text-zinc-400 mt-0.5 truncate">{cls.days} • {cls.startTime} • {cls.room}</p>
+                                            <p className="text-[10px] text-zinc-400 mt-0.5 truncate">
+                                              {cls.days.join(', ')} • {cls.startTime} • {cls.room} {cls.facultyName ? `• ${cls.facultyName}` : ''}
+                                            </p>
                                           </div>
                                           <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 text-zinc-500 shrink-0">
                                             {cls.studentsCount || 0} students
@@ -2429,10 +2898,31 @@ export default function App() {
                                   </div>
                                 )}
 
-                                {navMatches.length === 0 && matchedClasses.length === 0 && (
-                                  <div className="py-6 text-center space-y-1.5">
+                                {/* 7. EMPTY RESULTS STATE */}
+                                {navMatches.length === 0 && matchedClasses.length === 0 && matchedFaculty.length === 0 && (
+                                  <div className="py-6 text-center space-y-2">
                                     <Search className="w-6 h-6 text-zinc-300 dark:text-zinc-700 mx-auto" />
-                                    <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400">No results found for "{searchQuery}"</p>
+                                    <p className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
+                                      No results found for "{searchQuery}"
+                                    </p>
+                                    {searchDeptOnly && (
+                                      <p className="text-[11px] text-zinc-400 max-w-xs mx-auto">
+                                        Filtering is set to your department only (<span className="text-emerald-500 font-bold">{userDeptName}</span>).
+                                      </p>
+                                    )}
+                                    {searchDeptOnly && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSearchDeptOnly(false);
+                                          safeStorage.setItem('cp_search_dept_only', 'false');
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                                      >
+                                        <Building2 className="w-3.5 h-3.5 text-emerald-500" />
+                                        Search Across All Campus
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </>
@@ -2530,8 +3020,8 @@ export default function App() {
             {/* Primary content grid layout block */}
             <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2.5 max-w-7xl w-full mx-auto flex-1 overflow-y-auto ${
               activeScreen === 'messages' || activeScreen === 'tickets' 
-                ? 'pb-24 md:pb-4 space-y-0' 
-                : 'pb-32 sm:pb-28 md:pb-8 space-y-2.5 sm:space-y-4'
+                ? 'pb-24 md:pb-6 space-y-0' 
+                : 'pb-36 sm:pb-32 md:pb-10 space-y-2.5 sm:space-y-4'
             }`}>
               
               {/* Accessibility options expansion widget */}
@@ -2721,7 +3211,7 @@ export default function App() {
             </main>
 
             {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Glassmorphic Dock with iOS Safe-Area support) */}
-            <div className={`md:hidden fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-4 sm:right-4 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-xl shadow-zinc-950/15 transition-all duration-300 ease-in-out transform ${
+            <div className={`md:hidden fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-6 sm:right-6 max-w-lg mx-auto z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-xl shadow-zinc-950/15 transition-all duration-300 ease-in-out transform ${
               isKeyboardOpen 
                 ? 'hidden opacity-0 pointer-events-none' 
                 : isMobileBarVisible 

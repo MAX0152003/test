@@ -2485,7 +2485,7 @@ export default function DashboardAdmin({
                                     hide={true} 
                                     domain={[0, 100]}
                                   />
-                                  <RechartsTooltip content={<CustomRechartsTooltip />} />
+                                  <RechartsTooltip content={<CustomRechartsTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
                                   <Area 
                                     type="monotone" 
                                     dataKey="value" 
@@ -2547,7 +2547,7 @@ export default function DashboardAdmin({
                             tick={{ fill: '#888888', fontSize: 10 }}
                             domain={[0, 1000]}
                           />
-                          <RechartsTooltip content={<EnrollmentTooltip />} />
+                          <RechartsTooltip content={<EnrollmentTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
                           <Area 
                             type="monotone" 
                             dataKey="value" 
@@ -2609,7 +2609,7 @@ export default function DashboardAdmin({
                             tick={{ fill: '#888888', fontSize: 10 }}
                             domain={[0, 100]}
                           />
-                          <RechartsTooltip content={<RetentionTooltip />} />
+                          <RechartsTooltip content={<RetentionTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
                           <Area 
                             type="monotone" 
                             dataKey="value" 
@@ -2659,7 +2659,7 @@ export default function DashboardAdmin({
                             tick={{ fill: '#888888', fontSize: 10 }}
                             domain={[0, 300]}
                           />
-                          <RechartsTooltip content={<ClearanceTooltip />} />
+                          <RechartsTooltip content={<ClearanceTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
                           <Bar dataKey="total" fill="#60a5fa" radius={[3, 3, 0, 0]} />
                           <Bar dataKey="cleared" fill="#34d399" radius={[3, 3, 0, 0]} />
                         </BarChart>
@@ -2677,12 +2677,12 @@ export default function DashboardAdmin({
               {/* Dynamic horizontal metrics: Room Utilization */}
               <div className="grid grid-cols-1 gap-5 pt-4 border-t border-zinc-100 dark:border-zinc-900 text-left">
                 
-                {/* Laboratory/Room occupied coordinates meters - Dynamic based on actual labRooms */}
+                {/* Laboratory/Room occupied coordinates meters - Dynamic based on actual labRooms and enrolled students */}
                 <div className="space-y-3 w-full">
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-widest font-mono">Laboratory Room Utilization</h4>
-                      <p className="text-[10px] text-zinc-400 leading-normal">Real-time occupancy and active scanner terminal logs</p>
+                      <p className="text-[10px] text-zinc-400 leading-normal">Real-time room occupancy and student enrollment capacity</p>
                     </div>
                     <span className="text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                       {labRooms.filter(r => r.status === 'occupied').length} / {labRooms.length} Active Labs
@@ -2691,19 +2691,22 @@ export default function DashboardAdmin({
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     {labRooms.map((rm) => {
+                      const isOverloaded = rm.capacity > 0 && rm.currentOccupancy > rm.capacity;
                       const occupancyPercent = typeof rm.capacity === 'number' && rm.capacity > 0 
                         ? Math.min(100, Math.round((rm.currentOccupancy / rm.capacity) * 100)) 
                         : 0;
-                      const isOccupied = rm.status === 'occupied' || rm.currentOccupancy > 0;
                       const displayScale = rm.status === 'maintenance' 
                         ? 'Maintenance Lockout' 
                         : rm.currentOccupancy === 0 
-                        ? 'Fully Empty' 
-                        : `${rm.currentOccupancy}/${rm.capacity} active slots`;
+                        ? '0 Enrolled' 
+                        : isOverloaded
+                        ? `${rm.currentOccupancy}/${rm.capacity} Enrolled (Overloaded)`
+                        : `${rm.currentOccupancy}/${rm.capacity} Enrolled`;
 
                       return (
                         <div key={rm.id} className={`space-y-1 bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-xl border flex flex-col justify-between transition-all ${
                           rm.status === 'maintenance' ? 'border-amber-500/30' :
+                          isOverloaded ? 'border-red-500/50 bg-red-500/[0.02]' :
                           occupancyPercent >= 85 ? 'border-red-500/30' :
                           occupancyPercent >= 60 ? 'border-amber-500/30' :
                           'border-emerald-500/20'
@@ -2714,13 +2717,15 @@ export default function DashboardAdmin({
                               <span className={`px-1.5 py-0.5 rounded-[4px] text-[8px] font-mono font-bold shrink-0 uppercase tracking-wider ${
                                 rm.status === 'maintenance' 
                                   ? 'bg-amber-500/10 text-amber-500' 
+                                  : isOverloaded
+                                  ? 'bg-red-500 text-white animate-pulse'
                                   : occupancyPercent >= 85
                                   ? 'bg-red-500/10 text-red-500'
                                   : occupancyPercent >= 60
                                   ? 'bg-amber-500/10 text-amber-500'
                                   : 'bg-emerald-500/10 text-emerald-500'
                               }`}>
-                                {rm.status === 'maintenance' ? '⚠️ Maint' : occupancyPercent >= 85 ? '🔴 High Occ' : occupancyPercent >= 60 ? '🟠 Mod Occ' : '🟢 Optimal'}
+                                {rm.status === 'maintenance' ? '⚠️ Maint' : isOverloaded ? '⚠️ OVERLOAD' : occupancyPercent >= 85 ? '🔴 High Occ' : occupancyPercent >= 60 ? '🟠 Mod Occ' : '🟢 Optimal'}
                               </span>
                             </div>
                             {rm.floor && (
@@ -2735,11 +2740,12 @@ export default function DashboardAdmin({
                                 <div 
                                   className={`h-full rounded-full transition-all duration-500 ${
                                     rm.status === 'maintenance' ? 'bg-amber-500' :
+                                    isOverloaded ? 'bg-red-600' :
                                     occupancyPercent >= 85 ? 'bg-red-500' :
                                     occupancyPercent >= 60 ? 'bg-amber-500' :
                                     'bg-emerald-500'
                                   }`}
-                                  style={{ width: `${rm.status === 'maintenance' ? 100 : occupancyPercent}%` }}
+                                  style={{ width: `${rm.status === 'maintenance' ? 100 : Math.min(100, occupancyPercent)}%` }}
                                 />
                               </div>
                               <span className="font-mono text-[9px] text-zinc-450 dark:text-zinc-400 text-right shrink-0">
@@ -2907,7 +2913,9 @@ export default function DashboardAdmin({
                           <div>
                             <h4 className="text-xs font-extrabold text-zinc-805 dark:text-zinc-200">{rm.name}</h4>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
-                              <span className="text-[9px] text-zinc-500 font-mono font-extrabold">{rm.currentOccupancy} / {rm.capacity} Pax</span>
+                              <span className={`text-[9px] font-mono font-extrabold ${rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? 'text-red-500 font-black' : 'text-zinc-500'}`}>
+                                {rm.currentOccupancy} / {rm.capacity} Enrolled {rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? '(Overload)' : 'Pax'}
+                              </span>
                               <span className="text-[9px] text-zinc-300 dark:text-zinc-700">•</span>
                               <span className="text-[9px] text-zinc-500 font-mono">{rm.devicesCount} Terminals</span>
                               {rm.floor && (
@@ -2920,11 +2928,12 @@ export default function DashboardAdmin({
                           </div>
 
                           <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 block ${
-                            rm.status === 'occupied' ? 'bg-red-500/10 text-red-500' :
                             rm.status === 'maintenance' ? 'bg-amber-500/10 text-amber-500' :
+                            rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? 'bg-red-500 text-white animate-pulse' :
+                            rm.status === 'occupied' ? 'bg-red-500/10 text-red-500' :
                             'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450'
                           }`}>
-                            {rm.status}
+                            {rm.status === 'maintenance' ? 'maintenance' : rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? '⚠️ OVERLOAD' : rm.status}
                           </span>
                         </div>
 
@@ -5111,7 +5120,7 @@ export default function DashboardAdmin({
                 </div>
               </div>
 
-              {/* Ping All Scanner Terminals */}
+              {/* Ping All Scanner Services */}
               <div className="p-4 rounded-xl border border-zinc-150 dark:border-zinc-850 bg-zinc-50/50 dark:bg-zinc-900/20 space-y-2 text-left">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">Live Diagnostics</h4>
@@ -5120,7 +5129,7 @@ export default function DashboardAdmin({
                   </span>
                 </div>
                 <p className="text-[10.5px] text-zinc-500 leading-normal">
-                  Broadcast test signals to verify all physical classroom check-in scanner hubs and hardware terminals.
+                  Broadcast test signals to verify all digital classroom check-in scanner services and camera hubs.
                 </p>
                 <div className="pt-2">
                   <button
@@ -5128,7 +5137,7 @@ export default function DashboardAdmin({
                     type="button"
                     className="w-full py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer text-center"
                   >
-                    Broadcast Terminal Diagnostics
+                    Broadcast Scanner Diagnostics
                   </button>
                 </div>
               </div>
@@ -6385,29 +6394,33 @@ export default function DashboardAdmin({
                                   </div>
                                   <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider shrink-0 font-mono ${
                                     rm.status === 'maintenance' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
+                                    rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? 'bg-red-500 text-white animate-pulse' :
                                     percent >= 85 ? 'bg-red-500/10 text-red-500 border border-red-500/30' :
                                     percent >= 60 ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30' :
                                     'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30'
                                   }`}>
-                                    {rm.status === 'maintenance' ? '⚠️ Maintenance' : percent >= 85 ? '🔴 High (≥85%)' : percent >= 60 ? '🟠 Moderate (60-84%)' : '🟢 Low (<60%)'}
+                                    {rm.status === 'maintenance' ? '⚠️ Maintenance' : rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? '⚠️ OVERLOADED' : percent >= 85 ? '🔴 High (≥85%)' : percent >= 60 ? '🟠 Moderate (60-84%)' : '🟢 Low (<60%)'}
                                   </span>
                                 </div>
 
                                 {/* Capacity indicators */}
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-[9px] text-zinc-400 font-mono">
-                                    <span>Occupancy:</span>
-                                    <span className="font-bold text-zinc-700 dark:text-zinc-300">{rm.currentOccupancy} / {rm.capacity} Pax ({percent}%)</span>
+                                    <span>Enrolled Occupancy:</span>
+                                    <span className={`font-bold ${rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? 'text-red-500 font-black' : 'text-zinc-700 dark:text-zinc-300'}`}>
+                                      {rm.currentOccupancy} / {rm.capacity} Enrolled {rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? '(Overloaded)' : `(${percent}%)`}
+                                    </span>
                                   </div>
                                   <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-850 rounded-full overflow-hidden">
                                     <div 
                                       className={`h-full transition-all duration-300 ${
                                         rm.status === 'maintenance' ? 'bg-amber-500' :
+                                        rm.capacity > 0 && rm.currentOccupancy > rm.capacity ? 'bg-red-600' :
                                         percent >= 85 ? 'bg-red-500' :
                                         percent >= 60 ? 'bg-amber-500' :
                                         'bg-emerald-500'
                                       }`} 
-                                      style={{ width: `${rm.status === 'maintenance' ? 100 : percent}%` }}
+                                      style={{ width: `${rm.status === 'maintenance' ? 100 : Math.min(100, percent)}%` }}
                                     />
                                   </div>
                                 </div>
