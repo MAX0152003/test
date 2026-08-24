@@ -187,7 +187,16 @@ export default function App() {
 
   const [isMobileBarVisible, setIsMobileBarVisible] = React.useState(true);
   const [isKeyboardOpen, setIsKeyboardOpen] = React.useState(false);
+  const [isInsideChatThread, setIsInsideChatThread] = React.useState(false);
   const lastScrollTopRef = React.useRef(0);
+
+  React.useEffect(() => {
+    const handleChatViewChange = (e: any) => {
+      setIsInsideChatThread(!!e.detail?.inConversation);
+    };
+    window.addEventListener('classpulse-chat-view-change', handleChatViewChange);
+    return () => window.removeEventListener('classpulse-chat-view-change', handleChatViewChange);
+  }, []);
 
   React.useEffect(() => {
     const handleFocusIn = (e: FocusEvent) => {
@@ -2381,7 +2390,7 @@ export default function App() {
             )}
 
             {/* Top Operational bar - Applies to all screen sizes including mobile */}
-            <header className={`flex px-2.5 sm:px-6 py-2 sm:py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200/80 dark:border-zinc-850/80 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md text-zinc-900 dark:text-zinc-100 relative ${
+            <header className={`flex px-2.5 sm:px-6 py-2 sm:py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-850 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl text-zinc-900 dark:text-zinc-100 relative ${
               isSearchOpen ? 'z-[100]' : 'z-30'
             }`}>
               
@@ -2432,19 +2441,19 @@ export default function App() {
                           handleAddRecentSearch(searchQuery.trim());
                         }
                       }}
-                      className="w-full pl-8 pr-7 py-1.5 sm:py-1 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/70 dark:bg-zinc-900/70 backdrop-blur-md text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
+                      className="w-full pl-8 pr-12 sm:pr-14 py-1.5 sm:py-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
                     />
                     {searchQuery ? (
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-2 p-0.5 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer"
+                        className="absolute right-2 p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                         title="Clear search input"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     ) : (
-                      <kbd className="hidden sm:inline-block absolute right-2 px-1 py-0.2 text-[9px] font-mono font-bold text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs pointer-events-none">
+                      <kbd className="hidden sm:inline-block absolute right-2 px-1.5 py-0.5 text-[9px] font-mono font-bold text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded shadow-2xs pointer-events-none">
                         ⌘K
                       </kbd>
                     )}
@@ -2456,7 +2465,7 @@ export default function App() {
                         setIsSearchOpen(false);
                         setIsMobileBarVisible(true);
                       }}
-                      className="sm:hidden px-2 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 shrink-0 cursor-pointer"
+                      className="sm:hidden px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 shrink-0 cursor-pointer rounded-lg hover:bg-emerald-500/10 transition-colors"
                     >
                       Cancel
                     </button>
@@ -2469,7 +2478,7 @@ export default function App() {
                     <>
                       {/* Dimmed backdrop handler to dismiss pull-down dropdown when clicking outside */}
                       <div 
-                        className="fixed inset-0 z-[90] bg-black/20 dark:bg-black/50 backdrop-blur-2xs" 
+                        className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xs" 
                         onClick={() => {
                           setIsSearchOpen(false);
                           setIsMobileBarVisible(true);
@@ -2481,7 +2490,7 @@ export default function App() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.97 }}
                         transition={{ type: "spring", damping: 25, stiffness: 350 }}
-                        className="absolute top-full left-0 right-0 mt-2 z-[100] bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-left max-h-[75vh]"
+                        className="absolute top-full left-0 right-0 mt-2 z-[100] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-left max-h-[75vh]"
                       >
                         {/* 1. Filter Scope Toggle Bar: All Campus vs. My Department */}
                         {(() => {
@@ -3018,10 +3027,10 @@ export default function App() {
             )}
 
             {/* Primary content grid layout block */}
-            <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2.5 max-w-7xl w-full mx-auto flex-1 overflow-y-auto ${
+            <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2 max-w-7xl w-full mx-auto flex-1 ${
               activeScreen === 'messages' || activeScreen === 'tickets' 
-                ? 'pb-24 md:pb-6 space-y-0' 
-                : 'pb-36 sm:pb-32 md:pb-10 space-y-2.5 sm:space-y-4'
+                ? 'flex flex-col min-h-0 overflow-hidden pb-0' 
+                : 'overflow-y-auto pb-36 sm:pb-32 md:pb-10 space-y-2.5 sm:space-y-4'
             }`}>
               
               {/* Accessibility options expansion widget */}
@@ -3210,9 +3219,9 @@ export default function App() {
 
             </main>
 
-            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Glassmorphic Dock with iOS Safe-Area support) */}
-            <div className={`md:hidden fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-6 sm:right-6 max-w-lg mx-auto z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-2xl border border-zinc-200/80 dark:border-zinc-800/80 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-xl shadow-zinc-950/15 transition-all duration-300 ease-in-out transform ${
-              isKeyboardOpen 
+            {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Dock with iOS Safe-Area support) */}
+            <div className={`md:hidden fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-6 sm:right-6 max-w-lg mx-auto z-40 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-2xl shadow-zinc-950/20 transition-all duration-300 ease-in-out transform ${
+              isKeyboardOpen || (activeScreen === 'messages' && isInsideChatThread)
                 ? 'hidden opacity-0 pointer-events-none' 
                 : isMobileBarVisible 
                   ? 'translate-y-0 opacity-100' 
@@ -3236,10 +3245,10 @@ export default function App() {
                     className={`flex flex-col items-center justify-center gap-0.5 transition-all flex-1 py-1 cursor-pointer scale-100 active:scale-95 ${
                       isActive 
                         ? 'text-emerald-500 font-black' 
-                        : 'text-zinc-450 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
                     }`}
                   >
-                    <Icon className={`w-4.5 h-4.5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-450 dark:text-zinc-455'}`} />
+                    <Icon className={`w-4.5 h-4.5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-500 dark:text-zinc-400'}`} />
                     <span className="text-[9px] font-black tracking-wider uppercase">{item.label}</span>
                   </button>
                 );
@@ -3258,14 +3267,14 @@ export default function App() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15 } }}
-            className="fixed bottom-20 left-3 right-3 sm:left-auto sm:right-6 sm:bottom-6 z-50 max-w-sm p-3 rounded-2xl shadow-2xl bg-zinc-900/90 dark:bg-zinc-950/90 border border-zinc-800/80 text-white backdrop-blur-xl flex items-center justify-between gap-3 text-left"
+            className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-auto sm:right-6 sm:bottom-6 z-50 max-w-sm p-3.5 rounded-2xl shadow-2xl bg-zinc-900 dark:bg-zinc-950 border border-zinc-750 text-white flex items-center justify-between gap-3 text-left"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${
-                toast.type === 'success' ? 'bg-emerald-500' :
-                toast.type === 'warning' ? 'bg-amber-500' :
-                toast.type === 'error' ? 'bg-red-500' :
-                'bg-indigo-500'
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                toast.type === 'success' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' :
+                toast.type === 'warning' ? 'bg-amber-500 shadow-sm shadow-amber-500/50' :
+                toast.type === 'error' ? 'bg-red-500 shadow-sm shadow-red-500/50' :
+                'bg-indigo-500 shadow-sm shadow-indigo-500/50'
               }`} />
               <p className="text-xs font-bold tracking-tight text-zinc-100 truncate pr-2">
                 {toast.message}
@@ -3277,7 +3286,7 @@ export default function App() {
               className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
               title="Close Notification"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </motion.div>
         )}

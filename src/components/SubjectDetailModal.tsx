@@ -135,21 +135,21 @@ export default function SubjectDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal Box */}
-      <div className="relative w-full max-w-2xl rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto z-10 text-left">
+      <div className="relative w-full max-w-2xl rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-5 sm:p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto z-10 text-left">
         
         {/* Header */}
         <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-850 mb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-500 border border-emerald-500/10">
+              <span className="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 {cls.code} • Subject Profile
               </span>
               {cls.isClosed ? (
@@ -169,7 +169,7 @@ export default function SubjectDetailModal({
           </div>
           <button 
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+            className="p-2 rounded-xl text-zinc-400 hover:text-zinc-650 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -429,17 +429,17 @@ export default function SubjectDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-850 flex items-center justify-between gap-3 flex-wrap">
+        <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-zinc-850 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap">
             {/* Export Roster CSV - Only shown if enrolled or if user is faculty/admin */}
             {(isEnrolled || userRole !== 'student') && (
               <button
                 onClick={handleExportCSV}
                 type="button"
-                className="px-4 py-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
                 title="Export roster attendance dataset as CSV spreadsheet"
               >
-                <Download className="w-3.5 h-3.5 text-black" />
+                <Download className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                 <span>Export Roster CSV</span>
               </button>
             )}
@@ -451,7 +451,7 @@ export default function SubjectDetailModal({
                 onClick={() => {
                   onEnrollSubject(cls.id);
                 }}
-                className="px-4 py-2 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-emerald-500 text-black hover:bg-emerald-400 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
               >
                 <CheckCircle className="w-3.5 h-3.5 text-black" />
                 <span>Enroll Subject</span>
@@ -464,7 +464,7 @@ export default function SubjectDetailModal({
                 onClick={() => {
                   onDropSubject(cls.id);
                 }}
-                className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Unenroll Subject</span>
@@ -476,7 +476,7 @@ export default function SubjectDetailModal({
               <button
                 type="button"
                 onClick={() => onToggleCloseSubject(cls.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 border ${
+                className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95 border ${
                   cls.isClosed
                     ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                     : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
@@ -501,7 +501,7 @@ export default function SubjectDetailModal({
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 title="Remove or drop this subject completely"
               >
                 <Trash2 className="w-3.5 h-3.5 text-red-500" />
@@ -512,7 +512,7 @@ export default function SubjectDetailModal({
 
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+            className="px-5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 text-xs font-bold uppercase cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-center shrink-0"
           >
             Close
           </button>

@@ -298,6 +298,17 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('classpulse-chat-view-change', { 
+      detail: { inConversation: isMobile && mobileShowChat } 
+    }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('classpulse-chat-view-change', { 
+        detail: { inConversation: false } 
+      }));
+    };
+  }, [isMobile, mobileShowChat]);
   const [extraConversationIds, setExtraConversationIds] = useState<string[]>(() => {
     const cached = localStorage.getItem('classpulse_extra_chats');
     if (cached) {
@@ -947,7 +958,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         </div>
 
         {/* Channels/Contacts Unified Iterator list */}
-        <div className="flex-1 overflow-y-auto space-y-4 p-3 text-left">
+        <div className="flex-1 overflow-y-auto space-y-4 p-3 text-left pb-28 lg:pb-3">
           
           {/* Active Channels / Subject Groups (Hidden for Admins) */}
           {userProfile.role !== 'admin' && (
@@ -1448,7 +1459,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             )}
 
             {/* Chat inputs and Attachment menu */}
-            <div className="relative shrink-0 pb-1 sm:pb-0 bg-white dark:bg-zinc-950 sticky bottom-0 z-20">
+            <div className="relative shrink-0 pt-1.5 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:pb-1 bg-white dark:bg-zinc-950 sticky bottom-0 z-20">
               {showAttachmentMenu && (
                 <div className="absolute bottom-full left-0 mb-2 p-4 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-855 shadow-xl z-50 w-72 space-y-3.5 text-left animate-fade-in">
                   <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-900">

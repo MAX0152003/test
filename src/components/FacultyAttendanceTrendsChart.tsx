@@ -259,86 +259,113 @@ export default function FacultyAttendanceTrendsChart({
           <p className="text-[9px] text-zinc-400 mt-0.5">Valid excuse letters</p>
         </div>
 
-        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Punctuality Rate
             </span>
             <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
           </div>
-          <p className="text-lg font-black text-zinc-800 dark:text-zinc-100 mt-1 font-mono">
-            {weekSummary.punctualityRate}%
-          </p>
-          <p className="text-[9px] text-zinc-400 mt-0.5">Present vs. Late ratio</p>
+          {weekSummary.grandTotal > 0 ? (
+            <>
+              <p className="text-lg font-black text-zinc-800 dark:text-zinc-100 mt-1 font-mono">
+                {weekSummary.punctualityRate}%
+              </p>
+              <p className="text-[9px] text-zinc-400 mt-0.5">Present vs. Late ratio</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-black text-amber-600 dark:text-amber-400 mt-1.5 uppercase tracking-wide">
+                No logs yet
+              </p>
+              <p className="text-[9px] text-zinc-400 mt-0.5">Awaiting first session</p>
+            </>
+          )}
         </div>
       </div>
 
       {/* Main Bar Chart Container */}
-      <div className="h-[260px] w-full pt-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={weekDaysData}
-            margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
-            barGap={4}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke={isDark ? '#27272a' : '#e4e4e7'}
-              vertical={false}
-            />
-            <XAxis
-              dataKey="day"
-              tickLine={false}
-              axisLine={{ stroke: isDark ? '#3f3f46' : '#d4d4d8' }}
-              tick={{ fill: isDark ? '#a1a1aa' : '#71717a', fontSize: 11, fontWeight: 700 }}
-            />
-            <YAxis
-              allowDecimals={false}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: isDark ? '#a1a1aa' : '#71717a', fontSize: 10 }}
-            />
-            <Tooltip 
-              content={<CustomTooltip />} 
-              cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }}
-            />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              iconType="circle"
-              wrapperStyle={{ paddingBottom: '12px', fontSize: '11px', fontWeight: 'bold' }}
-            />
-            <Bar
-              name="Present"
-              dataKey="present"
-              fill="#10b981"
-              radius={[6, 6, 0, 0]}
-              maxBarSize={32}
-            />
-            <Bar
-              name="Late"
-              dataKey="late"
-              fill="#f59e0b"
-              radius={[6, 6, 0, 0]}
-              maxBarSize={32}
-            />
-            <Bar
-              name="Excused"
-              dataKey="excused"
-              fill="#0ea5e9"
-              radius={[6, 6, 0, 0]}
-              maxBarSize={32}
-            />
-            <Bar
-              name="Absent"
-              dataKey="absent"
-              fill="#ef4444"
-              radius={[6, 6, 0, 0]}
-              maxBarSize={32}
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {weekSummary.grandTotal > 0 ? (
+        <div className="h-[260px] w-full pt-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={weekDaysData}
+              margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
+              barGap={4}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke={isDark ? '#27272a' : '#e4e4e7'}
+                vertical={false}
+              />
+              <XAxis
+                dataKey="day"
+                tickLine={false}
+                axisLine={{ stroke: isDark ? '#3f3f46' : '#d4d4d8' }}
+                tick={{ fill: isDark ? '#a1a1aa' : '#71717a', fontSize: 11, fontWeight: 700 }}
+              />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: isDark ? '#a1a1aa' : '#71717a', fontSize: 10 }}
+              />
+              <Tooltip 
+                content={<CustomTooltip />} 
+                cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }}
+              />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                iconType="circle"
+                wrapperStyle={{ paddingBottom: '12px', fontSize: '11px', fontWeight: 'bold' }}
+              />
+              <Bar
+                name="Present"
+                dataKey="present"
+                fill="#10b981"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={32}
+              />
+              <Bar
+                name="Late"
+                dataKey="late"
+                fill="#f59e0b"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={32}
+              />
+              <Bar
+                name="Excused"
+                dataKey="excused"
+                fill="#0ea5e9"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={32}
+              />
+              <Bar
+                name="Absent"
+                dataKey="absent"
+                fill="#ef4444"
+                radius={[6, 6, 0, 0]}
+                maxBarSize={32}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="h-[180px] w-full flex flex-col items-center justify-center p-6 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800 text-center space-y-2">
+          <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <BarChart3 className="w-5 h-5" />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
+              No Attendance Records for This Period
+            </p>
+            <p className="text-[11px] text-zinc-400 max-w-sm">
+              Generate an active QR code or start a classroom session to begin tracking real-time student check-ins and punctuality metrics.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

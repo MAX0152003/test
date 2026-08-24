@@ -152,17 +152,17 @@ export default function AccountLinkQRModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-left"
+          className="w-full max-w-md bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-left"
         >
           {/* Modal Header */}
-          <div className="p-5 border-b border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
+          <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-850 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
                 <QrCode className="w-5 h-5" />
               </div>
               <div>
@@ -180,12 +180,12 @@ export default function AccountLinkQRModal({
           </div>
 
           {/* Mode Tabs */}
-          <div className="p-2 bg-zinc-100/70 dark:bg-zinc-800/50 flex gap-1 mx-5 mt-4 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50">
+          <div className="p-1.5 bg-zinc-100 dark:bg-zinc-900 flex gap-1 mx-4 sm:mx-5 mt-4 rounded-2xl border border-zinc-200 dark:border-zinc-800">
             <button
               onClick={() => setActiveTab('generate')}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 activeTab === 'generate'
-                  ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  ? 'bg-white dark:bg-zinc-950 text-emerald-600 dark:text-emerald-400 shadow-xs border border-zinc-200/50 dark:border-zinc-800'
                   : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
               }`}
             >
@@ -196,7 +196,7 @@ export default function AccountLinkQRModal({
               onClick={() => setActiveTab('scan')}
               className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 activeTab === 'scan'
-                  ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  ? 'bg-white dark:bg-zinc-950 text-emerald-600 dark:text-emerald-400 shadow-xs border border-zinc-200/50 dark:border-zinc-800'
                   : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
               }`}
             >

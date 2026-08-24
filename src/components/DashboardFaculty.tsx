@@ -2960,7 +2960,7 @@ export default function DashboardFaculty({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100dvh-5.5rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden pb-0"
+          className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
         >
           <Messages 
             userProfile={userProfile} 

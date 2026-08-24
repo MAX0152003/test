@@ -152,12 +152,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-3 sm:p-6 select-none animate-fade-in"
+      className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6 select-none animate-fade-in"
       onClick={onClose}
     >
       {/* Header bar */}
       <div 
-        className="w-full max-w-5xl flex items-center justify-between gap-4 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-white shadow-2xl z-10 mb-3"
+        className="w-full max-w-5xl flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-zinc-900 border border-zinc-750 text-white shadow-2xl z-10 mb-3"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -179,12 +179,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Zoom controls */}
-          <div className="hidden sm:flex items-center gap-1 bg-zinc-800/80 p-1 rounded-xl border border-zinc-750">
+          <div className="hidden sm:flex items-center gap-1 bg-zinc-800 p-1 rounded-xl border border-zinc-700">
             <button
               type="button"
               onClick={() => setScale(s => Math.max(s - 0.25, 0.5))}
               title="Zoom Out (-)"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700/60 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
             >
               <ZoomOut className="w-4 h-4" />
             </button>
@@ -195,7 +195,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               type="button"
               onClick={() => setScale(s => Math.min(s + 0.25, 3))}
               title="Zoom In (+)"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700/60 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
             >
               <ZoomIn className="w-4 h-4" />
             </button>
@@ -203,7 +203,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               type="button"
               onClick={() => setRotation(r => (r + 90) % 360)}
               title="Rotate 90°"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700/60 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
             >
               <RotateCw className="w-4 h-4" />
             </button>
@@ -211,7 +211,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
               type="button"
               onClick={() => { setScale(1); setRotation(0); }}
               title="Reset View"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700/60 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
@@ -222,7 +222,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             type="button"
             onClick={handleDownload}
             disabled={isSaving}
-            className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-95 ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-95 ${
               isSaved
                 ? 'bg-emerald-500 text-black shadow-emerald-500/20'
                 : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
@@ -231,12 +231,12 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
             {isSaved ? (
               <>
                 <Check className="w-4 h-4 text-black stroke-[3]" />
-                <span>Saved!</span>
+                <span className="hidden xs:inline">Saved!</span>
               </>
             ) : (
               <>
                 <Download className="w-4 h-4 stroke-[2.5]" />
-                <span>Save Image</span>
+                <span className="hidden xs:inline">Save Image</span>
               </>
             )}
           </button>
@@ -255,7 +255,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
       {/* Main Image Stage */}
       <div 
-        className="w-full max-w-5xl flex-1 flex items-center justify-center overflow-auto p-2 sm:p-4 rounded-3xl bg-zinc-950/70 border border-zinc-850/80 shadow-2xl relative"
+        className="w-full max-w-5xl flex-1 flex items-center justify-center overflow-auto p-2 sm:p-4 rounded-3xl bg-zinc-950 border border-zinc-850 shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
       >
         <div 
