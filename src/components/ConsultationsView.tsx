@@ -517,13 +517,13 @@ export default function ConsultationsView({
 
             {/* Day Cells Grid */}
             <div className="grid grid-cols-7 gap-1.5">
-              {calendarDays.map((day, idx) => {
+              {calendarDays.map((day) => {
                 const isSelected = selectedDateFilter === day.dateStr;
                 const isToday = day.dateStr === new Date().toISOString().split('T')[0];
 
                 return (
                   <div
-                    key={idx}
+                    key={day.dateStr}
                     onClick={() => {
                       if (day.isCurrentMonth) {
                         setSelectedDateFilter(isSelected ? null : day.dateStr);

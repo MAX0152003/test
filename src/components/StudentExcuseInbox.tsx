@@ -24,6 +24,7 @@ import {
 import { LeaveRequest, ClassSession, UserProfile } from '../types';
 import { EXCUSE_PRESET_TYPES } from '../lib/msuUtils';
 import { speakText } from './AccessibilitySettings';
+import { compressImage } from '../lib/imageUtils';
 
 interface StudentExcuseInboxProps {
   excuseLetters: LeaveRequest[];
@@ -129,51 +130,30 @@ export default function StudentExcuseInbox({
     speakText("Editing your pending excuse letter", readAloudEnabled);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setFormAttachmentName(file.name);
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (!result) return;
-
-      // Compress if it's an image
-      if (file.type.startsWith('image/')) {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxDimension = 1000;
-
-          if (width > height && width > maxDimension) {
-            height = (height * maxDimension) / width;
-            width = maxDimension;
-          } else if (height > maxDimension) {
-            width = (width * maxDimension) / height;
-            height = maxDimension;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressed = canvas.toDataURL('image/jpeg', 0.85);
-            setFormAttachment(compressed);
-          } else {
-            setFormAttachment(result);
-          }
-        };
-        img.src = result;
-      } else {
-        setFormAttachment(result);
+    try {
+      const { dataUrl, name } = await compressImage(file, 1280, 0.82);
+      setFormAttachment(dataUrl);
+      setFormAttachmentName(name);
+      setFormError(null);
+      if (typeof window !== 'undefined' && (window as any).showToast) {
+        (window as any).showToast(`Document "${name}" attached successfully (under 500 KB quota).`, "success");
       }
-    };
-    reader.readAsDataURL(file);
+      speakText(`Successfully attached document ${name}`, readAloudEnabled);
+    } catch (err: any) {
+      console.error("Attachment validation error:", err);
+      const errMsg = err?.message || "Invalid attachment file format or size exceeds 500 KB limit.";
+      setFormError(errMsg);
+      setFormAttachment('');
+      setFormAttachmentName('');
+      if (typeof window !== 'undefined' && (window as any).showToast) {
+        (window as any).showToast(errMsg, "error");
+      }
+      speakText(errMsg, readAloudEnabled);
+    }
   };
 
   const handleSubmitForm = (e: React.FormEvent) => {

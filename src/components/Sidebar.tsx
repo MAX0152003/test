@@ -208,7 +208,6 @@ export default function Sidebar({
               { id: 'resets', label: 'Password Resets', icon: Lock, badge: pendingResetsCount },
               { id: 'users', label: 'Users Directory', icon: Users },
               { id: 'schedule-editor', label: 'Schedules', icon: CalendarDays },
-              { id: 'consultations', label: 'Consultations', icon: CalendarClock, badge: pendingConsultationCount },
               { id: 'rooms', label: 'Rooms Directory', icon: MapPin },
               { id: 'reports', label: 'Reports Export', icon: Download },
               { id: 'tickets', label: 'Help Tickets', icon: HelpCircle, badge: pendingTicketsCount },
@@ -341,7 +340,7 @@ export default function Sidebar({
         <div className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-3">
           <nav className="px-3 space-y-4 text-left">
             {navSections.map((section, idx) => (
-              <div key={idx} className="space-y-1">
+              <div key={section.title} className="space-y-1">
                 {!isEffectiveCollapsed ? (
                   <div className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                     {section.title}

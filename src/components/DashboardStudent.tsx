@@ -19,6 +19,9 @@ import StudentExcuseInbox from './StudentExcuseInbox';
 import ConsultationsView from './ConsultationsView';
 import { getFacultyInClassDetails } from '../lib/facultyTimeUtils';
 import { playSuccessChime, playWarningChime, triggerHapticFeedback } from '../lib/soundUtils';
+import { compressImage } from '../lib/imageUtils';
+import { EmptyState } from './EmptyState';
+import { StudentFacultyCard, StudentCourseCard, StudentExcuseCard, StudentLectureCard } from './StudentDashboardCards';
 import { 
   Scan, 
   Calendar, 
@@ -56,7 +59,9 @@ import {
   Filter,
   History,
   Check,
-  RotateCcw
+  RotateCcw,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock, { triggerNativeChime } from './AlarmClock';
@@ -65,6 +70,7 @@ import Messages from './Messages';
 import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import StudentWeeklyAttendanceChart from './StudentWeeklyAttendanceChart';
+import StudentAttendanceTrendChart from './StudentAttendanceTrendChart';
 import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
 import { EXCUSE_PRESET_TYPES, isFridayPrayerWindow } from '../lib/msuUtils';
 
@@ -274,6 +280,7 @@ export default function DashboardStudent({
   }, [activeScreen]);
   
   // State for customizing the attendance trends graph
+  const [analyticsTab, setAnalyticsTab] = React.useState<'trend' | 'distribution'>('trend');
   const [graphPeriod, setGraphPeriod] = React.useState<'days' | 'weeks' | 'months'>('weeks');
   const [graphStartDate, setGraphStartDate] = React.useState<string>(() => {
     const d = new Date();
@@ -517,6 +524,9 @@ export default function DashboardStudent({
   });
 
   const leaveRequests = excuseLetters || localLeaveRequests;
+
+  // Toggle state to only show recent excuse letter by default and hide past history
+  const [showAllExcuses, setShowAllExcuses] = React.useState(false);
 
   React.useEffect(() => {
     localStorage.setItem('classpulse_student_leaves', JSON.stringify(leaveRequests));
@@ -971,15 +981,21 @@ export default function DashboardStudent({
     speakText(`Opening course detail modal for ${cls.name}`, accessibility.readAloud);
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setProfileAvatar(reader.result as string);
+      try {
+        const { dataUrl } = await compressImage(file, 600, 0.85);
+        setProfileAvatar(dataUrl);
         speakText("New avatar graphic uploaded cleanly. Click save details to publish.", accessibility.readAloud);
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setProfileAvatar(reader.result as string);
+          speakText("New avatar graphic uploaded cleanly. Click save details to publish.", accessibility.readAloud);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -1423,16 +1439,27 @@ export default function DashboardStudent({
                         id="excuse-letter-upload-real"
                         accept="image/*,application/pdf"
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              setLeaveAttachment(reader.result as string);
-                              setLeaveAttachmentName(file.name);
-                              speakText(`Successfully attached document ${file.name}`, accessibility.readAloud);
-                            };
-                            reader.readAsDataURL(file);
+                            try {
+                              const { dataUrl, name } = await compressImage(file, 1280, 0.82);
+                              setLeaveAttachment(dataUrl);
+                              setLeaveAttachmentName(name);
+                              if (typeof window !== 'undefined' && (window as any).showToast) {
+                                (window as any).showToast(`Document "${name}" attached successfully (under 500 KB limit).`, "success");
+                              }
+                              speakText(`Successfully attached document ${name}`, accessibility.readAloud);
+                            } catch (err: any) {
+                              console.error("Document upload error:", err);
+                              const errMsg = err?.message || "Invalid attachment file format or size exceeds 500 KB limit.";
+                              setLeaveAttachment('');
+                              setLeaveAttachmentName('');
+                              if (typeof window !== 'undefined' && (window as any).showToast) {
+                                (window as any).showToast(errMsg, "error");
+                              }
+                              speakText(errMsg, accessibility.readAloud);
+                            }
                           }
                         }}
                       />
@@ -1489,60 +1516,58 @@ export default function DashboardStudent({
               </div>
             )}
 
-            {/* Render student applied leaves inline */}
-            {leaveRequests.length > 0 && (
-              <div className="pt-3 border-t border-zinc-100 dark:border-zinc-900 text-left">
-                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Submitted Excuse Letters ({leaveRequests.length})</span>
-                <div className="space-y-2 mt-2 max-h-48 overflow-y-auto scrollbar-thin">
-                  {leaveRequests.map(req => (
-                    <div key={req.id} className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1.5 font-bold flex-wrap">
-                          <span className="font-extrabold text-xs text-zinc-800 dark:text-zinc-200">{req.className}</span>
-                          <span className="text-[9px] font-mono font-black text-zinc-400">({req.id})</span>
-                          {req.excuseType && (
-                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              {req.excuseType}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-zinc-450 leading-normal mt-0.5">Duration: {req.startDate} to {req.endDate} • {req.reason}</p>
-                        {(req.attachmentImg || req.attachmentData || req.attachmentName) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const img = req.attachmentImg || req.attachmentData || '';
-                              if (img) {
-                                setImagePreviewData({
-                                  url: img,
-                                  title: req.excuseType || 'Excuse Letter Attachment',
-                                  subtitle: `Class: ${req.className} • ${req.startDate} to ${req.endDate}`,
-                                  fileName: req.attachmentName || `excuse_${req.id}.png`
-                                });
-                              } else {
-                                if (typeof window !== 'undefined' && (window as any).showToast) {
-                                  (window as any).showToast(`Document: ${req.attachmentName}`, "info");
-                                }
-                              }
-                            }}
-                            className="text-[9px] font-mono bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded mt-1 inline-flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            📎 {req.attachmentName || 'Supporting Attachment'} (Click to View/Save)
-                          </button>
+            {/* Render student applied leaves inline (Recent excuse letter prioritized, past ones hidden with toggle) */}
+            {leaveRequests.length > 0 && (() => {
+              // Sort to ensure the most recent is at the top
+              const sortedLeaves = [...leaveRequests].sort((a, b) => {
+                const timeA = new Date(a.appliedAt || a.createdAt || a.startDate || 0).getTime();
+                const timeB = new Date(b.appliedAt || b.createdAt || b.startDate || 0).getTime();
+                return timeB - timeA;
+              });
+              const displayedLeaves = showAllExcuses ? sortedLeaves : sortedLeaves.slice(0, 1);
+              const pastCount = sortedLeaves.length - 1;
+
+              return (
+                <div className="pt-3 border-t border-zinc-100 dark:border-zinc-900 text-left">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      Recent Submitted Excuse Letter {pastCount > 0 && !showAllExcuses && `(1 of ${sortedLeaves.length})`}
+                    </span>
+                    {pastCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllExcuses(!showAllExcuses)}
+                        className="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {showAllExcuses ? (
+                          <>
+                            <ChevronUp className="w-3 h-3" />
+                            Hide Past Excuses
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3" />
+                            View Past ({pastCount})
+                          </>
                         )}
-                      </div>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ml-2 ${
-                        req.status === 'approved' || req.status === 'valid' ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' :
-                        req.status === 'rejected' || req.status === 'invalid' ? 'bg-red-100 dark:bg-red-500/15 text-red-500' :
-                        'bg-zinc-200 dark:bg-zinc-850 text-zinc-550'
-                      }`}>
-                        {req.status === 'approved' || req.status === 'valid' ? 'valid' : req.status === 'rejected' || req.status === 'invalid' ? 'invalid' : req.status}
-                      </span>
-                    </div>
-                  ))}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 mt-2 max-h-56 overflow-y-auto scrollbar-thin">
+                    {displayedLeaves.map((req, idx) => (
+                      <StudentExcuseCard
+                        key={req.id}
+                        req={req}
+                        isLatest={idx === 0}
+                        onPreviewImage={setImagePreviewData}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Live Instructors Directory (Real-time tracking of enrolled faculty with search across all campus faculty) */}
@@ -1634,339 +1659,103 @@ export default function DashboardStudent({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {displayedFaculty.map(fac => {
                   const isWatched = watchedFacultyIds.includes(fac.id);
-                  const timeInfo = fac.status === 'in-class' ? getFacultyInClassDetails(fac, classes) : null;
                   const isEnrolledInstructor = enrolledFacultyIds.has(fac.id) || enrolledFacultyNames.has(fac.name.trim().toLowerCase());
 
                   return (
-                    <div 
-                      key={fac.id} 
-                      className={`p-3.5 sm:p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 border transition-all text-left flex flex-col justify-between gap-3 ${
-                        fac.status === 'available'
-                          ? 'border-emerald-500/30 shadow-xs ring-1 ring-emerald-500/10 hover:border-emerald-500/50'
-                          : fac.status === 'in-class'
-                          ? 'border-amber-500/30 hover:border-amber-500/50'
-                          : 'border-zinc-200 dark:border-zinc-800'
-                      }`}
-                    >
-                      {/* Instructor Profile & Live Status */}
-                      <div>
-                        <div className="flex items-start justify-between gap-2.5">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="relative shrink-0">
-                              <img 
-                                src={fac.avatar} 
-                                alt={fac.name} 
-                                className="w-11 h-11 rounded-full object-cover border-2 border-zinc-200 dark:border-zinc-750 shadow-2xs" 
-                              />
-                              <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-zinc-900 ${
-                                fac.status === 'available' ? 'bg-emerald-500 ring-1 ring-emerald-400' :
-                                fac.status === 'in-class' ? 'bg-amber-500 ring-1 ring-amber-400' :
-                                'bg-red-500'
-                              }`} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <h4 className="font-extrabold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate">{fac.name}</h4>
-                                {isEnrolledInstructor && (
-                                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
-                                    Enrolled
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1 mt-0.5">
-                                <MapPin className="w-3 h-3 shrink-0 text-emerald-500" />
-                                <span>{fac.room || 'Consultation Office'}</span>
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Status Chip */}
-                          <div className="shrink-0">
-                            {fac.status === 'available' ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
-                                <CheckCircle className="w-3 h-3" /> Available
-                              </span>
-                            ) : fac.status === 'in-class' ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black text-amber-700 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 uppercase tracking-wider flex items-center gap-1 animate-pulse">
-                                <Clock className="w-3 h-3" /> In Class
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black text-red-600 dark:text-red-400 bg-red-500/15 border border-red-500/30 uppercase tracking-wider flex items-center gap-1">
-                                <X className="w-3 h-3" /> Unavailable
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Remaining Time / In-Class Indicator */}
-                        {fac.status === 'in-class' && timeInfo && (
-                          <div className="mt-2.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-left gap-2">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 text-[11px] font-black text-amber-800 dark:text-amber-300">
-                                <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-spin" />
-                                <span className="truncate">Free in ~{timeInfo.remainingMinutes} mins</span>
-                              </div>
-                              <div className="text-[10px] text-amber-700 dark:text-amber-400 font-medium truncate mt-0.5">
-                                {timeInfo.endTimeStr ? `Class finishes at ${timeInfo.endTimeStr}` : 'Teaching ongoing'}
-                                {timeInfo.currentClassCode ? ` • ${timeInfo.currentClassCode}` : ''}
-                              </div>
-                            </div>
-                            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
-                              In Session
-                            </span>
-                          </div>
-                        )}
-
-                        {fac.status === 'available' && (
-                          <div className="mt-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-                            <Sparkles className="w-3 h-3 text-emerald-500" />
-                            <span>Free for walk-in consultation or scheduled appointment</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons Row */}
-                      <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200/70 dark:border-zinc-800/70 flex-wrap">
-                        {/* Notify Me / Alert on Free Button */}
-                        {fac.status !== 'available' && (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleWatchFaculty(fac.id, fac.name, fac.room)}
-                            className={`flex-1 min-w-[110px] py-1.5 px-2 rounded-xl text-[10px] font-black tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-                              isWatched
-                                ? 'bg-emerald-500 text-black border border-emerald-400 shadow-xs'
-                                : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30'
-                            }`}
-                            title={isWatched ? "Cancel alert for this instructor" : "Get a browser push notification the moment this instructor is free"}
-                          >
-                            {isWatched ? (
-                              <>
-                                <BellRing className="w-3 h-3 text-black animate-bounce" />
-                                <span>Alert Active</span>
-                              </>
-                            ) : (
-                              <>
-                                <Bell className="w-3 h-3" />
-                                <span>Notify Me</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-
-                        {/* Book Slot Button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedFacultyForConsultation(fac.id);
-                            setScreen('consultations');
-                            speakText(`Opening consultation scheduler for ${fac.name}`, accessibility.readAloud);
-                          }}
-                          className="flex-1 min-w-[100px] py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-700 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                          title={`Book a formal consultation slot with ${fac.name}`}
-                        >
-                          <CalendarClock className="w-3.5 h-3.5" />
-                          <span>Book Slot</span>
-                        </button>
-
-                        {/* Message Button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const targetFacId = fac.id || 'fac-1';
-                            const contactObj = { id: targetFacId, name: fac.name, ts: Date.now() };
-                            setSelectedFacultyForChat(contactObj);
-                            setScreen('messages', contactObj);
-                            speakText(`Directing to message ${fac.name}`, accessibility.readAloud);
-                          }}
-                          className="py-1.5 px-2.5 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 shrink-0"
-                          title={`Message ${fac.name}`}
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Chat</span>
-                        </button>
-                      </div>
-                    </div>
+                    <StudentFacultyCard
+                      key={fac.id}
+                      fac={fac}
+                      classes={classes}
+                      isEnrolledInstructor={isEnrolledInstructor}
+                      isWatched={isWatched}
+                      onToggleWatch={handleToggleWatchFaculty}
+                      onBookSlot={(facId, facName) => {
+                        setSelectedFacultyForConsultation(facId);
+                        setScreen('consultations');
+                        speakText(`Opening consultation scheduler for ${facName}`, accessibility.readAloud);
+                      }}
+                      onChat={(facId, facName) => {
+                        const targetFacId = facId || 'fac-1';
+                        const contactObj = { id: targetFacId, name: facName, ts: Date.now() };
+                        setSelectedFacultyForChat(contactObj);
+                        setScreen('messages', contactObj);
+                        speakText(`Directing to message ${facName}`, accessibility.readAloud);
+                      }}
+                    />
                   );
                 })}
               </div>
             )}
           </div>
 
-          {/* Student High-Fidelity Analytics & Tracking Suite */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6">
-            
-            {/* 1. Interactive Visual Attendance Analytics & Subject Breakdown Graph */}
-            <div className="md:col-span-6 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[9px] font-mono font-black uppercase text-zinc-400 tracking-widest block">Attendance Summary</span>
-                  <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-0.5">Subject Attendance Graph</h4>
-                </div>
-                <div className="text-right">
-                  <span className="font-mono font-black text-lg text-emerald-500 leading-none block">
-                    {attendanceRate}%
-                  </span>
-                  <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wide mt-0.5 ${
-                    attendanceRate >= 80 ? 'bg-emerald-500/10 text-emerald-500' :
-                    attendanceRate >= 70 ? 'bg-amber-500/10 text-amber-500' :
-                    'bg-red-500/10 text-red-500'
-                  }`}>
-                    {attendanceRate >= 80 ? 'Good Standing' : 'Needs Attention'}
-                  </span>
-                </div>
+          {/* Student High-Fidelity Analytics & Visual Attendance Tracking Suite */}
+          <div className="space-y-4">
+            {/* Visual Analytics View Switcher */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 bg-zinc-100 dark:bg-zinc-900/80 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  id="student-analytics-trend-tab-btn"
+                  onClick={() => setAnalyticsTab('trend')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                    analyticsTab === 'trend'
+                      ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Attendance Trend Line Chart</span>
+                </button>
+                <button
+                  type="button"
+                  id="student-analytics-dist-tab-btn"
+                  onClick={() => setAnalyticsTab('distribution')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                    analyticsTab === 'distribution'
+                      ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                  }`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>4-Week Session Breakdown</span>
+                </button>
               </div>
 
-              {/* Status Proportion Multi-Segment Bar */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] font-bold text-zinc-500">
-                  <span>Status Distribution</span>
-                  <span className="font-mono text-[9px]">{totalChecked} total sessions</span>
-                </div>
-                <div className="w-full h-3.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden flex p-0.5 gap-0.5">
-                  {totalChecked > 0 ? (
-                    <>
-                      {presentsCount > 0 && (
-                        <div 
-                          style={{ width: `${(presentsCount / totalChecked) * 100}%` }} 
-                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                          title={`Present: ${presentsCount}`}
-                        />
-                      )}
-                      {latesCount > 0 && (
-                        <div 
-                          style={{ width: `${(latesCount / totalChecked) * 100}%` }} 
-                          className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                          title={`Late: ${latesCount}`}
-                        />
-                      )}
-                      {absentsCount > 0 && (
-                        <div 
-                          style={{ width: `${(absentsCount / totalChecked) * 100}%` }} 
-                          className="bg-red-500 h-full rounded-full transition-all duration-500"
-                          title={`Absent: ${absentsCount}`}
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <div className="w-full h-full bg-emerald-500/20 rounded-full" />
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-1 pt-1 text-center">
-                  <div className="bg-zinc-50 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-850">
-                    <span className="text-[8px] font-bold uppercase text-emerald-500 block">Present</span>
-                    <span className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100">{presentsCount}</span>
-                  </div>
-                  <div className="bg-zinc-50 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-850">
-                    <span className="text-[8px] font-bold uppercase text-amber-500 block">Late</span>
-                    <span className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100">{latesCount}</span>
-                  </div>
-                  <div className="bg-zinc-50 dark:bg-zinc-900/60 p-1.5 rounded-xl border border-zinc-100 dark:border-zinc-850">
-                    <span className="text-[8px] font-bold uppercase text-red-500 block">Absent</span>
-                    <span className="font-mono font-black text-xs text-zinc-900 dark:text-zinc-100">{absentsCount}</span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 px-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadReport}
+                  className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Download attendance CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Download Report (CSV)</span>
+                </button>
               </div>
-
-              {/* Per-Subject Attendance Performance Progress Bars */}
-              <div className="space-y-2 pt-1 border-t border-zinc-100 dark:border-zinc-900">
-                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Subject Rate Graph</span>
-                <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                  {(() => {
-                    const enrolledClassesList = classes.filter(cls =>
-                      enrollments.some(
-                        e => e.classId === cls.id && 
-                             (e.studentId === userProfile.studentId || e.studentEmail === userProfile.email) &&
-                             !e.deletedByStudent
-                      )
-                    );
-                    if (enrolledClassesList.length === 0) {
-                      return <div className="text-[10px] text-zinc-400 py-2">No subjects currently enrolled.</div>;
-                    }
-                    return enrolledClassesList.map((cls) => {
-                      const clsRecs = attendanceRecords.filter(
-                        r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
-                      );
-                      const p = clsRecs.filter(r => r.status === 'present').length;
-                      const l = clsRecs.filter(r => r.status === 'late').length;
-                      const tot = clsRecs.length;
-                      const rate = tot > 0 ? Math.round(((p + l * 0.7) / tot) * 100) : 100;
-                      return (
-                        <div key={cls.id} className="space-y-0.5">
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate max-w-[180px]">{cls.code || cls.name}</span>
-                            <span className={`font-mono font-black ${rate >= 80 ? 'text-emerald-500' : rate >= 70 ? 'text-amber-500' : 'text-red-500'}`}>{rate}%</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-                            <div 
-                              style={{ width: `${Math.min(rate, 100)}%` }} 
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                rate >= 80 ? 'bg-emerald-500' : rate >= 70 ? 'bg-amber-500' : 'bg-red-500'
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                id="student-download-report-btn"
-                onClick={handleDownloadReport}
-                className="w-full mt-1 py-2 px-3 bg-zinc-950 hover:bg-zinc-900 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95 border border-zinc-800 dark:border-zinc-800"
-                title="Download your printable monthly attendance report as localized CSV"
-              >
-                <Download className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                Download Report (CSV)
-              </button>
             </div>
 
-            {/* 3. Upcoming physical lectures timetable */}
-            <div className="md:col-span-6 p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm flex flex-col justify-between space-y-3 sm:space-y-4">
-              <div>
-                <span className="text-[9px] font-mono font-black uppercase text-zinc-400 tracking-widest block">Term calendar</span>
-                <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1">Upcoming Lectures today</h4>
-              </div>
-
-              <div className="space-y-2 text-left">
-                {(() => {
-                  const enrolledList = classes.filter(cls => studentEnrolledClassIds.has(cls.id));
-                  if (enrolledList.length === 0) {
-                    return <div className="text-[10px] text-zinc-400 text-center py-4">No enrolled classes in schedule.</div>;
-                  }
-                  return enrolledList.slice(0, 2).map((cls, idx) => (
-                    <div key={idx} className="flex gap-2.5 items-start">
-                      <div className="p-1 px-1.5 rounded-lg bg-emerald-500/10 text-emerald-505 font-mono text-[9px] font-black uppercase shrink-0 mt-0.5">
-                        {cls.startTime.split(' ')[0]}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h5 className="text-[10.5px] font-black text-zinc-800 dark:text-zinc-200 truncate leading-tight">{cls.name}</h5>
-                        <span className="text-[9px] text-zinc-400 block mt-0.5 truncate">{cls.room} • {cls.code}</span>
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-
-              <button 
-                onClick={() => setScreen('schedule')}
-                className="w-full py-1.5 bg-zinc-50 dark:bg-zinc-900/60 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 hover:text-emerald-500 transition-colors text-[9.5px] font-bold uppercase tracking-wider rounded-lg border border-zinc-200/50 dark:border-zinc-850/50 text-zinc-650 dark:text-zinc-350 cursor-pointer text-center block"
-              >
-                Inspect All Schedules Catalog
-              </button>
-            </div>
-
+            {/* Selected Recharts Visual View */}
+            {analyticsTab === 'trend' ? (
+              <StudentAttendanceTrendChart
+                records={attendanceRecords}
+                classes={classes}
+                enrollments={enrollments}
+                userProfile={userProfile}
+                onOpenScanner={() => {
+                  setScreen('attendance');
+                  speakText("Opening QR attendance scanner.", accessibility.readAloud);
+                }}
+                onDownloadReport={handleDownloadReport}
+              />
+            ) : (
+              <StudentWeeklyAttendanceChart 
+                records={attendanceRecords} 
+                classes={classes} 
+                enrollments={enrollments} 
+                userProfile={userProfile} 
+              />
+            )}
           </div>
-
-          {/* 4-Week Attendance Trends & Punctuality Consistency Bar Chart */}
-          <StudentWeeklyAttendanceChart 
-            records={attendanceRecords} 
-            classes={classes} 
-            enrollments={enrollments} 
-            userProfile={userProfile} 
-          />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
             
@@ -2043,89 +1832,17 @@ export default function DashboardStudent({
                     return displayClasses.map(cls => {
                       const isEnrolled = studentEnrolledClassIds.has(cls.id);
 
-                      // Compute active standing indicators
-                      const studentRecordsForClass = attendanceRecords.filter(
-                        r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
-                      );
-                      const standing = calculateStudentStanding(studentRecordsForClass);
-                      const standingLabel = standing.label;
-                      const standingColor = standing.badgeColor;
-
                       return (
-                        <div 
+                        <StudentCourseCard
                           key={cls.id}
-                          onClick={() => handleOpenSubjectDetails(cls)}
-                          className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all duration-200 hover:scale-[1.01] cursor-pointer relative group/card ${
-                            isEnrolled 
-                              ? 'bg-zinc-50/50 hover:bg-zinc-100/60 dark:bg-zinc-900/30 dark:border-zinc-840 dark:hover:bg-zinc-900/65' 
-                              : 'bg-zinc-100/20 border-dashed border-zinc-200 dark:border-zinc-900 hover:border-emerald-500/40'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase inline-block">
-                                {cls.code}
-                              </span>
-                              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1.5 sm:mt-2 tracking-tight truncate">{cls.name}</h4>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
-                                isEnrolled 
-                                  ? 'bg-blue-600 text-white font-extrabold shadow-sm' 
-                                  : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-500'
-                              }`}>
-                                {isEnrolled ? 'Joined' : 'Available'}
-                              </span>
-
-                              {isEnrolled && (
-                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md whitespace-nowrap ${standingColor}`}>
-                                  {standingLabel}
-                                </span>
-                              )}
-                              
-                              {/* Student soft delete/drop action trigger button */}
-                              {isEnrolled && onDropSubject && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setStudentDeleteConfirm({ id: cls.id, code: cls.code, name: cls.name });
-                                  }}
-                                  className="p-1 h-6 w-6 mt-1 flex items-center justify-center rounded-md bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-80 sm:opacity-0 group-hover/card:opacity-100 animate-fade-in"
-                                  title="Delete/drop subject"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-
-                              {/* Manual Enroll Button for unenrolled subjects found via search */}
-                              {!isEnrolled && onEnrollSubject && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEnrollSubject(cls.id);
-                                  }}
-                                  className="mt-1.5 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all whitespace-nowrap"
-                                  title="Enroll in this subject"
-                                >
-                                  Enroll Now
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2.5 sm:gap-3.5 text-[10px] text-zinc-400 mt-3 sm:mt-4 flex-wrap">
-                            <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-                              <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                              {cls.startTime}
-                            </span>
-                            <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-                              <MapPin className="w-3.5 h-3.5 text-zinc-500" />
-                              {cls.room}
-                            </span>
-                          </div>
-                        </div>
+                          cls={cls}
+                          isEnrolled={isEnrolled}
+                          attendanceRecords={attendanceRecords}
+                          userProfile={userProfile}
+                          onOpenDetails={handleOpenSubjectDetails}
+                          onDrop={onDropSubject ? (c) => setStudentDeleteConfirm({ id: c.id, code: c.code, name: c.name }) : undefined}
+                          onEnroll={onEnrollSubject ? (cId) => onEnrollSubject(cId) : undefined}
+                        />
                       );
                     });
                   })()}
@@ -2939,16 +2656,15 @@ export default function DashboardStudent({
 
                   if (filtered.length === 0) {
                     return (
-                      <div className="p-8 text-center rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-2">
-                        <p className="text-xs text-zinc-400 font-bold">No notifications match your active search filter.</p>
-                        <button
-                          type="button"
-                          onClick={() => { setNotifSearch(''); setNotifFilter('all'); }}
-                          className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:underline cursor-pointer"
-                        >
-                          Reset filters
-                        </button>
-                      </div>
+                      <EmptyState
+                        iconType="notification"
+                        title={notifications.length === 0 ? "No Notifications Yet" : "No Matching Notifications"}
+                        description={notifications.length === 0 
+                          ? "Administrative records, attendance notices, and system alerts will appear here as they occur."
+                          : "No notification records matched your active keyword filter."}
+                        actionText={notifications.length > 0 ? "Reset Filters" : undefined}
+                        onAction={notifications.length > 0 ? () => { setNotifSearch(''); setNotifFilter('all'); } : undefined}
+                      />
                     );
                   }
 

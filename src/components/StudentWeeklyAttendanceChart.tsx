@@ -234,7 +234,7 @@ export default function StudentWeeklyAttendanceChart({
             <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1">
               {data.issues.map((iss, idx) => (
                 <span 
-                  key={idx}
+                  key={`${iss}-${idx}`}
                   className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
                     iss.includes('Absent') ? 'bg-red-500/10 text-red-500' :
                     iss.includes('Late') ? 'bg-amber-500/10 text-amber-500' :

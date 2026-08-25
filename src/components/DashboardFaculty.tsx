@@ -14,6 +14,7 @@ import {
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { EmptyState } from './EmptyState';
 import { 
   Plus, 
   QrCode, 
@@ -195,6 +196,103 @@ const checkDaysOverlapVal = (daysA: string[], daysB: string[]): boolean => {
   const expandedB = expandDaysToSpecificOnesVal(daysB);
   return expandedA.some(day => expandedB.includes(day));
 };
+
+// ==========================================
+// Memoized Faculty Course Card
+// ==========================================
+interface FacultyCourseCardProps {
+  cls: ClassSession;
+  enrolledCount: number;
+  onOpenDetails: (cls: ClassSession) => void;
+  onToggleClose: (id: string) => void;
+  onDeleteConfirm: (cls: { id: string; code: string }) => void;
+}
+
+const FacultyCourseCard: React.FC<FacultyCourseCardProps> = React.memo(({
+  cls,
+  enrolledCount,
+  onOpenDetails,
+  onToggleClose,
+  onDeleteConfirm
+}) => {
+  return (
+    <div
+      onClick={() => onOpenDetails(cls)}
+      className={`p-5 pl-7 rounded-2xl border bg-white dark:bg-zinc-900 shadow-xs hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group ${
+        cls.isClosed 
+          ? 'border-amber-500/40 opacity-90 hover:border-amber-500' 
+          : 'border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/30'
+      }`}
+    >
+      {/* Left-border ribbon accentuating the status */}
+      <div className={`absolute top-0 left-0 w-1.5 h-full transition-transform duration-300 group-hover:scale-y-110 ${
+        cls.isClosed ? 'bg-amber-500' : 'bg-emerald-500'
+      }`} />
+      
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-[9px] font-black tracking-widest px-2.5 py-1 rounded-md font-bold uppercase ${
+          cls.isClosed
+            ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+            : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+        }`}>
+          {cls.code}
+        </span>
+
+        {cls.isClosed && (
+          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+            <Lock className="w-2.5 h-2.5" /> Concluded
+          </span>
+        )}
+      </div>
+      
+      <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight mt-3 truncate">{cls.name}</h4>
+      
+      <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-850">
+        <span className="flex items-center gap-1 font-semibold text-zinc-650 dark:text-zinc-350">
+          <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+          {cls.startTime}
+        </span>
+        <span className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-500/10">
+          <Users className="w-3.5 h-3.5 text-emerald-500" /> {enrolledCount} Students
+        </span>
+      </div>
+
+      {/* Quick Management Toolbar */}
+      <div className="flex items-center justify-between gap-1.5 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-850/80 text-[10px]">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleClose(cls.id);
+          }}
+          className={`px-2 py-1 rounded-lg font-extrabold uppercase text-[9px] flex items-center gap-1 transition-all cursor-pointer ${
+            cls.isClosed
+              ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300'
+          }`}
+          title={cls.isClosed ? 'Reopen subject' : 'Close subject (End of Semester)'}
+        >
+          {cls.isClosed ? <Unlock className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
+          <span>{cls.isClosed ? 'Reopen' : 'Close Term'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteConfirm({ id: cls.id, code: cls.code });
+          }}
+          className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-extrabold uppercase text-[9px] flex items-center gap-1 transition-all cursor-pointer"
+          title="Delete/Drop Subject"
+        >
+          <Trash2 className="w-2.5 h-2.5" />
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
+  );
+});
+FacultyCourseCard.displayName = 'FacultyCourseCard';
 
 export interface ScheduledClassProximity {
   activeOrNearClass: ClassSession | null;
@@ -1386,8 +1484,8 @@ export default function DashboardFaculty({
 
                 return (
                   <div className="space-y-3.5 pt-1">
-                    {stats.map((stat, idx) => (
-                      <div key={idx} className="space-y-1">
+                    {stats.map((stat) => (
+                      <div key={stat.name} className="space-y-1">
                         <div className="flex justify-between items-center text-[10px]">
                           <span className="font-bold text-zinc-700 dark:text-zinc-200">{stat.name}</span>
                           <span className="font-mono text-zinc-400">{stat.count} students ({stat.percent}%)</span>
@@ -1463,81 +1561,14 @@ export default function DashboardFaculty({
                         {displayedClasses.map(cls => {
                           const enrolledCount = enrollments.filter(e => e.classId === cls.id).length;
                           return (
-                            <div
+                            <FacultyCourseCard
                               key={cls.id}
-                              onClick={() => handleOpenSubjectDetails(cls)}
-                              className={`p-5 pl-7 rounded-2xl border bg-white dark:bg-zinc-900 shadow-xs hover:shadow-md transition-all cursor-pointer text-left relative overflow-hidden group ${
-                                cls.isClosed 
-                                  ? 'border-amber-500/40 opacity-90 hover:border-amber-500' 
-                                  : 'border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/30'
-                              }`}
-                            >
-                              {/* High elegance left-border ribbon accentuating the status */}
-                              <div className={`absolute top-0 left-0 w-1.5 h-full transition-transform duration-300 group-hover:scale-y-110 ${
-                                cls.isClosed ? 'bg-amber-500' : 'bg-emerald-500'
-                              }`} />
-                              
-                              <div className="flex items-center justify-between gap-2">
-                                <span className={`text-[9px] font-black tracking-widest px-2.5 py-1 rounded-md font-bold uppercase ${
-                                  cls.isClosed
-                                    ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                                    : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                                }`}>
-                                  {cls.code}
-                                </span>
-
-                                {cls.isClosed && (
-                                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                                    <Lock className="w-2.5 h-2.5" /> Concluded
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 tracking-tight mt-3 truncate">{cls.name}</h4>
-                              
-                              <div className="flex items-center justify-between text-[10px] text-zinc-500 dark:text-zinc-400 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-850">
-                                <span className="flex items-center gap-1 font-semibold text-zinc-650 dark:text-zinc-350">
-                                  <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                  {cls.startTime}
-                                </span>
-                                <span className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-500/10">
-                                  <Users className="w-3.5 h-3.5 text-emerald-500" /> {enrolledCount} Students
-                                </span>
-                              </div>
-
-                              {/* Quick Management Toolbar */}
-                              <div className="flex items-center justify-between gap-1.5 mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-850/80 text-[10px]">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleCloseClass(cls.id);
-                                  }}
-                                  className={`px-2 py-1 rounded-lg font-extrabold uppercase text-[9px] flex items-center gap-1 transition-all cursor-pointer ${
-                                    cls.isClosed
-                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                                      : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                                  }`}
-                                  title={cls.isClosed ? 'Reopen subject' : 'Close subject (End of Semester)'}
-                                >
-                                  {cls.isClosed ? <Unlock className="w-2.5 h-2.5" /> : <Lock className="w-2.5 h-2.5" />}
-                                  <span>{cls.isClosed ? 'Reopen' : 'Close Term'}</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteConfirmClass({ id: cls.id, code: cls.code });
-                                  }}
-                                  className="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 font-extrabold uppercase text-[9px] flex items-center gap-1 transition-all cursor-pointer"
-                                  title="Delete/Drop Subject"
-                                >
-                                  <Trash2 className="w-2.5 h-2.5" />
-                                  <span>Delete</span>
-                                </button>
-                              </div>
-                            </div>
+                              cls={cls}
+                              enrolledCount={enrolledCount}
+                              onOpenDetails={handleOpenSubjectDetails}
+                              onToggleClose={handleToggleCloseClass}
+                              onDeleteConfirm={setDeleteConfirmClass}
+                            />
                           );
                         })}
                       </div>
@@ -1749,7 +1780,7 @@ export default function DashboardFaculty({
                     <MapPin className="w-4 h-4 text-emerald-500" />
                     Laboratory Rooms Cabinet
                   </h4>
-                  <p className="text-[10px] text-zinc-400">Select and monitor campus lab availability & active scanner logs</p>
+                  <p className="text-[10px] text-zinc-400">Select and monitor campus lab availability & room status</p>
                 </div>
 
                 {/* Dropdown Room Selector */}
@@ -1838,10 +1869,6 @@ export default function DashboardFaculty({
                         <div className="flex items-center justify-between text-[10px] font-mono">
                           <span className="text-zinc-400">Hardware systems:</span>
                           <span className="text-zinc-700 dark:text-zinc-300 font-extrabold">{activeRoom.devicesCount} Terminals</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] font-mono">
-                          <span className="text-zinc-400">Terminal scan state:</span>
-                          <span className={`font-black leading-none ${activeRoom.scannersActive ? 'text-emerald-500' : 'text-zinc-400'}`}>{activeRoom.scannersActive ? '● SECURE POWERED' : '○ SHUTDOWN'}</span>
                         </div>
                         {activeRoom.floor && (
                           <div className="flex items-center justify-between text-[10px] font-mono">
@@ -2770,16 +2797,15 @@ export default function DashboardFaculty({
 
               if (filtered.length === 0) {
                 return (
-                  <div className="p-8 text-center rounded-2xl bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-150 dark:border-zinc-850 space-y-2">
-                    <p className="text-xs text-zinc-400 font-bold">No notifications match your active search filter.</p>
-                    <button
-                      type="button"
-                      onClick={() => { setNotifSearch(''); setNotifFilter('all'); }}
-                      className="text-[10px] font-black text-emerald-500 uppercase tracking-widest hover:underline cursor-pointer"
-                    >
-                      Reset filters
-                    </button>
-                  </div>
+                  <EmptyState
+                    iconType="notification"
+                    title={notifications.length === 0 ? "No Notifications Yet" : "No Matching Notifications"}
+                    description={notifications.length === 0 
+                      ? "Administrative records, scan alerts, and system notifications will appear here as they are generated."
+                      : "No notification records matched your active filter criteria."}
+                    actionText={notifications.length > 0 ? "Reset Filters" : undefined}
+                    onAction={notifications.length > 0 ? () => { setNotifSearch(''); setNotifFilter('all'); } : undefined}
+                  />
                 );
               }
 

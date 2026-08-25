@@ -7,14 +7,15 @@
       "properties": {
         "id": { "type": "string" },
         "code": { "type": "string" },
-        "title": { "type": "string" },
+        "name": { "type": "string" },
+        "section": { "type": "string" },
         "schedule": { "type": "string" },
         "room": { "type": "string" },
-        "faculty": { "type": "string" },
-        "enrolled": { "type": "number" },
+        "facultyId": { "type": "string" },
+        "facultyName": { "type": "string" },
         "type": { "type": "string" }
       },
-      "required": ["id", "code", "title"]
+      "required": ["id", "code", "name"]
     },
     "AttendanceRecord": {
       "title": "Attendance Record",
@@ -27,9 +28,10 @@
         "studentId": { "type": "string" },
         "status": { "type": "string" },
         "date": { "type": "string" },
+        "time": { "type": "string" },
         "timestamp": { "type": "string" }
       },
-      "required": ["id", "classId", "studentId", "status"]
+      "required": ["id", "classId", "studentId", "status", "date"]
     },
     "ChatMessage": {
       "title": "Chat Message",
@@ -70,6 +72,39 @@
         "enrolledAt": { "type": "string" }
       },
       "required": ["id", "studentId", "classId"]
+    },
+    "LeaveRequest": {
+      "title": "Excuse Letter / Leave Request",
+      "description": "Student medical or academic excuse letters submitted to faculty",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "classId": { "type": "string" },
+        "className": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" }
+      },
+      "required": ["id", "studentId", "classId", "reason", "status"]
+    },
+    "ConsultationBooking": {
+      "title": "Consultation Booking",
+      "description": "Student faculty consultation appointment booking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "facultyId": { "type": "string" },
+        "facultyName": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "studentId", "facultyId", "date", "status"]
     }
   },
   "firestore": {
@@ -81,6 +116,10 @@
       "schema": "AttendanceRecord",
       "description": "Collection of attendance logs"
     },
+    "/attendance/{attendanceId}": {
+      "schema": "AttendanceRecord",
+      "description": "Collection of attendance records"
+    },
     "/messages/{messageId}": {
       "schema": "ChatMessage",
       "description": "Collection of chat communications"
@@ -89,9 +128,29 @@
       "schema": "UserProfile",
       "description": "Collection of registered user profiles"
     },
+    "/registered_users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of registered user accounts"
+    },
     "/enrollments/{enrollmentId}": {
       "schema": "Enrollment",
       "description": "Collection of subject enrollments"
+    },
+    "/excuse_letters/{letterId}": {
+      "schema": "LeaveRequest",
+      "description": "Collection of student excuse letters"
+    },
+    "/excuseLetters/{letterId}": {
+      "schema": "LeaveRequest",
+      "description": "Legacy alias for student excuse letters"
+    },
+    "/consultation_bookings/{bookingId}": {
+      "schema": "ConsultationBooking",
+      "description": "Collection of consultation appointments"
+    },
+    "/consultations/{consultationId}": {
+      "schema": "ConsultationBooking",
+      "description": "Legacy alias for consultation appointments"
     }
   }
 }

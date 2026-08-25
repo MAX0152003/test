@@ -74,6 +74,7 @@ import AuthScreens from './components/AuthScreens';
 import LandingPage from './components/LandingPage';
 import AccessibilitySettings, { speakText } from './components/AccessibilitySettings';
 import SettingsPage from './components/Settings';
+import { idbStorage } from './lib/idbStorage';
 import { 
   Wifi, 
   WifiOff, 
@@ -106,9 +107,15 @@ import {
   History,
   RotateCcw
 } from 'lucide-react';
+import { 
+  useDebouncedStorageSync, 
+  useDebouncedAbsenceMonitor, 
+  useDebouncedLabRoomOccupancy, 
+  useDebouncedRoomStatusAlerts 
+} from './lib/performanceHooks';
 
-// Safe Local Storage Wrapper to prevent app crashes due to QuotaExceededError or browser iframe restrictions
-const safeStorage = {
+// Safe Local Storage Wrapper with IndexedDB multi-megabyte offline backing
+export const safeStorage = {
   getItem: (key: string): string | null => {
     try {
       return localStorage.getItem(key);
@@ -131,6 +138,8 @@ const safeStorage = {
         } catch (_) {}
       }
     }
+    // Asynchronously mirror into IndexedDB for persistent capacity
+    idbStorage.set(key, value).catch(() => {});
   },
   removeItem: (key: string): void => {
     try {
@@ -138,6 +147,7 @@ const safeStorage = {
     } catch (e) {
       console.warn(`[ClassPulse] Failed to remove "${key}" from localStorage:`, e);
     }
+    idbStorage.delete(key).catch(() => {});
   }
 };
 
@@ -542,13 +552,9 @@ export default function App() {
     };
   }, []);
 
-  React.useEffect(() => {
-    safeStorage.setItem('classpulse_student_leaves', JSON.stringify(excuseLetters));
-  }, [excuseLetters]);
-
-  React.useEffect(() => {
-    safeStorage.setItem('classpulse_consultation_bookings', JSON.stringify(consultationBookings));
-  }, [consultationBookings]);
+  // Debounced persistence for leaves and consultations
+  useDebouncedStorageSync('classpulse_student_leaves', excuseLetters, 400);
+  useDebouncedStorageSync('classpulse_consultation_bookings', consultationBookings, 400);
 
   const [accessibility, setAccessibility] = React.useState<AccessibilityConfig>(() => {
     const cached = safeStorage.getItem('cp_accessibility');
@@ -874,7 +880,7 @@ export default function App() {
     }
   }, [isOffline, !!user]);
 
-  // 2. Persistent side-effects
+  // 2. Debounced persistent storage side-effects to prevent I/O blocking
   React.useEffect(() => {
     if (user) {
       safeStorage.setItem('cp_user', JSON.stringify(user));
@@ -887,246 +893,41 @@ export default function App() {
     safeStorage.setItem('cp_screen', activeScreen);
   }, [activeScreen]);
 
-  React.useEffect(() => {
-    safeStorage.setItem('cp_classes', JSON.stringify(classes));
-  }, [classes]);
+  useDebouncedStorageSync('cp_classes', classes, 350);
+  useDebouncedStorageSync('cp_records', attendanceRecords, 350);
+  useDebouncedStorageSync('cp_notifications', notifications, 350);
+  useDebouncedStorageSync('cp_faculty_statuses', facultyStatuses, 350);
+  useDebouncedStorageSync('cp_accessibility', accessibility, 350);
+  useDebouncedStorageSync('cp_enrollments', enrollments, 350);
+  useDebouncedStorageSync('cp_announcements', announcements, 350);
+  useDebouncedStorageSync('cp_lab_rooms', labRooms, 350);
 
-  React.useEffect(() => {
-    safeStorage.setItem('cp_records', JSON.stringify(attendanceRecords));
-  }, [attendanceRecords]);
+  // Debounced Automated Absence Alert Monitor: Flags students with 3+ consecutive unexcused absences
+  useDebouncedAbsenceMonitor({
+    classes,
+    enrollments,
+    attendanceRecords,
+    setNotifications,
+    delay: 500
+  });
 
-  React.useEffect(() => {
-    safeStorage.setItem('cp_notifications', JSON.stringify(notifications));
-  }, [notifications]);
+  // Automatically calculate room occupancy and status based on active classes and enrollments
+  useDebouncedLabRoomOccupancy({
+    classes,
+    enrollments,
+    setLabRooms,
+    delay: 300
+  });
 
-  React.useEffect(() => {
-    safeStorage.setItem('cp_faculty_statuses', JSON.stringify(facultyStatuses));
-  }, [facultyStatuses]);
-
-  React.useEffect(() => {
-    safeStorage.setItem('cp_accessibility', JSON.stringify(accessibility));
-  }, [accessibility]);
-
-  React.useEffect(() => {
-    safeStorage.setItem('cp_enrollments', JSON.stringify(enrollments));
-  }, [enrollments]);
-
-  React.useEffect(() => {
-    safeStorage.setItem('cp_announcements', JSON.stringify(announcements));
-  }, [announcements]);
-
-  // Automated Absence Alert Monitor: Flags students with 3+ consecutive unexcused absences in major subjects
-  // and dispatches alert pings to assigned department chair and academic adviser
-  React.useEffect(() => {
-    if (classes.length === 0 || enrollments.length === 0 || attendanceRecords.length === 0) return;
-
-    try {
-      const alertedMap: Record<string, number> = JSON.parse(safeStorage.getItem('cp_consecutive_absence_alerts') || '{}');
-      const now = Date.now();
-      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-      const newAlerts: AppNotification[] = [];
-      const newDispatches: any[] = [];
-
-      enrollments.forEach(enr => {
-        if (enr.deletedByStudent) return;
-        const matchedClass = classes.find(c => c.id === enr.classId);
-        if (!matchedClass) return;
-
-        // Filter attendance records for this student and class
-        const studentRecords = attendanceRecords.filter(
-          r => r.classId === enr.classId && 
-          (r.studentId === enr.studentId || r.studentName === enr.studentName || (enr.studentEmail && r.studentEmail === enr.studentEmail))
-        );
-
-        // Sort descending by date
-        const sorted = [...studentRecords].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-        let consecutiveAbs = 0;
-        for (const r of sorted) {
-          if (r.status === 'absent') {
-            consecutiveAbs++;
-          } else if (r.status === 'excused') {
-            continue;
-          } else {
-            break;
-          }
-        }
-
-        if (consecutiveAbs >= 3) {
-          const alertKey = `${enr.studentId || enr.studentName}_${matchedClass.id}_3abs`;
-          const lastAlerted = alertedMap[alertKey] || 0;
-
-          // Check if alerted within last 24 hours
-          if (now - lastAlerted > ONE_DAY_MS) {
-            alertedMap[alertKey] = now;
-
-            const notif: AppNotification = {
-              id: 'notif-3abs-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-              title: `⚠️ 3 Consecutive Absences: ${enr.studentName || 'Student'}`,
-              message: `Early Warning Policy: ${enr.studentName || 'Student'} has accumulated ${consecutiveAbs} consecutive unexcused absences in ${matchedClass.code} (${matchedClass.name}). Alert dispatched to Academic Adviser & Department Chair.`,
-              timestamp: 'Just Now',
-              type: 'alert',
-              read: false
-            };
-            newAlerts.push(notif);
-
-            const emailDispatch = {
-              id: 'email-auto-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
-              studentId: enr.studentId || 'STU-OFFICIAL',
-              studentName: enr.studentName || 'Student Candidate',
-              studentEmail: enr.studentEmail || `${enr.studentId || 'student'}@msumain.edu.ph`,
-              classCode: matchedClass.code,
-              className: matchedClass.name,
-              attendanceRate: Math.round(((sorted.filter(r => r.status === 'present' || r.status === 'late').length) / (sorted.length || 1)) * 100),
-              advisorEmail: 'cics.academic.adviser@msumain.edu.ph',
-              departmentChairEmail: 'cics.deptchair@msumain.edu.ph',
-              dispatchedAt: new Date().toLocaleString(),
-              status: 'Delivered',
-              subject: `⚠️ AUTOMATED ATTENDANCE ALERT: 3 Consecutive Absences - ${enr.studentName} in ${matchedClass.code}`,
-              body: `OFFICIAL MSU EARLY INTERVENTION NOTICE\n\nStudent: ${enr.studentName} (${enr.studentId || 'ID Pending'})\nSubject: ${matchedClass.code} - ${matchedClass.name}\nConsecutive Unexcused Absences: ${consecutiveAbs}\n\nNotice has been automatically routed to the Academic Adviser and Department Chair for immediate student counseling and intervention under MSU Academic Attendance Guidelines.`
-            };
-            newDispatches.push(emailDispatch);
-          }
-        }
-      });
-
-      if (newAlerts.length > 0) {
-        safeStorage.setItem('cp_consecutive_absence_alerts', JSON.stringify(alertedMap));
-        setNotifications(prev => [...newAlerts, ...prev]);
-
-        const existingDispatches = JSON.parse(safeStorage.getItem('classpulse_dispatched_emails') || '[]');
-        safeStorage.setItem('classpulse_dispatched_emails', JSON.stringify([...newDispatches, ...existingDispatches]));
-
-        if (typeof window !== 'undefined' && (window as any).showToast) {
-          (window as any).showToast(`⚠️ Automated Absence Monitor: ${newAlerts.length} student(s) flagged with 3+ consecutive absences. Alerts dispatched.`, "warning");
-        }
-      }
-    } catch (e) {
-      console.error("Error running automated absence monitor:", e);
-    }
-  }, [attendanceRecords, enrollments, classes]);
-
-  // Automatically calculate each room's occupancy and status based on active classes and enrolled students
-  React.useEffect(() => {
-    let changed = false;
-    const updated = labRooms.map(rm => {
-      if (rm.status === 'maintenance') {
-        return rm;
-      }
-      
-      const rmNameNorm = (rm.name || '').toLowerCase().trim();
-      const matchingClasses = classes.filter(cls => {
-        const clsRoom = (cls.tempRoom || cls.room || '').toLowerCase().trim();
-        return clsRoom && (clsRoom === rmNameNorm || clsRoom.includes(rmNameNorm) || rmNameNorm.includes(clsRoom));
-      });
-
-      // Calculate total active enrolled students in this room
-      const enrolledCount = enrollments.filter(e => {
-        if (e.deletedByStudent) return false;
-        return matchingClasses.some(c => c.id === e.classId);
-      }).length;
-
-      const activeClassLabel = matchingClasses.length > 0 ? matchingClasses.map(c => c.code).join(', ') : '';
-      const isOccupied = enrolledCount > 0 || activeClassLabel !== '';
-      const newStatus = isOccupied ? 'occupied' : 'available';
-
-      if (rm.currentOccupancy !== enrolledCount || rm.activeClass !== activeClassLabel || rm.status !== newStatus) {
-        changed = true;
-        return {
-          ...rm,
-          currentOccupancy: enrolledCount,
-          activeClass: activeClassLabel,
-          status: newStatus as 'occupied' | 'available'
-        };
-      }
-      return rm;
-    });
-
-    if (changed) {
-      setLabRooms(updated);
-    }
-  }, [classes, enrollments, labRooms]);
-
-  React.useEffect(() => {
-    safeStorage.setItem('cp_lab_rooms', JSON.stringify(labRooms));
-  }, [labRooms]);
-
-  // Track room status changes and send 'Room Status Alert' to faculty under schedule
-  React.useEffect(() => {
-    if (labRooms.length === 0) return;
-
-    // A. Initialize prevLabRoomsRef on mounting
-    if (Object.keys(prevLabRoomsRef.current).length === 0) {
-      const initialMap: Record<string, 'occupied' | 'available' | 'maintenance'> = {};
-      labRooms.forEach(rm => {
-        initialMap[rm.id] = rm.status;
-      });
-      prevLabRoomsRef.current = initialMap;
-      return;
-    }
-
-    // B. Check for status transitions
-    labRooms.forEach(rm => {
-      const prevStatus = prevLabRoomsRef.current[rm.id];
-      if (prevStatus !== undefined && prevStatus !== rm.status) {
-        // Find classes that are in this laboratory room
-        const affectedClasses = classes.filter(cls => {
-          const clsRoomLower = (cls.room || '').toLowerCase().trim();
-          const rmNameLower = (rm.name || '').toLowerCase().trim();
-          const tempRoomLower = cls.tempRoom ? cls.tempRoom.toLowerCase().trim() : '';
-
-          return (
-            rmNameLower.includes(clsRoomLower) ||
-            clsRoomLower.includes(rmNameLower) ||
-            (tempRoomLower && (rmNameLower.includes(tempRoomLower) || tempRoomLower.includes(rmNameLower)))
-          );
-        });
-
-        if (affectedClasses.length > 0) {
-          // Identify unique faculty members affected
-          const uniqueFacultyMap = new Map<string, { id: string; name: string }>();
-          affectedClasses.forEach(cls => {
-            if (cls.facultyId) {
-              uniqueFacultyMap.set(cls.facultyId, { id: cls.facultyId, name: cls.facultyName });
-            }
-          });
-
-          uniqueFacultyMap.forEach((fac) => {
-            const newNotif: AppNotification = {
-              id: 'notif-room-alert-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-              title: `Room Alert: ${rm.name} Status Change`,
-              message: `Attention Instructor ${fac.name}: The laboratory room "${rm.name}" assigned under your course schedule has been updated from "${prevStatus}" to "${rm.status}". Please adapt your physical terminal coordinates or syllabus if required.`,
-              timestamp: 'Just Now',
-              type: 'alert',
-              read: false
-            };
-
-            setNotifications(prev => {
-              if (prev.some(n => n.title === newNotif.title && n.message === newNotif.message)) {
-                return prev;
-              }
-              return [newNotif, ...prev];
-            });
-
-            // Trigger real device pop-up screen notification & sound alarm
-            triggerClassAlarmNotification({
-              title: `🏢 Room Update: ${rm.name} is now ${rm.status.toUpperCase()}`,
-              message: `Assigned course room "${rm.name}" changed from ${prevStatus} to ${rm.status}. Tap to view schedule.`,
-              room: rm.name,
-              type: 'room_change',
-              screen: 'schedule'
-            }).catch(() => {});
-
-            speakText(`Push Alert: Laboratory room "${rm.name}" is now "${rm.status}".`, accessibility.readAloud);
-            
-            if (typeof window !== 'undefined' && (window as any).showToast) {
-              (window as any).showToast(`Status Alert sent to faculty ${fac.name} for room ${rm.name}`, "info");
-            }
-          });
-        }
-      }
-      prevLabRoomsRef.current[rm.id] = rm.status;
-    });
-  }, [labRooms, classes, accessibility.readAloud]);
+  // Track room status changes and dispatch 'Room Status Alert' to faculty under schedule
+  useDebouncedRoomStatusAlerts({
+    labRooms,
+    classes,
+    accessibility,
+    prevLabRoomsRef,
+    setNotifications,
+    delay: 200
+  });
 
   // Register Background Notification Service Worker on app load
   React.useEffect(() => {
@@ -1134,12 +935,19 @@ export default function App() {
   }, []);
 
   // Continuous background schedule alarm monitor (runs every 10s like a built-in alarm clock)
+  const alarmDataRef = React.useRef({ classes, enrollments, user });
+  React.useEffect(() => {
+    alarmDataRef.current = { classes, enrollments, user };
+  }, [classes, enrollments, user]);
+
   React.useEffect(() => {
     const alarmsEnabled = safeStorage.getItem('cp_pref_schedule_alarms') !== 'false';
     if (!alarmsEnabled || !user) return;
 
     const runAlarmCheck = () => {
-      checkActiveScheduleAlarms(classes, enrollments, user, (alarm: ClassAlarmPayload) => {
+      const { classes: curClasses, enrollments: curEnrollments, user: curUser } = alarmDataRef.current;
+      if (!curUser) return;
+      checkActiveScheduleAlarms(curClasses, curEnrollments, curUser, (alarm: ClassAlarmPayload) => {
         const newNotif: AppNotification = {
           id: 'alarm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
           title: alarm.title,
@@ -1158,7 +966,7 @@ export default function App() {
     runAlarmCheck();
     const interval = setInterval(runAlarmCheck, 10000);
     return () => clearInterval(interval);
-  }, [classes, enrollments, user]);
+  }, [user?.id]);
 
   // Listen to custom navigation events from notifications & service worker
   React.useEffect(() => {
@@ -1233,63 +1041,117 @@ export default function App() {
     };
   }, [user]);
 
-  // Process offline attendance queue and auto-upload to Firestore when online
+  // Mutex and debounce references to prevent concurrent sync collisions during network flutters
+  const isSyncingQueueMutexRef = React.useRef(false);
+  const lastSyncTriggerTimeRef = React.useRef(0);
+
+  // Process offline attendance queue and auto-upload to Firestore when online using worker-style chunking
   const processOfflineQueueAndSync = React.useCallback(async () => {
+    // 1. Concurrency Mutex Gate: Prevent parallel sync tasks from colliding
+    if (isSyncingQueueMutexRef.current) {
+      console.log("[Sync Mutex] Queue processing already active, skipping concurrent trigger.");
+      return;
+    }
+
+    // 2. Debounce Gate: Prevent double-firing within 1500ms
+    const now = Date.now();
+    if (now - lastSyncTriggerTimeRef.current < 1500) {
+      console.log("[Sync Mutex] Throttled rapid reconnection trigger.");
+      return;
+    }
+
+    isSyncingQueueMutexRef.current = true;
+    lastSyncTriggerTimeRef.current = now;
     setIsSyncing(true);
+
     let pendingQueue: AttendanceRecord[] = [];
     try {
       pendingQueue = JSON.parse(safeStorage.getItem('cp_pending_attendance_queue') || '[]');
     } catch {}
 
     let uploadedCount = 0;
-    if (pendingQueue.length > 0) {
-      // Deduplicate queue items before sending to Firestore
-      const dedupeMap = new Map<string, AttendanceRecord>();
-      for (const rec of pendingQueue) {
-        const key = `${rec.studentId || rec.studentName || 'anon'}_${rec.classId}_${rec.date}`;
-        dedupeMap.set(key, rec);
-      }
-      const uniqueRecords = Array.from(dedupeMap.values());
-
-      for (const rec of uniqueRecords) {
-        try {
-          await saveAttendanceToFirestore(false, rec);
-          uploadedCount++;
-        } catch (err) {
-          console.error("Failed to upload pending offline attendance record:", rec, err);
-        }
-      }
-      safeStorage.removeItem('cp_pending_attendance_queue');
-      setOfflineQueueCount(0);
-    }
+    const failedRecords: AttendanceRecord[] = [];
 
     try {
-      await forceResyncAllFromFirestore(false, {
-        onClassesSync: (fetchedClasses) => setClasses(fetchedClasses),
-        onAttendanceSync: (fetchedRecords) => setAttendanceRecords(fetchedRecords)
-      });
-    } catch (err) {
-      console.warn("Error force-resyncing Firestore:", err);
+      if (pendingQueue.length > 0) {
+        // Timestamp-aware Composite Key Deduplication
+        const dedupeMap = new Map<string, AttendanceRecord>();
+        for (const rec of pendingQueue) {
+          const studentIdentifier = rec.studentId || rec.studentName || 'anon';
+          const timeIdentifier = rec.time || rec.timestamp || 'notime';
+          const key = `${studentIdentifier}_${rec.classId}_${rec.date}_${timeIdentifier}`;
+          dedupeMap.set(key, rec);
+        }
+        const uniqueRecords = Array.from(dedupeMap.values());
+
+        // Worker-style batch chunking: Process in batches of 4 records with microtask / requestIdleCallback yields
+        const CHUNK_SIZE = 4;
+        for (let i = 0; i < uniqueRecords.length; i += CHUNK_SIZE) {
+          const chunk = uniqueRecords.slice(i, i + CHUNK_SIZE);
+          
+          await Promise.allSettled(
+            chunk.map(async (rec) => {
+              try {
+                await saveAttendanceToFirestore(false, rec);
+                uploadedCount++;
+              } catch (err) {
+                console.error("Failed to upload pending offline attendance record:", rec, err);
+                failedRecords.push(rec);
+              }
+            })
+          );
+
+          // Yield execution to browser event loop / render pipeline between chunks
+          await new Promise<void>((resolve) => {
+            if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+              (window as any).requestIdleCallback(() => resolve(), { timeout: 40 });
+            } else {
+              setTimeout(resolve, 16);
+            }
+          });
+        }
+
+        if (failedRecords.length > 0) {
+          safeStorage.setItem('cp_pending_attendance_queue', JSON.stringify(failedRecords));
+          setOfflineQueueCount(failedRecords.length);
+        } else {
+          safeStorage.removeItem('cp_pending_attendance_queue');
+          setOfflineQueueCount(0);
+        }
+      }
+
+      try {
+        await forceResyncAllFromFirestore(false, {
+          onClassesSync: (fetchedClasses) => setClasses(fetchedClasses),
+          onAttendanceSync: (fetchedRecords) => setAttendanceRecords(fetchedRecords)
+        });
+      } catch (err) {
+        console.warn("Error force-resyncing Firestore:", err);
+      }
+
+      setSyncDoneBanner(true);
+      setTimeout(() => setSyncDoneBanner(false), 3800);
+
+      const messageStr = uploadedCount > 0
+        ? `Auto-Uploaded ${uploadedCount} offline attendance scan(s) to Firestore cloud database!`
+        : 'All offline local records successfully synchronized with Firestore cloud registry.';
+
+      const syncNotif: AppNotification = {
+        id: 'notif-autosync-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+        title: 'Database Auto-Synchronized',
+        message: messageStr,
+        timestamp: 'Just Now',
+        type: 'success',
+        read: false
+      };
+      setNotifications(prev => [syncNotif, ...prev]);
+      speakText(messageStr, accessibility.readAloud);
+    } catch (e) {
+      console.error("Critical error in processOfflineQueueAndSync:", e);
+    } finally {
+      isSyncingQueueMutexRef.current = false;
+      setIsSyncing(false);
     }
-
-    setIsSyncing(false);
-    setSyncDoneBanner(true);
-    setTimeout(() => setSyncDoneBanner(false), 3800);
-
-    const messageStr = uploadedCount > 0
-      ? `Auto-Uploaded ${uploadedCount} offline attendance scan(s) to Firestore cloud database!`
-      : 'All offline local records successfully synchronized with Firestore cloud registry.';
-
-    const syncNotif: AppNotification = {
-      id: 'notif-autosync-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-      title: 'Database Auto-Synchronized',
-      message: messageStr,
-      timestamp: 'Just Now',
-      type: 'success',
-      read: false
-    };
-    setNotifications(prev => [syncNotif, ...prev]);
-    speakText(messageStr, accessibility.readAloud);
   }, [accessibility.readAloud]);
 
   // Window network event listener for auto reconnection upload

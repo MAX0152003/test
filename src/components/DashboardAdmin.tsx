@@ -23,6 +23,7 @@ import {
   LabRoom
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
+import { EmptyState } from './EmptyState';
 import { ACADEMIC_TERMS } from '../lib/msuUtils';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { 
@@ -191,7 +192,7 @@ interface StatCardProps {
   idx: number;
 }
 
-function StatCard({ stat, idx }: StatCardProps) {
+const StatCard = React.memo(function StatCard({ stat, idx }: StatCardProps) {
   const IconComp = stat.icon;
   // Simple simulation of state-based ticker increment
   const [displayCount, setDisplayCount] = React.useState(0);
@@ -235,7 +236,8 @@ function StatCard({ stat, idx }: StatCardProps) {
       </div>
     </motion.div>
   );
-}
+});
+StatCard.displayName = 'StatCard';
 
 // Custom responsive tooltips for Recharts graphs
 const CustomRechartsTooltip = ({ active, payload }: any) => {
@@ -1676,12 +1678,6 @@ export default function DashboardAdmin({
   const handleSimulateScan = (action: 'IN' | 'OUT') => {
     const activeRoom = labRooms.find(r => r.id === selectedRoomId);
     if (!activeRoom) return;
-    if (!activeRoom.scannersActive) {
-      if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast("LMS sync channel is offline. Activate synchronization to trigger events.", "error");
-      }
-      return;
-    }
 
     const students = [
       { id: '2023-14923', name: 'John Doe' },
@@ -2034,7 +2030,7 @@ export default function DashboardAdmin({
               { label: 'Classes Tracked', targetVal: classesTrackedCount, icon: BookOpen, color: 'amber', text: `Semestral classes`, detail: `${classes.length} scheduled courses` },
               { label: 'Attendance Today', targetVal: attendanceTodayCount, icon: Calendar, color: 'purple', text: `${activeRatePercent}% present`, detail: `${instantScansRecorded} check-ins logged` }
             ].map((stat, idx) => (
-              <StatCard key={idx} stat={stat} idx={idx} />
+              <StatCard key={stat.label} stat={stat} idx={idx} />
             ))}
           </div>
 
@@ -2967,24 +2963,6 @@ export default function DashboardAdmin({
                               Delete
                             </button>
                           </div>
-
-                          <div className="flex items-center gap-1 z-10">
-                            <span className="text-[8px] font-mono text-zinc-400 uppercase tracking-wider">Scanner:</span>
-                            <button
-                              onClick={() => {
-                                const updated = labRooms.map(r => r.id === rm.id ? { ...r, scannersActive: !r.scannersActive } : r);
-                                onUpdateLabRooms?.(updated);
-                                speakText(`Scanner terminals safety power toggled in ${rm.name}.`, accessibility.readAloud);
-                              }}
-                              className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase transition-colors cursor-pointer ${
-                                rm.scannersActive 
-                                  ? 'bg-emerald-500 text-black' 
-                                  : 'bg-zinc-150 dark:bg-zinc-800 text-zinc-500'
-                              }`}
-                            >
-                              {rm.scannersActive ? 'ON' : 'OFF'}
-                            </button>
-                          </div>
                         </div>
                       </div>
                     );
@@ -3010,7 +2988,7 @@ export default function DashboardAdmin({
                   <div className="absolute top-4 bottom-4 left-3 border-l border-zinc-200 dark:border-zinc-805" />
                   <div className="space-y-4 relative">
                     {dynamicAuditEvents.map((act, idx) => (
-                      <div key={idx} className="flex gap-4 items-start text-left pl-1">
+                      <div key={act.id || `${act.title}-${act.time}-${idx}`} className="flex gap-4 items-start text-left pl-1">
                         <div className={`mt-1.5 h-3 w-3 rounded-full border-2 border-white dark:border-zinc-950 flex items-center justify-center shrink-0 ${
                           act.status === 'success' 
                             ? 'bg-emerald-500 text-white' 
@@ -5940,10 +5918,11 @@ export default function DashboardAdmin({
             {(() => {
               if (!notifications || notifications.length === 0) {
                 return (
-                  <div className="p-12 text-center rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-zinc-50/20 dark:bg-zinc-950/20">
-                    <p className="text-zinc-400 text-xs font-bold uppercase tracking-wider mb-1">No notifications found</p>
-                    <p className="text-[10px] text-zinc-500 font-medium">As soon as systemic events occur, they will propagate onto this desk.</p>
-                  </div>
+                  <EmptyState
+                    iconType="notification"
+                    title="No System Notifications Found"
+                    description="As soon as systemic events, room updates, or scans occur, they will propagate onto this desk."
+                  />
                 );
               }
 
@@ -5960,9 +5939,13 @@ export default function DashboardAdmin({
 
               if (filtered.length === 0) {
                 return (
-                  <div className="p-12 text-center rounded-3xl bg-zinc-50/25 dark:bg-zinc-950/25">
-                    <p className="text-xs text-zinc-400 font-bold">No notifications match your active search filter.</p>
-                  </div>
+                  <EmptyState
+                    iconType="notification"
+                    title="No Matching Notifications"
+                    description="No notifications match your active search filter or category selection."
+                    actionText="Reset Filters"
+                    onAction={() => { setNotifSearch(''); setNotifFilter('all'); }}
+                  />
                 );
               }
 
@@ -6036,7 +6019,7 @@ export default function DashboardAdmin({
                   <MapPin className="w-5 h-5 text-emerald-500" />
                   Rooms Directory Management
                 </h2>
-                <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider mt-1 font-mono">Manage available rooms, capacities, and active scanner states</p>
+                <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider mt-1 font-mono">Manage available rooms, capacities, and campus allocations</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -6212,7 +6195,6 @@ export default function DashboardAdmin({
 
                   const clusterCapacity = clusterRooms.reduce((acc, r) => acc + (r.capacity || 0), 0);
                   const clusterOccupied = clusterRooms.reduce((acc, r) => acc + (r.currentOccupancy || 0), 0);
-                  const clusterScanners = clusterRooms.filter(r => r.scannersActive).length;
 
                   return (
                     <div key={clusterName} className="p-4 rounded-2xl bg-zinc-50/50 dark:bg-zinc-950/40 border border-zinc-200/80 dark:border-zinc-800/80 space-y-3">
@@ -6233,9 +6215,6 @@ export default function DashboardAdmin({
                         </div>
 
                         <div className="flex items-center gap-2 text-[9px] font-mono">
-                          <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-850 text-zinc-600 dark:text-zinc-300 font-bold">
-                            📡 {clusterScanners}/{clusterRooms.length} Scanners Active
-                          </span>
                           <button
                             type="button"
                             onClick={() => handleDeleteCustomBuilding(clusterName)}
@@ -6431,10 +6410,8 @@ export default function DashboardAdmin({
                                     <p className="font-bold text-zinc-700 dark:text-zinc-300">{rm.devicesCount} Terminals</p>
                                   </div>
                                   <div>
-                                    <span className="text-zinc-400">Scanner system:</span>
-                                    <p className={`font-black uppercase tracking-wide flex items-center gap-1 ${rm.scannersActive ? 'text-emerald-500' : 'text-zinc-450'}`}>
-                                      <span className="w-1.5 h-1.5 rounded-full bg-current" /> {rm.scannersActive ? 'ACTIVE' : 'OFF'}
-                                    </p>
+                                    <span className="text-zinc-400">Floor Level:</span>
+                                    <p className="font-bold text-zinc-700 dark:text-zinc-300">{rm.floor || '2nd Floor'}</p>
                                   </div>
                                 </div>
 
@@ -6472,20 +6449,6 @@ export default function DashboardAdmin({
                                     Delete
                                   </button>
                                 </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = labRooms.map(r => r.id === rm.id ? { ...r, scannersActive: !r.scannersActive } : r);
-                                    onUpdateLabRooms?.(updated);
-                                    speakText(`Scanner state toggled in ${rm.name}`, accessibility.readAloud);
-                                  }}
-                                  className={`text-[8.5px] font-mono tracking-tight font-black uppercase px-2 py-1 rounded-lg border overflow-hidden cursor-pointer ${
-                                    rm.scannersActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-450 border-zinc-200 dark:border-zinc-805'
-                                  }`}
-                                >
-                                  {rm.scannersActive ? 'Disable Scanner' : 'Enable Scanner'}
-                                </button>
                               </div>
                             </div>
                           );

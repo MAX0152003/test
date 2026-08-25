@@ -3,6 +3,7 @@ import { ClassSession, Enrollment, UserProfile } from '../types';
 import { Clock, MapPin, User, Calendar, LayoutGrid, Columns, ListFilter } from 'lucide-react';
 import { motion } from 'motion/react';
 import { isFridayPrayerWindow } from '../lib/msuUtils';
+import { EmptyState } from './EmptyState';
 
 interface WeeklyScheduleGridProps {
   classes: ClassSession[];
@@ -271,6 +272,13 @@ export default function WeeklyScheduleGrid({
       {/* WEEKLY CALENDAR TIMETABLE MATRIX GRID MODE */}
       {/* -------------------------------------------------------------------------- */}
       {viewMode === 'matrix' && (
+        filteredClasses.length === 0 ? (
+          <EmptyState
+            iconType="schedule"
+            title="No Scheduled Classes Found"
+            description={searchQuery?.trim() ? `No course sessions matched "${searchQuery}". Check the subject code or day filter.` : "No class sessions are currently loaded for this schedule configuration."}
+          />
+        ) : (
         <div className="w-full overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 shadow-sm">
           <table className="w-full min-w-[800px] border-collapse text-left">
             <thead>
@@ -436,12 +444,20 @@ export default function WeeklyScheduleGrid({
             </tbody>
           </table>
         </div>
+        )
       )}
 
       {/* -------------------------------------------------------------------------- */}
       {/* MODE 2: DAY COLUMNS VIEW */}
       {/* -------------------------------------------------------------------------- */}
       {viewMode === 'columns' && (
+        filteredClasses.length === 0 ? (
+          <EmptyState
+            iconType="schedule"
+            title="No Scheduled Classes Found"
+            description={searchQuery?.trim() ? `No course sessions matched "${searchQuery}". Check the subject code or day filter.` : "No class sessions are currently loaded for this schedule configuration."}
+          />
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 w-full">
           {activeDays.map(day => {
             const isToday = day.key === currentDayKey;
@@ -580,6 +596,7 @@ export default function WeeklyScheduleGrid({
             );
           })}
         </div>
+        )
       )}
 
       {/* -------------------------------------------------------------------------- */}
@@ -658,9 +675,12 @@ export default function WeeklyScheduleGrid({
               );
             })
           ) : (
-            <div className="col-span-full p-8 text-center rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-850 bg-zinc-50/50 dark:bg-zinc-900/30">
-              <Calendar className="w-8 h-8 text-zinc-400 mx-auto mb-2" />
-              <p className="text-xs font-black uppercase text-zinc-500 tracking-wider">No matching classes found</p>
+            <div className="col-span-full">
+              <EmptyState
+                iconType="schedule"
+                title="No Schedule Matches Found"
+                description={searchQuery?.trim() ? `No course sessions matched "${searchQuery}". Check the subject code or day filter.` : "No class sessions are currently loaded for this schedule configuration."}
+              />
             </div>
           )}
         </div>
