@@ -108,14 +108,16 @@ export default function Sidebar({
       }
     };
 
+    const handleStorage = () => {
+      updateResetsCount();
+      updateTicketsCount();
+    };
+
     updateResetsCount();
     updateTicketsCount();
     window.addEventListener('password-reset-requests-changed', updateResetsCount);
     window.addEventListener('cp-support-tickets-changed', updateTicketsCount);
-    window.addEventListener('storage', () => {
-      updateResetsCount();
-      updateTicketsCount();
-    });
+    window.addEventListener('storage', handleStorage);
 
     const code = localStorage.getItem('classpulse_faculty_reg_code') || 'Faculty123';
     setFacultyCode(code);
@@ -133,6 +135,7 @@ export default function Sidebar({
     return () => {
       window.removeEventListener('password-reset-requests-changed', updateResetsCount);
       window.removeEventListener('cp-support-tickets-changed', updateTicketsCount);
+      window.removeEventListener('storage', handleStorage);
       window.removeEventListener('toggle-mobile-sidebar', handleToggle);
       window.removeEventListener('close-mobile-sidebar', handleClose);
       window.removeEventListener('faculty-code-changed', handleCodeChange);
@@ -353,7 +356,7 @@ export default function Sidebar({
                   const isActive = activeScreen === item.id;
                   return (
                     <button
-                      key={item.id}
+                      key={`${section.title}-${item.id}`}
                       onClick={() => handleNavClick(item.id, item.label)}
                       type="button"
                       title={isEffectiveCollapsed ? item.label : undefined}

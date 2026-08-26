@@ -21,7 +21,10 @@ import { getFacultyInClassDetails } from '../lib/facultyTimeUtils';
 import { playSuccessChime, playWarningChime, triggerHapticFeedback } from '../lib/soundUtils';
 import { compressImage } from '../lib/imageUtils';
 import { EmptyState } from './EmptyState';
+import { VirtualList } from './VirtualList';
+import { ConfirmationDialog } from './ConfirmationDialog';
 import { StudentFacultyCard, StudentCourseCard, StudentExcuseCard, StudentLectureCard } from './StudentDashboardCards';
+import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
 import { 
   Scan, 
   Calendar, 
@@ -999,89 +1002,31 @@ export default function DashboardStudent({
     }
   };
 
-  // Helper to determine if an enrollment belongs to this logged-in student
-  const isStudentEnrollmentMatch = React.useCallback((e: Enrollment) => {
-    if (!userProfile) return false;
-    const uEmail = (userProfile.email || '').trim().toLowerCase();
-    const uStuId = (userProfile.studentId || '').trim().toLowerCase();
-    const uId = (userProfile.id || '').trim().toLowerCase();
-    const uName = (userProfile.name || '').trim().toLowerCase();
-
-    const eEmail = (e.studentEmail || '').trim().toLowerCase();
-    const eStuId = (e.studentId || '').trim().toLowerCase();
-    const eName = (e.studentName || '').trim().toLowerCase();
-
-    if (uEmail && eEmail && uEmail === eEmail) return true;
-    if (uStuId && eStuId && uStuId === eStuId) return true;
-    if (uId && eStuId && uId === eStuId) return true;
-    if (uName && eName && uName === eName) return true;
-    return false;
-  }, [userProfile]);
-
-  // Compute enrolled class IDs for this student (excluding unenrolled/dropped/deleted subjects)
-  const studentEnrolledClassIds = React.useMemo(() => {
-    return new Set(
-      enrollments
-        .filter(e => isStudentEnrollmentMatch(e) && !e.deletedByStudent)
-        .map(e => e.classId)
-    );
-  }, [enrollments, isStudentEnrollmentMatch]);
-
-  // Compute enrolled classes and enrolled faculty identifiers
-  const studentEnrolledClasses = React.useMemo(() => {
-    return classes.filter(c => studentEnrolledClassIds.has(c.id));
-  }, [classes, studentEnrolledClassIds]);
-
-  const enrolledFacultyIds = React.useMemo(() => {
-    return new Set(studentEnrolledClasses.map(c => c.facultyId).filter(Boolean));
-  }, [studentEnrolledClasses]);
-
-  const enrolledFacultyNames = React.useMemo(() => {
-    return new Set(studentEnrolledClasses.map(c => (c.facultyName || '').trim().toLowerCase()).filter(Boolean));
-  }, [studentEnrolledClasses]);
-
-  // Displayed faculty for the Live Instructors Tracking widget
-  const displayedFaculty = React.useMemo(() => {
-    const query = facultySearchQuery.trim().toLowerCase();
-    
-    // When search query is entered: search across ALL faculty in the university
-    if (query) {
-      return facultyStatuses.filter(fac => {
-        const nameMatch = fac.name.toLowerCase().includes(query);
-        const roomMatch = (fac.room || '').toLowerCase().includes(query);
-        const teachesMatch = classes.some(c => 
-          (c.facultyId === fac.id || (c.facultyName && c.facultyName.toLowerCase() === fac.name.toLowerCase())) &&
-          (c.code.toLowerCase().includes(query) || c.name.toLowerCase().includes(query))
-        );
-        return nameMatch || roomMatch || teachesMatch;
-      });
-    }
-
-    // Default: ONLY show enrolled faculty
-    return facultyStatuses.filter(fac => 
-      enrolledFacultyIds.has(fac.id) || enrolledFacultyNames.has(fac.name.trim().toLowerCase())
-    );
-  }, [facultyStatuses, facultySearchQuery, classes, enrolledFacultyIds, enrolledFacultyNames]);
-
-  // Filter attendance records to ONLY those belonging to currently enrolled classes
-  const enrolledStudentRecords = React.useMemo(() => {
-    return attendanceRecords.filter(r => {
-      const uEmail = (userProfile.email || '').trim().toLowerCase();
-      const uStuId = (userProfile.studentId || '').trim().toLowerCase();
-      const uId = (userProfile.id || '').trim().toLowerCase();
-      const uName = (userProfile.name || '').trim().toLowerCase();
-
-      const rStuId = (r.studentId || '').trim().toLowerCase();
-      const rStuName = (r.studentName || '').trim().toLowerCase();
-
-      const isStudentMatch = (uStuId && rStuId && uStuId === rStuId) ||
-                             (uId && rStuId && uId === rStuId) ||
-                             (uEmail && rStuId && uEmail === rStuId) ||
-                             (uName && rStuName && uName === rStuName);
-
-      return isStudentMatch && studentEnrolledClassIds.has(r.classId);
-    });
-  }, [attendanceRecords, userProfile, studentEnrolledClassIds]);
+  // Consume centralized, memoized student dashboard metrics & percentages hook
+  const {
+    studentEnrolledClassIds,
+    studentEnrolledClasses,
+    enrolledFacultyIds,
+    enrolledFacultyNames,
+    displayedFaculty,
+    enrolledStudentRecords,
+    totalChecked,
+    presentsCount,
+    latesCount,
+    absentsCount,
+    excusedCount,
+    attendanceRate,
+    standingLabel,
+    standingBadgeColor,
+    myRecentScans
+  } = useDashboardMetrics({
+    attendanceRecords,
+    enrollments,
+    classes,
+    userProfile,
+    facultyStatuses,
+    facultySearchQuery
+  });
 
   const handleDownloadReport = () => {
     const studentRecs = enrolledStudentRecords;
@@ -1145,28 +1090,22 @@ export default function DashboardStudent({
     speakText("Highly-detailed localized attendance transcript downloaded successfully.", accessibility.readAloud);
   };
 
-  // Compute stats metrics dynamically based ONLY on enrolled subjects
-  const totalChecked = enrolledStudentRecords.length;
-  const presentsCount = enrolledStudentRecords.filter(r => r.status === 'present').length;
-  const latesCount = enrolledStudentRecords.filter(r => r.status === 'late').length;
-  const absentsCount = enrolledStudentRecords.filter(r => r.status === 'absent').length;
-  
-  const attendanceRate = totalChecked > 0 ? Math.round(((presentsCount + latesCount * 0.7) / totalChecked) * 100) : 100;
-
   return (
     <div className={activeScreen === 'messages' || activeScreen === 'help-center' ? "h-full flex flex-col min-h-0" : "space-y-6"}>
       
       <AnimatePresence mode="wait">
-        {/* 1. STUDENT DASHBOARD CONTAINER */}
-        {activeScreen === 'dashboard' && (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-3 sm:space-y-4 text-left"
-          >
+        {(() => {
+          switch (activeScreen) {
+            case 'dashboard':
+              return (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-3 sm:space-y-4 text-left"
+                >
             {/* Compact Welcome Banner */}
           <div className="p-3.5 sm:p-4 md:p-5 rounded-2xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-850 text-white shadow-md">
             <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
@@ -1859,18 +1798,18 @@ export default function DashboardStudent({
 
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 2. MY SCHEDULE CALENDAR VIEW */}
-      {activeScreen === 'schedule' && (
-        <motion.div
-          key="schedule"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
-        >
+      case 'schedule':
+        return (
+          <motion.div
+            key="schedule"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left"
+          >
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-3 text-left">
               <button 
@@ -1947,33 +1886,20 @@ export default function DashboardStudent({
             );
           })()}
         </motion.div>
-      )}
+      );
 
-      {/* 3. QR CODES ATTENDANCE SCANNER SIMULATOR VIEW */}
-      {activeScreen === 'attendance' && (
-        <motion.div
-          key="attendance"
-          id="attendance-scanner-card"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
+      case 'attendance':
+        return (
+          <motion.div
+            key="attendance"
+            id="attendance-scanner-card"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           className="w-full space-y-5 text-left animate-fade-in"
         >
           {(() => {
-            // Filter last 5 successful check-ins specifically for this student
-            const myRecentScans = attendanceRecords
-              .filter(r => 
-                (r.studentId === userProfile.studentId || r.studentId === userProfile.id || r.studentName === userProfile.name || (!r.studentId && userProfile.role === 'student')) &&
-                (r.status === 'present' || r.status === 'late' || r.status === 'excused')
-              )
-              .sort((a, b) => {
-                const timeA = new Date(`${a.date} ${a.time || '00:00'}`).getTime() || 0;
-                const timeB = new Date(`${b.date} ${b.time || '00:00'}`).getTime() || 0;
-                return timeB - timeA;
-              })
-              .slice(0, 5);
-
             return (
               <div className="space-y-5 text-left">
                 <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850 pb-4">
@@ -2445,18 +2371,20 @@ export default function DashboardStudent({
             );
           })()}
         </motion.div>
-      )}
+      );
 
-      {/* 4. EXCUSE LETTERS & LEAVES INBOX */}
-      {(activeScreen === 'excuse-letters' || activeScreen === 'excuse-inbox' || activeScreen === 'excuses') && (
-        <motion.div
-          key="excuse-letters"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
-        >
+      case 'excuse-letters':
+      case 'excuse-inbox':
+      case 'excuses':
+        return (
+          <motion.div
+            key="excuse-letters"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in"
+          >
           <StudentExcuseInbox
             excuseLetters={excuseLetters || []}
             classes={classes}
@@ -2468,18 +2396,18 @@ export default function DashboardStudent({
             readAloudEnabled={accessibility.readAloud}
           />
         </motion.div>
-      )}
+      );
 
-      {/* 4B. FACULTY CONSULTATIONS BOOKING & CALENDAR */}
-      {activeScreen === 'consultations' && (
-        <motion.div
-          key="consultations"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
-        >
+      case 'consultations':
+        return (
+          <motion.div
+            key="consultations"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in"
+          >
           <ConsultationsView
             role="student"
             userProfile={userProfile}
@@ -2499,18 +2427,18 @@ export default function DashboardStudent({
             readAloudEnabled={accessibility.readAloud}
           />
         </motion.div>
-      )}
+      );
 
-      {/* Messages tab routing */}
-      {activeScreen === 'messages' && (
-        <motion.div
-          key="messages"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
-        >
+      case 'messages':
+        return (
+          <motion.div
+            key="messages"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
+          >
           <Messages 
             userProfile={userProfile} 
             classes={classes} 
@@ -2524,34 +2452,35 @@ export default function DashboardStudent({
             initialContactId={selectedChatContact || selectedFacultyForChat}
           />
         </motion.div>
-      )}
+      );
 
-      {/* Help Center Routing Panel */}
-      {activeScreen === 'help-center' && (
-        <motion.div
-          key="help-center"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        >
+      case 'help-center':
+        return (
+          <motion.div
+            key="help-center"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          >
           <HelpCenter 
             userProfile={userProfile} 
             accessibility={accessibility} 
             onBack={() => setScreen('dashboard')} 
           />
         </motion.div>
-      )}
+      );
 
-      {activeScreen === 'notifications' && (
-        <motion.div
-          key="notifications"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-4 text-left animate-fade-in"
-        >
+      case 'notifications':
+        return (
+          <motion.div
+            key="notifications"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-4 text-left animate-fade-in"
+          >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-855/60 pb-3">
             <div className="flex items-start gap-3">
               <button 
@@ -2668,36 +2597,45 @@ export default function DashboardStudent({
                     );
                   }
 
-                  return filtered.map((notif) => (
-                    <div 
-                      key={notif.id}
-                      className={`p-3.5 rounded-xl bg-white dark:bg-zinc-950 border ${
-                        notif.read
-                          ? 'border-zinc-200/50 dark:border-zinc-900/60 opacity-80'
-                          : 'border-zinc-200/80 dark:border-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)]'
-                      } flex items-start gap-3 text-left transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900/20`}
-                    >
-                      <div className="shrink-0 mt-1">
-                        <span className={`w-2 h-2 rounded-full block ${
-                          notif.type === 'alert' ? 'bg-red-500' :
-                          notif.type === 'warning' ? 'bg-amber-550 bg-amber-500' :
-                          notif.type === 'success' ? 'bg-emerald-500' :
-                          'bg-indigo-500'
-                        }`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline justify-between gap-2.5">
-                          <h4 className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-650 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
-                            {notif.title}
-                          </h4>
-                          <span className="text-[8px] font-mono font-black text-zinc-400 dark:text-zinc-500 shrink-0 uppercase tracking-widest">{notif.timestamp}</span>
+                  return (
+                    <VirtualList
+                      items={filtered}
+                      itemHeight={92}
+                      maxHeight={560}
+                      getItemKey={(notif, nIdx) => notif.id ? `notif-${notif.id}` : `notif-${nIdx}-${notif.timestamp}`}
+                      renderItem={(notif) => (
+                        <div className="pb-2.5">
+                          <div 
+                            className={`p-3.5 rounded-xl bg-white dark:bg-zinc-950 border ${
+                              notif.read
+                                ? 'border-zinc-200/50 dark:border-zinc-900/60 opacity-80'
+                                : 'border-zinc-200/80 dark:border-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)]'
+                            } flex items-start gap-3 text-left transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900/20`}
+                          >
+                            <div className="shrink-0 mt-1">
+                              <span className={`w-2 h-2 rounded-full block ${
+                                notif.type === 'alert' ? 'bg-red-500' :
+                                notif.type === 'warning' ? 'bg-amber-500' :
+                                notif.type === 'success' ? 'bg-emerald-500' :
+                                'bg-indigo-500'
+                              }`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-baseline justify-between gap-2.5">
+                                <h4 className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-650 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                  {notif.title}
+                                </h4>
+                                <span className="text-[8px] font-mono font-black text-zinc-400 dark:text-zinc-500 shrink-0 uppercase tracking-widest">{notif.timestamp}</span>
+                              </div>
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug font-medium line-clamp-2">
+                                {notif.message}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug font-medium">
-                          {notif.message}
-                        </p>
-                      </div>
-                    </div>
-                  ));
+                      )}
+                    />
+                  );
                 })()}
               </div>
             </div>
@@ -2745,7 +2683,7 @@ export default function DashboardStudent({
                           const isAbsent = scan.status === 'absent';
                           return (
                             <motion.div 
-                              key={scan.id || scIdx}
+                              key={scan.id ? `scan-${scan.id}` : `scan-${scIdx}-${scan.date}-${scan.time || ''}`}
                               initial={{ opacity: 0, scale: 0.97, y: 5 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               transition={{
@@ -2812,18 +2750,18 @@ export default function DashboardStudent({
             </div>
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 5. USER PROFILE SETTINGS */}
-      {activeScreen === 'profile' && (
-        <motion.div
-          key="profile"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
-        >
+      case 'profile':
+        return (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in"
+          >
           <div className="space-y-6 text-left">
             <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4">
               <button 
@@ -2973,8 +2911,13 @@ export default function DashboardStudent({
             </form>
           </div>
         </motion.div>
-      )}
-      </AnimatePresence>
+      );
+
+      default:
+        return null;
+    }
+  })()}
+</AnimatePresence>
 
       {/* Roster detail modal */}
       <SubjectDetailModal
@@ -3116,47 +3059,30 @@ export default function DashboardStudent({
         </div>
       )}
 
-      {/* Custom Delete Confirmation Modal */}
-      {studentDeleteConfirm && (
-        <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto text-xl">
-              ⚠️
-            </div>
-            <div className="space-y-1 text-left">
-              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-center">Unenroll Confirmation</h4>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 text-center">
-                Are you sure you want to drop <span className="font-bold text-red-500">{studentDeleteConfirm.code}</span> from your dashboard?
-              </p>
-              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-1.5 leading-relaxed bg-zinc-50 dark:bg-zinc-900/40 p-2 rounded-lg text-center">
-                Note: Your official academic records on the faculty registers remain completely safe. You can re-enroll instantly by scanning the course QR code again.
-              </p>
-            </div>
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setStudentDeleteConfirm(null)}
-                className="flex-1 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-350 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onDropSubject) {
-                    onDropSubject(studentDeleteConfirm.id);
-                  }
-                  setStudentDeleteConfirm(null);
-                  speakText(`Successfully dropped course`, accessibility.readAloud);
-                }}
-                className="flex-1 py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 cursor-pointer"
-              >
-                Confirm Drop
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Reusable Drop Subject Confirmation Modal */}
+      <ConfirmationDialog
+        isOpen={!!studentDeleteConfirm}
+        onClose={() => setStudentDeleteConfirm(null)}
+        onConfirm={() => {
+          if (studentDeleteConfirm && onDropSubject) {
+            onDropSubject(studentDeleteConfirm.id);
+            speakText(`Successfully dropped course`, accessibility.readAloud);
+          }
+          setStudentDeleteConfirm(null);
+        }}
+        title="Drop / Unenroll Course?"
+        itemBadge={studentDeleteConfirm?.code}
+        itemName={studentDeleteConfirm?.name}
+        intent="warning"
+        confirmText="Confirm Drop"
+        cancelText="Cancel"
+        description={
+          <span>
+            Are you sure you want to drop <strong>{studentDeleteConfirm?.code}</strong> from your active courses dashboard?
+          </span>
+        }
+        subNote="Note: Your official academic records on the faculty registers remain completely safe. You can re-enroll instantly by scanning the course QR code again."
+      />
 
       {/* Image Preview Lightbox with Save & Rotate Controls */}
       <ImagePreviewModal

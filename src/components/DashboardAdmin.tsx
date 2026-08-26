@@ -24,6 +24,8 @@ import {
 } from '../types';
 import { calculateStudentStanding } from '../lib/attendanceRules';
 import { EmptyState } from './EmptyState';
+import { ConfirmationDialog } from './ConfirmationDialog';
+import { VirtualList } from './VirtualList';
 import { ACADEMIC_TERMS } from '../lib/msuUtils';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { 
@@ -1174,7 +1176,7 @@ export default function DashboardAdmin({
   React.useEffect(() => {
     const handleReset = (e: Event) => {
       const customEvent = e as CustomEvent;
-      if (customEvent.detail && customEvent.detail.screenId === 'users' || customEvent.detail?.screenId === 'schedule-editor') {
+      if (customEvent.detail && (customEvent.detail.screenId === 'users' || customEvent.detail.screenId === 'schedule-editor')) {
         setDirectoryRoleFilter('all');
         setUserDirectorySearch('');
         setAdminClassSearchQuery('');
@@ -2012,15 +2014,18 @@ export default function DashboardAdmin({
     <div className={activeScreen === 'messages' || activeScreen === 'tickets' || activeScreen === 'help-center' ? "h-full flex flex-col min-h-0" : "space-y-6"}>
 
       <AnimatePresence mode="wait">
-        {activeScreen === 'dashboard' && (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 text-left"
-          >
+        {(() => {
+          switch (activeScreen) {
+            case 'dashboard':
+              return (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-6 text-left"
+                >
           
           {/* Animated Dashboard Stats Panel */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -3564,18 +3569,18 @@ export default function DashboardAdmin({
           </div>
 
         </motion.div>
-      )}
+      );
 
-      {/* 2B. ACTIONABLE PASSWORD RESETS SCREEN */}
-      {activeScreen === 'resets' && (
-        <motion.div
-          key="resets"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left animate-fade-in"
-        >
+      case 'resets':
+        return (
+          <motion.div
+            key="resets"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left animate-fade-in"
+          >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -3821,18 +3826,18 @@ export default function DashboardAdmin({
             )}
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 2. USERS DIRECTORY VIEW */}
-      {activeScreen === 'users' && (
-        <motion.div
-          key="users"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left animate-fade-in"
-        >
+      case 'users':
+        return (
+          <motion.div
+            key="users"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left animate-fade-in"
+          >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -4578,109 +4583,108 @@ export default function DashboardAdmin({
               </div>
             )}
 
+            {/* Edit User Modal Dialog Overlay */}
+            {editingUser && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative text-left animate-scale-up">
+                  <button
+                    onClick={() => setEditingUser(null)}
+                    className="absolute top-4 right-4 w-7 h-7 rounded-full bg-zinc-105 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-500 hover:text-zinc-750 flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  
+                  <div className="flex items-center gap-2.5 pb-2 border-b border-zinc-100 dark:border-zinc-900">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                      <Edit className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wide">Edit Directory Record</h3>
+                      <p className="text-[10px] text-zinc-400">Modifying profile data credentials for {editingUser.role}</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleEditUserSubmit} className="space-y-4 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={editUserName}
+                        onChange={(e) => setEditUserName(e.target.value)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans">Official Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        value={editUserEmail}
+                        onChange={(e) => setEditUserEmail(e.target.value)}
+                        className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans">{editingUser.role === 'faculty' ? 'Faculty ID' : 'Student ID'}</label>
+                        <input
+                          type="text"
+                          required
+                          value={editUserUid}
+                          onChange={(e) => setEditUserUid(e.target.value)}
+                          className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans font-sans">Department</label>
+                        <select
+                          value={editUserDep}
+                          onChange={(e) => setEditUserDep(e.target.value)}
+                          className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
+                        >
+                          {departmentsList.map((dep, d_id) => (
+                            <option key={d_id} value={dep}>{dep}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                      <button
+                        type="button"
+                        onClick={() => setEditingUser(null)}
+                        className="px-4 py-2 border border-zinc-250 dark:border-zinc-800 rounded-xl text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-xs font-bold uppercase cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* Edit User Modal Dialog Overlay */}
-      {editingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative text-left animate-scale-up">
-            <button
-              onClick={() => setEditingUser(null)}
-              className="absolute top-4 right-4 w-7 h-7 rounded-full bg-zinc-105 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-500 hover:text-zinc-750 flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            
-            <div className="flex items-center gap-2.5 pb-2 border-b border-zinc-100 dark:border-zinc-900">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                <Edit className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="font-black text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wide">Edit Directory Record</h3>
-                <p className="text-[10px] text-zinc-400">Modifying profile data credentials for {editingUser.role}</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleEditUserSubmit} className="space-y-4 pt-1">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={editUserName}
-                  onChange={(e) => setEditUserName(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans">Official Email Address</label>
-                <input
-                  type="email"
-                  required
-                  value={editUserEmail}
-                  onChange={(e) => setEditUserEmail(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans">{editingUser.role === 'faculty' ? 'Faculty ID' : 'Student ID'}</label>
-                  <input
-                    type="text"
-                    required
-                    value={editUserUid}
-                    onChange={(e) => setEditUserUid(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100 font-mono"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-zinc-455 uppercase tracking-widest font-sans font-sans">Department</label>
-                  <select
-                    value={editUserDep}
-                    onChange={(e) => setEditUserDep(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-emerald-500 outline-none text-zinc-900 dark:text-zinc-100"
-                  >
-                    {departmentsList.map((dep, d_id) => (
-                      <option key={d_id} value={dep}>{dep}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
-                <button
-                  type="button"
-                  onClick={() => setEditingUser(null)}
-                  className="px-4 py-2 border border-zinc-250 dark:border-zinc-800 rounded-xl text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-xs font-bold uppercase cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Schedules / Curriculum Editor screen for Admin */}
-      {activeScreen === 'schedule-editor' && (
-        <motion.div
-          key="schedule-editor"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left animate-fade-in"
-        >
+      case 'schedule-editor':
+        return (
+          <motion.div
+            key="schedule-editor"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left animate-fade-in"
+          >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -4887,18 +4891,18 @@ export default function DashboardAdmin({
             );
           })()}
         </motion.div>
-      )}
+      );
 
-      {/* Profile, editable settings */}
-      {activeScreen === 'profile' && (
-        <motion.div
-          key="profile"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in text-zinc-900 dark:text-zinc-100"
-        >
+      case 'profile':
+        return (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in text-zinc-900 dark:text-zinc-100"
+          >
           <div className="space-y-6">
             <div className="flex justify-between items-center pb-3 border-b border-zinc-200 dark:border-zinc-855">
               <div>
@@ -5260,17 +5264,18 @@ export default function DashboardAdmin({
             </div>
           </div>
         </motion.div>
-      )}
+      );
 
-      {activeScreen === 'reports' && (
-        <motion.div
-          key="reports"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left text-zinc-900 dark:text-zinc-100"
-        >
+      case 'reports':
+        return (
+          <motion.div
+            key="reports"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left text-zinc-900 dark:text-zinc-100"
+          >
           <div className="p-6 rounded-3xl border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm space-y-6">
             <div className="flex justify-between items-center pb-4 border-b border-zinc-100 dark:border-zinc-900">
               <div>
@@ -5761,18 +5766,18 @@ export default function DashboardAdmin({
             </div>
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 6. MESSAGES TAB ROUTING FOR ADMIN */}
-      {activeScreen === 'messages' && (
-        <motion.div
-          key="messages"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
-        >
+      case 'messages':
+        return (
+          <motion.div
+            key="messages"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
+          >
           <Messages 
             userProfile={userProfile || { id: 'admin-01', name: 'Master Admin One', email: 'admin@msu.edu.ph', role: 'admin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150', department: 'Academic Registrar Board' }} 
             classes={classes} 
@@ -5783,18 +5788,18 @@ export default function DashboardAdmin({
             initialContactId={selectedChatContact}
           />
         </motion.div>
-      )}
+      );
 
-      {/* HELP TICKETS TAB ROUTING FOR ADMIN */}
-      {activeScreen === 'tickets' && (
-        <motion.div
-          key="tickets"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
-        >
+      case 'tickets':
+        return (
+          <motion.div
+            key="tickets"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+          >
           <div className="pb-3 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-4 shrink-0">
             <button 
               onClick={() => setScreen('dashboard')} 
@@ -5820,18 +5825,18 @@ export default function DashboardAdmin({
             mode="tickets"
           />
         </motion.div>
-      )}
+      );
 
-      {/* 7. SYSTEM LEVEL NOTIFICATION DECK FOR ADMIN */}
-      {activeScreen === 'notifications' && (
-        <motion.div
-          key="notifications"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-4 text-left animate-fade-in"
-        >
+      case 'notifications':
+        return (
+          <motion.div
+            key="notifications"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-4 text-left animate-fade-in"
+          >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-4">
               <button 
@@ -5949,60 +5954,65 @@ export default function DashboardAdmin({
                 );
               }
 
-              return filtered.map((notif, i) => {
-                return (
-                   <motion.div
-                    key={notif.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03, duration: 0.3 }}
-                    className={`p-3.5 rounded-xl border transition-all ${
-                      notif.read 
-                        ? 'bg-zinc-50/20 dark:bg-zinc-900/10 border-zinc-150/80 dark:border-zinc-900/60 opacity-80' 
-                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.012)]'
-                    } flex items-start gap-3 relative overflow-hidden`}
-                  >
-                    {!notif.read && (
-                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-                    )}
-                    <div className="shrink-0 mt-1">
-                      <span className={`w-2 h-2 rounded-full block ${
-                        notif.type === 'alert' ? 'bg-red-500' :
-                        notif.type === 'warning' ? 'bg-amber-550 bg-amber-500' :
-                        notif.type === 'success' ? 'bg-emerald-500' :
-                        'bg-indigo-500'
-                      }`} />
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="flex justify-between items-baseline gap-2.5">
-                        <h4 className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-650 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
-                          {notif.title}
-                        </h4>
-                        <span className="text-[8px] font-mono font-black text-zinc-400 dark:text-zinc-500 shrink-0 uppercase tracking-widest">
-                          {notif.timestamp}
-                        </span>
+              return (
+                <VirtualList
+                  items={filtered}
+                  itemHeight={92}
+                  maxHeight={560}
+                  getItemKey={(notif) => notif.id}
+                  renderItem={(notif) => (
+                    <div className="pb-2.5">
+                      <div
+                        className={`p-3.5 rounded-xl border transition-all ${
+                          notif.read 
+                            ? 'bg-zinc-50/20 dark:bg-zinc-900/10 border-zinc-150/80 dark:border-zinc-900/60 opacity-80' 
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.012)]'
+                        } flex items-start gap-3 relative overflow-hidden text-left`}
+                      >
+                        {!notif.read && (
+                          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
+                        )}
+                        <div className="shrink-0 mt-1">
+                          <span className={`w-2 h-2 rounded-full block ${
+                            notif.type === 'alert' ? 'bg-red-500' :
+                            notif.type === 'warning' ? 'bg-amber-500' :
+                            notif.type === 'success' ? 'bg-emerald-500' :
+                            'bg-indigo-500'
+                          }`} />
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex justify-between items-baseline gap-2.5">
+                            <h4 className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-650 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                              {notif.title}
+                            </h4>
+                            <span className="text-[8px] font-mono font-black text-zinc-400 dark:text-zinc-500 shrink-0 uppercase tracking-widest">
+                              {notif.timestamp}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-medium leading-snug line-clamp-2">
+                            {notif.message}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 font-medium leading-snug">
-                        {notif.message}
-                      </p>
                     </div>
-                  </motion.div>
-                );
-              });
+                  )}
+                />
+              );
             })()}
           </div>
         </motion.div>
-      )}
+      );
 
-      {activeScreen === 'rooms' && (
-        <motion.div
-          key="rooms"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
-        >
+      case 'rooms':
+        return (
+          <motion.div
+            key="rooms"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left"
+          >
           {/* Header section with back action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-4">
@@ -6676,8 +6686,13 @@ export default function DashboardAdmin({
             </div>
           </div>
         </motion.div>
-      )}
-      </AnimatePresence>
+      );
+
+      default:
+        return null;
+    }
+  })()}
+</AnimatePresence>
 
       {/* 5. INDIVIDUAL SUBJECT DETAILED AUDITS MODAL OVERLAY */}
       <SubjectDetailModal
@@ -7086,42 +7101,29 @@ export default function DashboardAdmin({
 
 
 
-      {/* Custom Delete Confirmation Modal */}
-      {adminDeleteConfirmClass && (
-        <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto text-xl">
-              ⚠️
-            </div>
-            <div className="space-y-1">
-              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Drop Course Confirmation</h4>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Are you absolutely sure you want to drop course <span className="font-bold text-red-500">{adminDeleteConfirmClass.code}</span> from MSU directories?
-              </p>
-            </div>
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setAdminDeleteConfirmClass(null)}
-                className="flex-1 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-350 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteClass(adminDeleteConfirmClass.id);
-                  setAdminDeleteConfirmClass(null);
-                  speakText(`Class dropped successfully`, accessibility.readAloud);
-                }}
-                className="flex-1 py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 cursor-pointer"
-              >
-                Confirm Drop
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Reusable Delete Class Confirmation Modal */}
+      <ConfirmationDialog
+        isOpen={!!adminDeleteConfirmClass}
+        onClose={() => setAdminDeleteConfirmClass(null)}
+        onConfirm={() => {
+          if (adminDeleteConfirmClass) {
+            onDeleteClass(adminDeleteConfirmClass.id);
+            setAdminDeleteConfirmClass(null);
+            speakText(`Class dropped successfully`, accessibility.readAloud);
+          }
+        }}
+        title="Drop Course from Institutional Registers?"
+        itemBadge={adminDeleteConfirmClass?.code}
+        intent="danger"
+        confirmText="Confirm Drop"
+        cancelText="Cancel"
+        description={
+          <span>
+            Are you absolutely sure you want to drop course <strong>{adminDeleteConfirmClass?.code}</strong> from MSU directories? All attached session records will be cleared.
+          </span>
+        }
+        subNote="Archived historical attendance data will remain intact in audit logs."
+      />
 
       {/* Semester Archiving Modal */}
       {archiveModalOpen && (
@@ -7314,40 +7316,25 @@ export default function DashboardAdmin({
       )}
 
       {/* Reusable Generic Admin Confirmation Dialog */}
-      {adminDialogConfirm && (
-        <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-2xl max-w-md w-full text-center space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-500 flex items-center justify-center mx-auto text-xl">
-              💡
-            </div>
-            <div className="space-y-1.5 text-left">
-              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-center">{adminDialogConfirm.title}</h4>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed text-center whitespace-pre-line mt-2">
-                {adminDialogConfirm.message}
-              </p>
-            </div>
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setAdminDialogConfirm(null)}
-                className="flex-1 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-350 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
-              >
-                {adminDialogConfirm.cancelText || 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  adminDialogConfirm.onConfirm();
-                  setAdminDialogConfirm(null);
-                }}
-                className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
-              >
-                {adminDialogConfirm.confirmText || 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={!!adminDialogConfirm}
+        onClose={() => setAdminDialogConfirm(null)}
+        onConfirm={async () => {
+          if (adminDialogConfirm) {
+            await adminDialogConfirm.onConfirm();
+            setAdminDialogConfirm(null);
+          }
+        }}
+        title={adminDialogConfirm?.title || 'Confirmation Required'}
+        intent="danger"
+        confirmText={adminDialogConfirm?.confirmText || 'Confirm'}
+        cancelText={adminDialogConfirm?.cancelText || 'Cancel'}
+        description={
+          <span className="whitespace-pre-line">
+            {adminDialogConfirm?.message}
+          </span>
+        }
+      />
 
       {/* ESTABLISH/ADD NEW ROOM INSTANT MODAL OVERLAY */}
       <AnimatePresence>

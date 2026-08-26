@@ -1078,7 +1078,7 @@ export default function App() {
         const dedupeMap = new Map<string, AttendanceRecord>();
         for (const rec of pendingQueue) {
           const studentIdentifier = rec.studentId || rec.studentName || 'anon';
-          const timeIdentifier = rec.time || rec.timestamp || 'notime';
+          const timeIdentifier = rec.time || (rec as any).timestamp || 'notime';
           const key = `${studentIdentifier}_${rec.classId}_${rec.date}_${timeIdentifier}`;
           dedupeMap.set(key, rec);
         }

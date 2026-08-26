@@ -15,6 +15,8 @@ import {
 import { calculateStudentStanding } from '../lib/attendanceRules';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { EmptyState } from './EmptyState';
+import { ConfirmationDialog } from './ConfirmationDialog';
+import { VirtualList } from './VirtualList';
 import { 
   Plus, 
   QrCode, 
@@ -1035,7 +1037,7 @@ export default function DashboardFaculty({
       if (interval) clearInterval(interval);
       if (rotationInterval) clearInterval(rotationInterval);
     };
-  }, [activeScreen, timeLeft, qrToken, activeQRClass, isManualOverrideActive, manualOverrideClassId, proximityInfo, classes]);
+  }, [activeScreen, timeLeft, qrToken, activeQRClass, isManualOverrideActive, manualOverrideClassId, proximityInfo, classes, onEditClass, accessibility.readAloud]);
 
   const handleStartQrSession = (targetClass: ClassSession) => {
     if (!targetClass) return;
@@ -1250,16 +1252,18 @@ export default function DashboardFaculty({
     <div className={activeScreen === 'messages' || activeScreen === 'help-center' ? "h-full flex flex-col min-h-0" : "space-y-6"}>
 
       <AnimatePresence mode="wait">
-        {/* 1. FACULTY INSIGHTS DASHBOARD */}
-        {activeScreen === 'dashboard' && (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-3.5 sm:space-y-4 text-left"
-          >
+        {(() => {
+          switch (activeScreen) {
+            case 'dashboard':
+              return (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-3.5 sm:space-y-4 text-left"
+                >
             {/* Compact Welcome Header */}
           <div className="p-3.5 sm:p-4 md:p-5 rounded-2xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-indigo-900 via-zinc-900 to-emerald-950 text-white shadow-md">
             <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
@@ -1911,18 +1915,18 @@ export default function DashboardFaculty({
 
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 2. SUBJECTS & SCHEDULE EDITOR SCREEN */}
-      {activeScreen === 'schedule-editor' && (
-        <motion.div
-          key="schedule-editor"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
-        >
+      case 'schedule-editor':
+        return (
+          <motion.div
+            key="schedule-editor"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left"
+          >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div className="flex items-start gap-3">
               <button 
@@ -2220,18 +2224,18 @@ export default function DashboardFaculty({
             onEditSubject={handleOpenEditForm}
           />
         </motion.div>
-      )}
+      );
 
-      {/* 3. QR CODES ATTENDANCE PASSCODE GENERATOR VIEW */}
-      {activeScreen === 'qr-generator' && (
-        <motion.div
-          key="qr-generator"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
-        >
+      case 'qr-generator':
+        return (
+          <motion.div
+            key="qr-generator"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in"
+          >
           <div className="space-y-6 text-left">
             <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
               <button 
@@ -2684,18 +2688,18 @@ export default function DashboardFaculty({
             )}
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 4. NOTIFICATIONS VIEW */}
-      {activeScreen === 'notifications' && (
-        <motion.div
-          key="notifications"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-4 text-left animate-fade-in"
-        >
+      case 'notifications':
+        return (
+          <motion.div
+            key="notifications"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-4 text-left animate-fade-in"
+          >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-3">
               <button 
@@ -2809,51 +2813,60 @@ export default function DashboardFaculty({
                 );
               }
 
-              return filtered.map((notif) => (
-                <div 
-                  key={notif.id}
-                  className={`p-3.5 rounded-xl bg-white dark:bg-zinc-950 border ${
-                    notif.read
-                      ? 'border-zinc-200/50 dark:border-zinc-900/60 opacity-80'
-                      : 'border-zinc-200/80 dark:border-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)]'
-                  } flex items-start gap-3 text-left transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900/20`}
-                >
-                  <div className="shrink-0 mt-1">
-                    <span className={`w-2 h-2 rounded-full block ${
-                      notif.type === 'alert' ? 'bg-red-500' :
-                      notif.type === 'warning' ? 'bg-amber-550 bg-amber-500' :
-                      notif.type === 'success' ? 'bg-emerald-500' :
-                      'bg-indigo-500'
-                    }`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline justify-between gap-2.5">
-                      <h4 className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-655 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
-                        {notif.title}
-                      </h4>
-                      <span className="text-[8px] font-mono font-black text-zinc-400 dark:text-zinc-500 shrink-0 uppercase tracking-widest">{notif.timestamp}</span>
+              return (
+                <VirtualList
+                  items={filtered}
+                  itemHeight={92}
+                  maxHeight={560}
+                  getItemKey={(notif) => notif.id}
+                  renderItem={(notif) => (
+                    <div className="pb-2.5">
+                      <div 
+                        className={`p-3.5 rounded-xl bg-white dark:bg-zinc-950 border ${
+                          notif.read
+                            ? 'border-zinc-200/50 dark:border-zinc-900/60 opacity-80'
+                            : 'border-zinc-200/80 dark:border-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)]'
+                        } flex items-start gap-3 text-left transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900/20`}
+                      >
+                        <div className="shrink-0 mt-1">
+                          <span className={`w-2 h-2 rounded-full block ${
+                            notif.type === 'alert' ? 'bg-red-500' :
+                            notif.type === 'warning' ? 'bg-amber-500' :
+                            notif.type === 'success' ? 'bg-emerald-500' :
+                            'bg-indigo-500'
+                          }`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between gap-2.5">
+                            <h4 className={`text-xs font-bold truncate ${notif.read ? 'text-zinc-655 dark:text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                              {notif.title}
+                            </h4>
+                            <span className="text-[8px] font-mono font-black text-zinc-400 dark:text-zinc-500 shrink-0 uppercase tracking-widest">{notif.timestamp}</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug font-medium line-clamp-2">
+                            {notif.message}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug font-medium">
-                      {notif.message}
-                    </p>
-                  </div>
-                </div>
-              ));
+                  )}
+                />
+              );
             })()}
           </div>
         </motion.div>
-      )}
+      );
 
-      {/* 5. PROFILE TAB */}
-      {activeScreen === 'profile' && (
-        <motion.div
-          key="profile"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
-        >
+      case 'profile':
+        return (
+          <motion.div
+            key="profile"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in"
+          >
           <div className="space-y-6 text-left">
             <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4">
               <button 
@@ -2962,32 +2975,19 @@ export default function DashboardFaculty({
             </form>
           </div>
         </motion.div>
-      )}
-
-      {/* Roster detail modal */}
-      <SubjectDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        cls={selectedClassDetail}
-        enrollments={enrollments}
-        records={attendanceRecords}
-        facultyStatuses={facultyStatuses}
-        isDark={accessibility.theme === 'dark'}
-        userRole="faculty"
-        onToggleCloseSubject={handleToggleCloseClass}
-        onDeleteClass={onDeleteClass}
-      />
+      );
 
       {/* Messages tab screen */}
-      {activeScreen === 'messages' && (
-        <motion.div
-          key="messages"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
-        >
+      case 'messages':
+        return (
+          <motion.div
+            key="messages"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
+          >
           <Messages 
             userProfile={userProfile} 
             classes={classes} 
@@ -2999,18 +2999,18 @@ export default function DashboardFaculty({
             onOpenConsultations={() => setScreen('consultations')}
           />
         </motion.div>
-      )}
+      );
 
-      {/* Consultations View screen for Faculty */}
-      {activeScreen === 'consultations' && (
-        <motion.div
-          key="consultations"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-6 text-left animate-fade-in"
-        >
+      case 'consultations':
+        return (
+          <motion.div
+            key="consultations"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full space-y-6 text-left animate-fade-in"
+          >
           <ConsultationsView
             role="faculty"
             userProfile={userProfile}
@@ -3026,10 +3026,9 @@ export default function DashboardFaculty({
             readAloudEnabled={accessibility.readAloud}
           />
         </motion.div>
-      )}
+      );
 
-      {/* 5B. EXCUSE LETTERS INBOX VIEW */}
-      {activeScreen === 'excuse-inbox' && (() => {
+      case 'excuse-inbox': {
         const totalCount = excuseLetters.length;
         const pendingCount = excuseLetters.filter(l => l.status === 'pending').length;
         const validCount = excuseLetters.filter(l => l.status === 'valid' || l.status === 'approved').length;
@@ -3494,18 +3493,18 @@ export default function DashboardFaculty({
             </div>
           </motion.div>
         );
-      })()}
+      }
 
-      {/* 6. STUDENTS MONITORING VIEW */}
-      {activeScreen === 'students-monitoring' && (
-        <motion.div
-          key="students-monitoring"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="space-y-6 text-left"
-        >
+      case 'students-monitoring':
+        return (
+          <motion.div
+            key="students-monitoring"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6 text-left"
+          >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -4167,25 +4166,44 @@ export default function DashboardFaculty({
           )}
 
         </motion.div>
-      )}
+      );
 
-      {/* Help Center View Panel */}
-      {activeScreen === 'help-center' && (
-        <motion.div
-          key="help-center"
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        >
+      case 'help-center':
+        return (
+          <motion.div
+            key="help-center"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          >
           <HelpCenter 
             userProfile={userProfile} 
             accessibility={accessibility} 
             onBack={() => setScreen('dashboard')} 
           />
         </motion.div>
-      )}
-      </AnimatePresence>
+      );
+
+      default:
+        return null;
+    }
+  })()}
+</AnimatePresence>
+
+      {/* Roster detail modal */}
+      <SubjectDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        cls={selectedClassDetail}
+        enrollments={enrollments}
+        records={attendanceRecords}
+        facultyStatuses={facultyStatuses}
+        isDark={accessibility.theme === 'dark'}
+        userRole="faculty"
+        onToggleCloseSubject={handleToggleCloseClass}
+        onDeleteClass={onDeleteClass}
+      />
 
       {/* Faculty Commencement Alarm Clock popup modal */}
       {isFacultyAlarmOpen && (
@@ -4279,42 +4297,29 @@ export default function DashboardFaculty({
         </div>
       )}
 
-      {/* Custom Delete Confirmation Modal */}
-      {deleteConfirmClass && (
-        <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto text-xl">
-              ⚠️
-            </div>
-            <div className="space-y-1">
-              <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Drop Course Confirmation</h4>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Are you absolutely sure you want to drop course <span className="font-bold text-red-500">{deleteConfirmClass.code}</span>?
-              </p>
-            </div>
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmClass(null)}
-                className="flex-1 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-650 dark:text-zinc-350 rounded-xl text-xs font-bold hover:bg-zinc-50 dark:hover:bg-zinc-900 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteClass(deleteConfirmClass.id);
-                  setDeleteConfirmClass(null);
-                  speakText(`Class dropped successfully`, accessibility.readAloud);
-                }}
-                className="flex-1 py-2 bg-red-500 text-white rounded-xl text-xs font-bold hover:bg-red-600 cursor-pointer"
-              >
-                Confirm Drop
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Reusable Delete Class Confirmation Modal */}
+      <ConfirmationDialog
+        isOpen={!!deleteConfirmClass}
+        onClose={() => setDeleteConfirmClass(null)}
+        onConfirm={() => {
+          if (deleteConfirmClass) {
+            onDeleteClass(deleteConfirmClass.id);
+            setDeleteConfirmClass(null);
+            speakText(`Class dropped successfully`, accessibility.readAloud);
+          }
+        }}
+        title="Drop / Delete Course?"
+        itemBadge={deleteConfirmClass?.code}
+        intent="danger"
+        confirmText="Confirm Delete Course"
+        cancelText="Cancel"
+        description={
+          <span>
+            Are you absolutely sure you want to drop course <strong>{deleteConfirmClass?.code}</strong>? This will remove the section from active attendance tracking and clear its active session schedules.
+          </span>
+        }
+        subNote="Historic student attendance logs for this class will remain archived."
+      />
 
       {/* Dispatched Warning Email Log Modal */}
       {dispatchedEmailsModalOpen && (

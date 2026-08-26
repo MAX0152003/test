@@ -219,7 +219,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
             {/* Dynamic Mobile Feature Card */}
             <div className="p-4 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs">
               <AnimatePresence mode="wait">
-                {mobileFeatureTab === 'qr' && (
+                {mobileFeatureTab === 'qr' ? (
                   <motion.div
                     key="mob-qr"
                     initial={{ opacity: 0, y: 8 }}
@@ -253,9 +253,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                       </div>
                     </div>
                   </motion.div>
-                )}
-
-                {mobileFeatureTab === 'matrix' && (
+                ) : mobileFeatureTab === 'matrix' ? (
                   <motion.div
                     key="mob-matrix"
                     initial={{ opacity: 0, y: 8 }}
@@ -283,9 +281,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                       <p className="text-[10px] opacity-80">Protected university window with zero class scheduling.</p>
                     </div>
                   </motion.div>
-                )}
-
-                {mobileFeatureTab === 'offline' && (
+                ) : (
                   <motion.div
                     key="mob-offline"
                     initial={{ opacity: 0, y: 8 }}
@@ -895,7 +891,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
             {/* Role Features Showcase */}
             <div className="p-8 sm:p-10 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-md">
               <AnimatePresence mode="wait">
-                {activeRoleTab === 'student' && (
+                {activeRoleTab === 'student' ? (
                   <motion.div
                     key="tab-student"
                     initial={{ opacity: 0, y: 15 }}
@@ -957,9 +953,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                       </div>
                     </div>
                   </motion.div>
-                )}
-
-                {activeRoleTab === 'faculty' && (
+                ) : activeRoleTab === 'faculty' ? (
                   <motion.div
                     key="tab-faculty"
                     initial={{ opacity: 0, y: 15 }}
@@ -1021,9 +1015,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                       </div>
                     </div>
                   </motion.div>
-                )}
-
-                {activeRoleTab === 'admin' && (
+                ) : (
                   <motion.div
                     key="tab-admin"
                     initial={{ opacity: 0, y: 15 }}

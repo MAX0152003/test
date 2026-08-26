@@ -2,7 +2,8 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ClassSession, Enrollment, AttendanceRecord, FacultyStatus } from '../types';
 import AttendanceGraph from './AttendanceGraph';
-import { X, Calendar, Clock, MapPin, User, Users, CheckCircle, Activity, Download, Search, Lock, Unlock, Trash2, AlertTriangle } from 'lucide-react';
+import { ConfirmationDialog } from './ConfirmationDialog';
+import { X, Calendar, Clock, MapPin, User, Users, CheckCircle, Activity, Download, Search, Lock, Unlock, Trash2 } from 'lucide-react';
 
 interface SubjectDetailModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function SubjectDetailModal({
 
   const [rosterSearch, setRosterSearch] = React.useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [showDropConfirm, setShowDropConfirm] = React.useState(false);
 
   const uEmail = (studentEmail || '').trim().toLowerCase();
   const uStuId = (studentId || '').trim().toLowerCase();
@@ -175,38 +177,7 @@ export default function SubjectDetailModal({
           </button>
         </div>
 
-        {/* Delete Confirmation Alert */}
-        {showDeleteConfirm && (
-          <div className="mb-5 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-3">
-            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-black text-xs uppercase tracking-wider">
-              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
-              <span>Confirm Subject Removal</span>
-            </div>
-            <p className="text-xs text-zinc-700 dark:text-zinc-300">
-              Are you sure you want to permanently remove <strong>{cls.code}: {cls.name}</strong>? This will remove the subject from active registers.
-            </p>
-            <div className="flex items-center gap-2 justify-end pt-1">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-900 cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteClass?.(cls.id);
-                  setShowDeleteConfirm(false);
-                  onClose();
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase hover:bg-red-700 cursor-pointer shadow-sm"
-              >
-                Permanently Delete Subject
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Delete Confirmation Alert removed in favor of ConfirmationDialog */}
 
         {/* Dynamic content grid */}
         <div className="space-y-6">
@@ -462,7 +433,7 @@ export default function SubjectDetailModal({
               <button
                 type="button"
                 onClick={() => {
-                  onDropSubject(cls.id);
+                  setShowDropConfirm(true);
                 }}
                 className="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/20 text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
               >
@@ -497,7 +468,7 @@ export default function SubjectDetailModal({
               </button>
             )}
 
-            {(userRole === 'faculty' || userRole === 'admin') && onDeleteClass && !showDeleteConfirm && (
+            {(userRole === 'faculty' || userRole === 'admin') && onDeleteClass && (
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
@@ -519,6 +490,50 @@ export default function SubjectDetailModal({
         </div>
 
       </div>
+
+      {/* Reusable Drop Subject Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDropConfirm}
+        onClose={() => setShowDropConfirm(false)}
+        onConfirm={() => {
+          onDropSubject?.(cls.id);
+          setShowDropConfirm(false);
+          onClose();
+        }}
+        title="Drop / Unenroll Subject?"
+        itemBadge={cls.code}
+        intent="warning"
+        confirmText="Confirm Drop Subject"
+        cancelText="Keep Subject"
+        description={
+          <span>
+            Are you sure you want to unenroll from <strong>{cls.code}: {cls.name}</strong>? You will no longer receive attendance reminders or appear on the active class roster for this semester.
+          </span>
+        }
+        subNote="Your historic attendance logs will remain securely archived for official MSU faculty records."
+      />
+
+      {/* Reusable Delete Class Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => {
+          onDeleteClass?.(cls.id);
+          setShowDeleteConfirm(false);
+          onClose();
+        }}
+        title="Permanently Delete Class?"
+        itemBadge={cls.code}
+        intent="danger"
+        confirmText="Delete Subject"
+        cancelText="Cancel"
+        description={
+          <span>
+            Are you sure you want to permanently delete <strong>{cls.code}: {cls.name}</strong>? This action will remove the curriculum course from institutional registers and detach active student enrollments.
+          </span>
+        }
+        subNote="This destructive action cannot be undone once confirmed."
+      />
     </div>
   );
 }
