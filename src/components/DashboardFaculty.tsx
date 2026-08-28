@@ -17,6 +17,8 @@ import { ImagePreviewModal } from './ImagePreviewModal';
 import { EmptyState } from './EmptyState';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { VirtualList } from './VirtualList';
+import { BatchAttendanceModal } from './BatchAttendanceModal';
+import { AccreditationReportModal } from './AccreditationReportModal';
 import { 
   Plus, 
   QrCode, 
@@ -57,7 +59,8 @@ import {
   RotateCcw,
   ChevronRight,
   Lock,
-  Unlock
+  Unlock,
+  Award
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock from './AlarmClock';
@@ -517,6 +520,8 @@ export default function DashboardFaculty({
   const [batchExcusedReason, setBatchExcusedReason] = React.useState<string>('Official MSU University Holiday / Suspension');
   const [rosterFilter, setRosterFilter] = React.useState<'all' | 'flagged' | 'borderline'>('all');
   const [dispatchedEmailsModalOpen, setDispatchedEmailsModalOpen] = React.useState<boolean>(false);
+  const [showBatchAttendanceModal, setShowBatchAttendanceModal] = React.useState<boolean>(false);
+  const [showAccreditationModal, setShowAccreditationModal] = React.useState<boolean>(false);
   const [selectedRosterDate, setSelectedRosterDate] = React.useState<string>(() => {
     // Default to current date in YYYY-MM-DD
     const localToday = new Date();
@@ -3610,7 +3615,27 @@ export default function DashboardFaculty({
 
                 <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden sm:block mx-1"></div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowBatchAttendanceModal(true)}
+                    className="rounded-lg bg-amber-500/15 hover:bg-amber-500 text-amber-700 hover:text-black dark:text-amber-400 dark:hover:text-black border border-amber-500/30 font-black uppercase tracking-wider flex items-center gap-1 px-2.5 py-1.5 text-[10.5px] transition-all cursor-pointer active:scale-95"
+                    title="Bulk mark attendance for university events or storm suspensions"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>Batch Adjust</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAccreditationModal(true)}
+                    className="rounded-lg bg-purple-500/15 hover:bg-purple-500 text-purple-700 hover:text-white dark:text-purple-400 dark:hover:text-white border border-purple-500/30 font-black uppercase tracking-wider flex items-center gap-1 px-2.5 py-1.5 text-[10.5px] transition-all cursor-pointer active:scale-95"
+                    title="Generate official accreditation audit registry"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Accreditation</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleExportSelectedClassAttendance}
@@ -3819,7 +3844,7 @@ export default function DashboardFaculty({
                     </div>
 
                     {/* Right: Roster Action Buttons */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
                       {/* Toggle Quick Edit Mode */}
                       <button
                         type="button"
@@ -3828,7 +3853,7 @@ export default function DashboardFaculty({
                           setShowQuickAttendanceEdit(next);
                           speakText(next ? "Enabled manual roster correction mode" : "Disabled manual roster correction mode", accessibility.readAloud);
                         }}
-                        className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                           showQuickAttendanceEdit
                             ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-2xs'
                             : 'bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900'
@@ -3838,21 +3863,7 @@ export default function DashboardFaculty({
                         <span>{showQuickAttendanceEdit ? 'Edit Mode: ON' : 'Quick Edit'}</span>
                       </button>
 
-                      {/* Batch Attendance Override: Mark All Excused (University Suspension / Holiday) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBatchActionType('excused');
-                          setShowBatchMarkConfirmModal(true);
-                          speakText("Open confirmation to mark entire session excused or university holiday", accessibility.readAloud);
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 active:scale-95"
-                        title="Mark entire class session as Excused / Official University Suspension or Holiday"
-                      >
-                        <span>🏛️ Mark All Excused / Holiday</span>
-                      </button>
-
-                      {/* Batch Attendance Override Button with Confirmation Safety */}
+                      {/* Batch Attendance Override Button: Mark All Present */}
                       <button
                         type="button"
                         onClick={() => {
@@ -3860,7 +3871,7 @@ export default function DashboardFaculty({
                           setShowBatchMarkConfirmModal(true);
                           speakText("Open confirmation to mark all present", accessibility.readAloud);
                         }}
-                        className="px-3 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs active:scale-95"
+                        className="px-3.5 py-1.5 rounded-lg text-[10.5px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs active:scale-95 whitespace-nowrap shrink-0"
                         title="Mark all enrolled students as Present for selected date"
                       >
                         <CheckSquare className="w-3.5 h-3.5 text-black stroke-[2.5]" />
@@ -4407,52 +4418,20 @@ export default function DashboardFaculty({
         <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-6 rounded-3xl max-w-md w-full text-left space-y-4 shadow-2xl animate-scale-up">
             <div className="flex items-center gap-3 pb-3 border-b border-zinc-150 dark:border-zinc-900">
-              <div className={`p-2.5 rounded-2xl border ${
-                batchActionType === 'excused' 
-                  ? 'bg-sky-500/10 text-sky-500 border-sky-500/20' 
-                  : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-              }`}>
+              <div className="p-2.5 rounded-2xl border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">
                 <CheckSquare className="w-5 h-5 stroke-[2.5]" />
               </div>
               <div>
                 <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
-                  {batchActionType === 'excused' ? '🏛️ Batch Excuse / University Suspension' : '⚡ Confirm Mass Attendance (Present)'}
+                  ⚡ Confirm Mass Attendance (Present)
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  {batchActionType === 'excused' 
-                    ? 'Mark whole class session as Excused due to official suspension or university event' 
-                    : 'Bulk mark enrolled students as Present for this date'}
+                  Bulk mark enrolled students as Present for this date
                 </p>
               </div>
             </div>
 
             <div className="space-y-3 text-xs text-zinc-600 dark:text-zinc-400">
-              {/* Mode Toggle */}
-              <div className="flex rounded-xl bg-zinc-100 dark:bg-zinc-900 p-1 border border-zinc-200 dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setBatchActionType('present')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                    batchActionType === 'present'
-                      ? 'bg-emerald-500 text-black shadow-xs'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
-                  }`}
-                >
-                  ⚡ Mark All Present
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBatchActionType('excused')}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                    batchActionType === 'excused'
-                      ? 'bg-sky-500 text-black shadow-xs'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
-                  }`}
-                >
-                  🏛️ Mark All Excused
-                </button>
-              </div>
-
               <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 space-y-2">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="font-bold text-zinc-400 uppercase tracking-wider text-[9px]">Course:</span>
@@ -4474,34 +4453,10 @@ export default function DashboardFaculty({
                 </div>
               </div>
 
-              {batchActionType === 'excused' && (
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                    Official Suspension / Excused Reason:
-                  </label>
-                  <select
-                    value={batchExcusedReason}
-                    onChange={(e) => setBatchExcusedReason(e.target.value)}
-                    className="w-full text-xs p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 focus:ring-1 focus:ring-sky-500 outline-none text-zinc-900 dark:text-zinc-100 font-semibold"
-                  >
-                    <option value="Official MSU University Holiday / Suspension">Official MSU University Holiday / Suspension</option>
-                    <option value="Severe Weather / Marawi Rainstorm & Flooding Suspension">Severe Weather / Marawi Rainstorm & Flooding Suspension</option>
-                    <option value="University Convocations / General Assembly">University Convocations / General Assembly</option>
-                    <option value="MSU System Athletic & Cultural Meet">MSU System Athletic & Cultural Meet</option>
-                    <option value="Campus-wide Transportation / 4th St Disruption">Campus-wide Transportation / 4th St Disruption</option>
-                    <option value="College Academic Day / Faculty Colloquium">College Academic Day / Faculty Colloquium</option>
-                  </select>
-                </div>
-              )}
-
-              <div className={`p-3 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
-                batchActionType === 'excused'
-                  ? 'bg-sky-500/10 border-sky-500/20 text-sky-700 dark:text-sky-300'
-                  : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300'
-              }`}>
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                <CheckSquare className="w-4 h-4 shrink-0 mt-0.5 text-emerald-500" />
                 <span>
-                  This action will mark attendance records for all <strong>{monEnrollments.length} enrolled students</strong> in this section as <strong>{batchActionType === 'excused' ? 'Excused (Official Suspension)' : 'Present'}</strong> on {selectedRosterDate}.
+                  This action will mark attendance records for all <strong>{monEnrollments.length} enrolled students</strong> in this section as <strong>Present</strong> on {selectedRosterDate}.
                 </span>
               </div>
             </div>
@@ -4518,15 +4473,11 @@ export default function DashboardFaculty({
                 type="button"
                 onClick={() => {
                   setShowBatchMarkConfirmModal(false);
-                  handleBatchAttendanceOverride(batchActionType);
+                  handleBatchAttendanceOverride('present');
                 }}
-                className={`flex-1 py-2.5 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer text-center transition-all shadow-sm active:scale-95 ${
-                  batchActionType === 'excused'
-                    ? 'bg-sky-400 hover:bg-sky-300'
-                    : 'bg-emerald-500 hover:bg-emerald-400'
-                }`}
+                className="flex-1 py-2.5 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer text-center transition-all shadow-sm active:scale-95 bg-emerald-500 hover:bg-emerald-400"
               >
-                {batchActionType === 'excused' ? 'Confirm Batch Excuse' : 'Yes, Mark All Present'}
+                Yes, Mark All Present
               </button>
             </div>
           </div>
@@ -4541,6 +4492,65 @@ export default function DashboardFaculty({
         subtitle={imagePreviewData?.subtitle}
         fileName={imagePreviewData?.fileName}
         readAloudEnabled={accessibility.readAloud}
+      />
+
+      {/* Advanced Enterprise Batch Attendance Adjustment Modal */}
+      <BatchAttendanceModal
+        isOpen={showBatchAttendanceModal}
+        onClose={() => setShowBatchAttendanceModal(false)}
+        classes={classes}
+        enrollments={enrollments}
+        onApplyBatch={({ classIds, date, status, reason }) => {
+          const now = new Date();
+          let hours = now.getHours();
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12 || 12;
+          const nowTime = `${hours}:${minutes} ${ampm}`;
+
+          classIds.forEach(cId => {
+            const targetClass = classes.find(c => c.id === cId);
+            if (!targetClass) return;
+            const classEnrollments = enrollments.filter(e => e.classId === cId && !e.deletedByStudent);
+
+            classEnrollments.forEach(student => {
+              const studentRecords = attendanceRecords.filter(
+                r => r.classId === cId &&
+                (r.studentId === student.studentId || r.studentName === student.studentName)
+              );
+              const existingDateRec = studentRecords.find(r => r.date === date);
+
+              if (existingDateRec) {
+                if (existingDateRec.status !== status && onUpdateAttendanceRecord) {
+                  onUpdateAttendanceRecord(existingDateRec.id, status);
+                }
+              } else if (onAddAttendanceRecord) {
+                onAddAttendanceRecord({
+                  classId: targetClass.id,
+                  className: targetClass.name,
+                  classCode: targetClass.code,
+                  date,
+                  time: nowTime,
+                  status,
+                  role: 'student',
+                  studentName: student.studentName,
+                  studentId: student.studentId
+                });
+              }
+            });
+          });
+
+          speakText(`Batch adjustment applied to ${classIds.length} course sections.`, accessibility.readAloud);
+        }}
+      />
+
+      {/* CHED & ISO-9001 Compliance Accreditation Report Engine */}
+      <AccreditationReportModal
+        isOpen={showAccreditationModal}
+        onClose={() => setShowAccreditationModal(false)}
+        classes={classes}
+        enrollments={enrollments}
+        attendanceRecords={attendanceRecords}
       />
     </div>
   );

@@ -196,24 +196,29 @@ interface CourseCardProps {
   onOpenDetails: (cls: ClassSession) => void;
   onDrop?: (cls: ClassSession) => void;
   onEnroll?: (classId: string) => void;
+  onOpenRiskCalculator?: (cls: ClassSession) => void;
 }
 
 export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
   cls,
   isEnrolled,
-  attendanceRecords,
+  attendanceRecords = [],
   userProfile,
   onOpenDetails,
   onDrop,
-  onEnroll
+  onEnroll,
+  onOpenRiskCalculator
 }) => {
+  const safeRecords = Array.isArray(attendanceRecords) ? attendanceRecords : [];
   // Compute active standing indicators
-  const studentRecordsForClass = attendanceRecords.filter(
-    r => r.classId === cls.id && (r.studentId === userProfile.studentId || r.studentName === userProfile.name)
+  const studentRecordsForClass = safeRecords.filter(
+    r => r.classId === cls.id && (r.studentId === (userProfile?.studentId || userProfile?.uid) || r.studentName === userProfile?.name)
   );
   const standing = calculateStudentStanding(studentRecordsForClass);
   const standingLabel = standing.label;
   const standingColor = standing.badgeColor;
+
+  const allowableLeft = Math.max(0, 5 - standing.absentCount);
 
   return (
     <div 
@@ -278,15 +283,37 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
         </div>
       </div>
 
-      <div className="flex items-center gap-2.5 sm:gap-3.5 text-[10px] text-zinc-400 mt-3 sm:mt-4 flex-wrap">
-        <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
-          <Clock className="w-3.5 h-3.5 text-zinc-500" />
-          {cls.startTime}
-        </span>
-        <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-          <MapPin className="w-3.5 h-3.5 text-zinc-500" />
-          {cls.room}
-        </span>
+      <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400 mt-3 sm:mt-4 flex-wrap pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 flex-wrap">
+          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
+            <Clock className="w-3.5 h-3.5 text-zinc-500" />
+            {cls.startTime}
+          </span>
+          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
+            <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+            {cls.room}
+          </span>
+        </div>
+
+        {isEnrolled && onOpenRiskCalculator && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenRiskCalculator(cls);
+            }}
+            className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
+              allowableLeft <= 1 
+                ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 animate-pulse'
+                : allowableLeft <= 2
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+            }`}
+            title="Open Allowable Absences Risk Meter"
+          >
+            <span>🛡️ {allowableLeft} Slot{allowableLeft === 1 ? '' : 's'} Left</span>
+          </button>
+        )}
       </div>
     </div>
   );

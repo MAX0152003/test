@@ -49,6 +49,7 @@ import {
 } from './lib/firestoreSync';
 import { normalizeUserIdentity } from './lib/authUtils';
 import AccountLinkQRModal from './components/AccountLinkQRModal';
+import DownloadAppModal from './components/DownloadAppModal';
 import { 
   INITIAL_CLASSES, 
   INITIAL_FACULTY_STATUSES, 
@@ -105,7 +106,8 @@ import {
   ArrowRight,
   Trash2,
   History,
-  RotateCcw
+  RotateCcw,
+  Smartphone
 } from 'lucide-react';
 import { 
   useDebouncedStorageSync, 
@@ -186,8 +188,40 @@ export default function App() {
     return null;
   });
 
-  const [unauthView, setUnauthView] = React.useState<'landing' | 'auth'>('landing');
+  // Check if running in installed standalone / APK / PWA mode
+  const isInstalledApp = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true ||
+      document.referrer.includes('android-app://') ||
+      window.location.search.includes('installed=true') ||
+      safeStorage.getItem('cp_is_installed') === 'true';
+    return isStandalone;
+  }, []);
+
+  const [unauthView, setUnauthView] = React.useState<'landing' | 'auth'>(() => {
+    // When installed as APK / PWA, don't show the landing page, go straight to auth/login
+    if (typeof window !== 'undefined') {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes('android-app://') ||
+        window.location.search.includes('installed=true') ||
+        safeStorage.getItem('cp_is_installed') === 'true';
+      if (isStandalone) return 'auth';
+    }
+    return 'landing';
+  });
   const [authInitialMode, setAuthInitialMode] = React.useState<'login' | 'register'>('login');
+
+  React.useEffect(() => {
+    // Listen for appinstalled event to flag installation
+    const handleAppInstalled = () => {
+      safeStorage.setItem('cp_is_installed', 'true');
+      setUnauthView('auth');
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => window.removeEventListener('appinstalled', handleAppInstalled);
+  }, []);
 
   const [activeScreen, setActiveScreen] = React.useState<string>(() => {
     return safeStorage.getItem('cp_screen') || 'dashboard';
@@ -725,6 +759,7 @@ export default function App() {
   const [isAccPanelOpen, setIsAccPanelOpen] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [isAccountLinkModalOpen, setIsAccountLinkModalOpen] = React.useState(false);
+  const [isDownloadAppModalOpen, setIsDownloadAppModalOpen] = React.useState(false);
 
   // Synchronize Dark / Light class on the HTML document element
   React.useEffect(() => {
@@ -2165,12 +2200,13 @@ export default function App() {
                 theme: prev.theme === 'dark' ? 'light' : 'dark'
               }));
             }}
+            onOpenDownloadApp={() => setIsDownloadAppModalOpen(true)}
           />
         ) : (
           <AuthScreens 
             onLoginSuccess={handleLoginSuccess} 
             accessibility={accessibility} 
-            onBackToLanding={() => setUnauthView('landing')}
+            onBackToLanding={isInstalledApp ? undefined : () => setUnauthView('landing')}
             initialMode={authInitialMode}
           />
         )
@@ -2221,6 +2257,7 @@ export default function App() {
                 : excuseLetters.filter(e => e.status === 'pending').length
             }
             accessibility={accessibility}
+            onOpenDownloadApp={() => setIsDownloadAppModalOpen(true)}
           />
 
           {/* Primary View Workspace */}
@@ -2939,6 +2976,7 @@ export default function App() {
                       setScreen={handleSetScreen}
                       classes={classes}
                       onOpenAccountLinkQR={() => setIsAccountLinkModalOpen(true)}
+                      onOpenDownloadApp={() => setIsDownloadAppModalOpen(true)}
                       isOffline={isOffline}
                     />
                   </motion.div>
@@ -3164,6 +3202,12 @@ export default function App() {
           const norm = normalizeUserIdentity(claimedProfile);
           handleLoginSuccess(norm.role as Role, norm.name, norm.email);
         }}
+      />
+
+      {/* Download APK / Mobile Install Modal */}
+      <DownloadAppModal
+        isOpen={isDownloadAppModalOpen}
+        onClose={() => setIsDownloadAppModalOpen(false)}
       />
 
     </div>

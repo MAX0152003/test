@@ -21,7 +21,15 @@ import {
   Check,
   Compass,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Smartphone,
+  Download,
+  CheckSquare,
+  Activity,
+  Award,
+  Users,
+  Bell,
+  Cpu
 } from 'lucide-react';
 import { AccessibilityConfig } from '../types';
 
@@ -29,9 +37,10 @@ interface LandingPageProps {
   onEnterPortal: (mode?: 'login' | 'register') => void;
   accessibility: AccessibilityConfig;
   onToggleTheme: () => void;
+  onOpenDownloadApp?: () => void;
 }
 
-export default function LandingPage({ onEnterPortal, accessibility, onToggleTheme }: LandingPageProps) {
+export default function LandingPage({ onEnterPortal, accessibility, onToggleTheme, onOpenDownloadApp }: LandingPageProps) {
   const [activeRoleTab, setActiveRoleTab] = useState<'student' | 'faculty' | 'admin'>('student');
   const [activeMatrixDay, setActiveMatrixDay] = useState<'mon' | 'wed' | 'fri'>('mon');
   const [mobileFeatureTab, setMobileFeatureTab] = useState<'qr' | 'matrix' | 'offline'>('qr');
@@ -99,7 +108,19 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {onOpenDownloadApp && (
+              <button
+                id="mobile-header-download-apk-btn"
+                onClick={onOpenDownloadApp}
+                type="button"
+                className="px-2.5 py-1.5 rounded-xl border border-emerald-500/30 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 active:scale-95 transition-transform flex items-center gap-1 cursor-pointer"
+                title="Download Android APK"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>APK</span>
+              </button>
+            )}
             <button
               id="mobile-toggle-theme-btn"
               onClick={onToggleTheme}
@@ -432,6 +453,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
             {/* Desktop Nav Links */}
             <nav className="flex items-center gap-6 text-xs font-bold text-zinc-600 dark:text-zinc-300">
               <a href="#features" className="hover:text-emerald-500 transition-colors">Core Capabilities</a>
+              <a href="#system-features" className="hover:text-emerald-500 transition-colors">System Features</a>
               <a href="#matrix" className="hover:text-emerald-500 transition-colors">Timetable Matrix</a>
               <a href="#roles" className="hover:text-emerald-500 transition-colors">Role Portals</a>
               <a href="#faq" className="hover:text-emerald-500 transition-colors">Campus FAQs</a>
@@ -439,6 +461,19 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
 
             {/* Action CTAs */}
             <div className="flex items-center gap-3">
+              {onOpenDownloadApp && (
+                <button
+                  id="desktop-header-download-apk-btn"
+                  onClick={onOpenDownloadApp}
+                  type="button"
+                  className="px-3.5 py-2.5 text-xs font-bold rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-all cursor-pointer flex items-center gap-1.5"
+                  title="Download Android APK / Install App"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Download APK</span>
+                </button>
+              )}
+
               <button
                 id="desktop-toggle-theme-btn"
                 onClick={onToggleTheme}
@@ -1084,7 +1119,185 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
           </div>
         </section>
 
-        {/* 6. CAMPUS FAQ SECTION */}
+        {/* 6. SYSTEM CAPABILITIES & COMPREHENSIVE FEATURES MATRIX */}
+        <section id="system-features" className="py-20 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-50/50 dark:bg-zinc-900/20">
+          <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-12 text-left">
+            
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <span className="text-xs font-mono font-black uppercase tracking-widest text-emerald-500">
+                End-To-End Academic Platform
+              </span>
+              <h2 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+                Complete System Architecture & Feature Suite
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                Explore the full breadth of integrated modules engineered specifically for Mindanao State University students, faculty members, and academic administrators.
+              </p>
+            </div>
+
+            {/* Comprehensive Features Showcase Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              
+              {/* Feature 1 */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <QrCode className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">Single-Use Rolling QR Code</h3>
+                    <span className="text-[10px] font-mono font-bold text-emerald-500">Anti-Proxy Protection</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Cryptographically secure attendance tokens refreshed dynamically per session. Scans within 10 minutes count as Present, 10–30 minutes Late, and expired beyond 30 minutes.
+                </p>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">10-min Window</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Camera Scanner</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Projector View</span>
+                </div>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <Compass className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">MSU Friday Jum’ah Window</h3>
+                    <span className="text-[10px] font-mono font-bold text-amber-500">Cultural & Religious Respect</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Automated institutional scheduling blackout from 11:30 AM to 1:30 PM every Friday across all colleges, guaranteeing zero conflicts with university congregational prayers.
+                </p>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Protected Slots</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Visual Indicator</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Zero Conflict</span>
+                </div>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                    <Wifi className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">Zero-Data-Loss Offline Sync</h3>
+                    <span className="text-[10px] font-mono font-bold text-indigo-500">Resilient Persistence</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Seamlessly take roll call and review course schedules even in campus dead zones. Queued attendance events automatically sync to the cloud once network connectivity is restored.
+                </p>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Queue Manager</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Auto Retries</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Status Badge</span>
+                </div>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                    <Layers className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">Conflict-Free Timetable Matrix</h3>
+                    <span className="text-[10px] font-mono font-bold text-teal-500">Multi-View Scheduling</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Switch dynamically between Hourly Matrix, Day Columns, and Course Cards. Integrated room collision and instructor double-booking prevention engine.
+                </p>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Hourly Grid</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Room Mapping</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Clash Prevention</span>
+                </div>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                    <FileText className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">Digital Medical Excuse System</h3>
+                    <span className="text-[10px] font-mono font-bold text-rose-500">Infirmary Verification</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Students upload medical certificates and hospital documents. Faculty inspect attachments and approve or reject excuses, recalculating standing scores in real-time.
+                </p>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Attachment Viewer</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">1-Click Approve</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Audit History</span>
+                </div>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                    <Award className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100">Official Accreditation & CSV Export</h3>
+                    <span className="text-[10px] font-mono font-bold text-blue-500">CHED & Institutional Ready</span>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Clean, streamlined export of official university ledgers, date-range attendance sheets, faculty consultation summaries, and CHED compliance audits.
+                </p>
+                <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">CSV Reports</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">CHED Compliant</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Custom Range</span>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Mobile & Standalone APK Download Banner */}
+            {onOpenDownloadApp && (
+              <div className="p-8 rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-emerald-950 border border-emerald-500/30 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="space-y-2 text-left max-w-xl">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Android & Mobile Companion App</span>
+                  </div>
+                  <h3 className="text-2xl font-black tracking-tight text-white">
+                    Download ClassPulse APK for Android
+                  </h3>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Install ClassPulse directly on your smartphone for faster QR scanning, offline caching, instant class notifications, and full home screen access without browser bars.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={onOpenDownloadApp}
+                    type="button"
+                    className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center gap-2.5"
+                  >
+                    <Download className="w-4 h-4 stroke-[2.5]" />
+                    <span>Download Mobile APK</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </section>
+
+        {/* 7. CAMPUS FAQ SECTION */}
         <section id="faq" className="py-20 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/50 dark:bg-zinc-900/30">
           <div className="max-w-4xl mx-auto px-6 lg:px-8 space-y-10 text-left">
             

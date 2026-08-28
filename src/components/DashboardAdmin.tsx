@@ -28,6 +28,8 @@ import { ConfirmationDialog } from './ConfirmationDialog';
 import { VirtualList } from './VirtualList';
 import { ACADEMIC_TERMS } from '../lib/msuUtils';
 import { ImagePreviewModal } from './ImagePreviewModal';
+import { BulkImportEngineModal } from './BulkImportEngineModal';
+import { AccreditationReportModal } from './AccreditationReportModal';
 import { 
   Users, 
   UserCheck, 
@@ -68,7 +70,10 @@ import {
   LayoutGrid,
   List,
   BellRing,
-  UserPlus
+  UserPlus,
+  UploadCloud,
+  Award,
+  Calculator
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { 
@@ -469,6 +474,8 @@ export default function DashboardAdmin({
   // Local states for announcements, searching, and profile
   const [userDirectorySearch, setUserDirectorySearch] = React.useState('');
   const [adminClassSearchQuery, setAdminClassSearchQuery] = React.useState('');
+  const [showBulkImportEngineModal, setShowBulkImportEngineModal] = React.useState(false);
+  const [showAccreditationModal, setShowAccreditationModal] = React.useState(false);
   
   const [isAnnFormOpen, setIsAnnFormOpen] = React.useState(false);
   const [annTitle, setAnnTitle] = React.useState('');
@@ -3850,14 +3857,26 @@ export default function DashboardAdmin({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setIsUserFormOpen(true)}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 transition-all px-4 py-2.5 text-xs"
-                >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  Add User
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkImportEngineModal(true)}
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-wider rounded-xl cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 transition-all px-4 py-2.5 text-xs"
+                    title="Bulk Ingest Students, Faculty, Classes, or Enrollments from SIS CSV"
+                  >
+                    <UploadCloud className="w-4 h-4 stroke-[2.5]" />
+                    SIS CSV Ingest
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsUserFormOpen(true)}
+                    className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-wider rounded-xl cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 transition-all px-4 py-2.5 text-xs"
+                  >
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                    Add User
+                  </button>
+                </div>
               </div>
 
               {/* Directory Filter triggers */}
@@ -5291,6 +5310,30 @@ export default function DashboardAdmin({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Report Card 0: Accreditation Report */}
+              <div className="p-4 sm:p-5 rounded-2xl border border-purple-500/30 bg-purple-500/5 dark:bg-purple-950/20 hover:bg-purple-500/10 transition-all space-y-3 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-5 h-5 text-purple-500" />
+                    <h4 className="text-sm font-extrabold uppercase tracking-wide text-zinc-900 dark:text-zinc-100">Accreditation & Attendance Report</h4>
+                  </div>
+                  <span className="px-2.5 py-0.5 text-[9px] font-mono rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-300 uppercase font-bold">Official Report</span>
+                </div>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  View and download complete attendance compliance records with course breakdown, attendance rates, and signature certification in CSV or Print/PDF format.
+                </p>
+                <div className="pt-1 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAccreditationModal(true)}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs hover:shadow active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    <Award className="w-4 h-4" />
+                    View Accreditation Report
+                  </button>
+                </div>
+              </div>
+
               {/* Report Card 1: Attendance Logs */}
               <div className="p-5 rounded-2xl border border-zinc-150 dark:border-zinc-850 bg-zinc-50/50 dark:bg-zinc-900/30 hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-all space-y-4">
                 <div className="flex items-center justify-between">
@@ -7703,6 +7746,100 @@ export default function DashboardAdmin({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Enterprise Multi-Domain Bulk CSV & SIS Ingestion Engine */}
+      <BulkImportEngineModal
+        isOpen={showBulkImportEngineModal}
+        onClose={() => setShowBulkImportEngineModal(false)}
+        existingUsers={usersList}
+        existingClasses={classes}
+        onImport={(target, validRows) => {
+          const isOffline = localStorage.getItem('cp_offline') === 'true';
+
+          if (target === 'students' || target === 'faculty') {
+            const role = target === 'students' ? 'student' : 'faculty';
+            const newUsers: MockUser[] = validRows.map((row, idx) => ({
+              id: `${role}-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+              name: row.name,
+              email: row.email,
+              role: role,
+              uid: row.studentId || row.facultyId || row.uid || `ID-${Date.now()}-${idx}`,
+              department: row.department || row.college || 'Academic Department',
+              registeredAt: new Date().toISOString()
+            }));
+
+            // Persist to local cache and Firestore
+            try {
+              const existingRaw = localStorage.getItem('classpulse_registered_users');
+              const existing: MockUser[] = existingRaw ? JSON.parse(existingRaw) : [];
+              const combined = [...existing, ...newUsers];
+              localStorage.setItem('classpulse_registered_users', JSON.stringify(combined));
+            } catch (e) {
+              console.error(e);
+            }
+
+            setUsersList(prev => [...prev, ...newUsers]);
+
+            for (const u of newUsers) {
+              saveRegisteredUserToFirestore(isOffline, u).catch(err => console.error(err));
+            }
+
+            speakText(`Imported ${newUsers.length} ${target} accounts successfully`, accessibility.readAloud);
+          } else if (target === 'classes') {
+            let addedCount = 0;
+            validRows.forEach(row => {
+              if (onAddClass) {
+                const daysParsed = (row.days || 'MWF').split(',').map((d: string) => d.trim());
+                onAddClass({
+                  code: row.code || 'COURSE',
+                  name: row.name || 'Subject Name',
+                  facultyName: row.instructor || row.facultyName || 'Faculty In-Charge',
+                  facultyId: row.facultyId || 'FAC-01',
+                  room: row.room || 'Room 101',
+                  startTime: row.startTime || '08:00 AM',
+                  endTime: row.endTime || '09:30 AM',
+                  days: daysParsed,
+                  credits: row.creditUnits ? Number(row.creditUnits) : (row.credits ? Number(row.credits) : 3),
+                  gracePeriodMinutes: 15,
+                  isClosed: false
+                });
+                addedCount++;
+              }
+            });
+            speakText(`Imported ${addedCount} curriculum course sections`, accessibility.readAloud);
+          } else if (target === 'enrollments') {
+            // Save enrollments into local cache
+            try {
+              const existingRaw = localStorage.getItem('classpulse_enrollments');
+              const existing: Enrollment[] = existingRaw ? JSON.parse(existingRaw) : [];
+              const newEnrs: Enrollment[] = validRows.map((row, idx) => ({
+                id: `enr-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+                studentId: row.studentId,
+                studentName: row.studentName,
+                studentEmail: row.studentEmail || `${(row.studentName || 'student').toLowerCase().replace(/\s+/g, '.')}@msu.edu.ph`,
+                studentAvatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
+                classId: row.classId,
+                enrolledAt: new Date().toISOString()
+              }));
+              const combined = [...existing, ...newEnrs];
+              localStorage.setItem('classpulse_enrollments', JSON.stringify(combined));
+              speakText(`Enrolled ${newEnrs.length} students into their designated classes`, accessibility.readAloud);
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        }}
+      />
+
+      {/* Official CHED CMO & ISO-9001 Compliance Accreditation Report Engine */}
+      <AccreditationReportModal
+        isOpen={showAccreditationModal}
+        onClose={() => setShowAccreditationModal(false)}
+        classes={classes}
+        enrollments={enrollments}
+        attendanceRecords={attendanceRecords}
+        users={usersList}
+      />
 
     </div>
   );

@@ -1,13 +1,35 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, User, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  getFirestore, 
+  doc, 
+  getDocFromServer, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
+  Firestore 
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-export const app = initializeApp(firebaseConfig);
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Use configured database ID if provided, otherwise default instance
 const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId || "ai-studio-classpulse20-2d99fc9f-395e-42ed-a65f-49548e77000e";
-export const db = getFirestore(app, firestoreDbId);
+
+let firestoreInstance: Firestore;
+try {
+  firestoreInstance = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    }),
+    experimentalAutoDetectLongPolling: true,
+  }, firestoreDbId);
+} catch {
+  // If already initialized with settings, get existing instance
+  firestoreInstance = getFirestore(app, firestoreDbId);
+}
+
+export const db = firestoreInstance;
 
 export const auth = getAuth(app);
 
@@ -84,13 +106,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    // Firestore operates in offline cache mode when connectivity is intermittent
-    if (error instanceof Error && (error.message.includes('offline') || error.message.includes('unavailable'))) {
-      console.info("[Firestore] Operating with offline cache and background synchronization.");
+  setTimeout(async () => {
+    try {
+      await getDocFromServer(doc(db, 'test', 'connection'));
+    } catch (error) {
+      if (error instanceof Error && (error.message.includes('offline') || error.message.includes('unavailable') || error.message.includes('the client is offline'))) {
+        console.info("[Firestore] Operating in offline mode until connection is established.");
+      }
     }
-  }
+  }, 500);
 }
 testConnection();

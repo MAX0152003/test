@@ -24,6 +24,7 @@ import { EmptyState } from './EmptyState';
 import { VirtualList } from './VirtualList';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { StudentFacultyCard, StudentCourseCard, StudentExcuseCard, StudentLectureCard } from './StudentDashboardCards';
+import { AttendanceRiskCalculatorModal } from './AttendanceRiskCalculatorModal';
 import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
 import { 
   Scan, 
@@ -180,6 +181,7 @@ export default function DashboardStudent({
   const [selectedFacultyForChat, setSelectedFacultyForChat] = React.useState<{ id: string; name?: string; ts: number } | undefined>(undefined);
   const [selectedFacultyForConsultation, setSelectedFacultyForConsultation] = React.useState<string | undefined>(undefined);
   const [imagePreviewData, setImagePreviewData] = React.useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
+  const [riskCalculatorClass, setRiskCalculatorClass] = React.useState<ClassSession | null>(null);
 
   // Faculty Directory Notify Me watchlist state
   const [watchedFacultyIds, setWatchedFacultyIds] = React.useState<string[]>(() => {
@@ -1781,6 +1783,7 @@ export default function DashboardStudent({
                           onOpenDetails={handleOpenSubjectDetails}
                           onDrop={onDropSubject ? (c) => setStudentDeleteConfirm({ id: c.id, code: c.code, name: c.name }) : undefined}
                           onEnroll={onEnrollSubject ? (cId) => onEnrollSubject(cId) : undefined}
+                          onOpenRiskCalculator={(c) => setRiskCalculatorClass(c)}
                         />
                       );
                     });
@@ -3093,6 +3096,19 @@ export default function DashboardStudent({
         subtitle={imagePreviewData?.subtitle}
         fileName={imagePreviewData?.fileName}
         readAloudEnabled={accessibility.readAloud}
+      />
+
+      {/* Early Intervention & Allowable Absences Risk Meter Modal */}
+      <AttendanceRiskCalculatorModal
+        isOpen={!!riskCalculatorClass}
+        onClose={() => setRiskCalculatorClass(null)}
+        cls={riskCalculatorClass}
+        enrolledClasses={(classes || []).filter(c => studentEnrolledClassIds?.has(c.id))}
+        attendanceRecords={attendanceRecords || []}
+        studentId={userProfile.studentId || ''}
+        studentName={userProfile.name}
+        onOpenExcuseModal={() => setScreen('excuse-inbox')}
+        onBookConsultation={() => setScreen('consultations')}
       />
     </div>
   );

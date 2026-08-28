@@ -14,19 +14,21 @@ interface AttendanceGraphProps {
   classId: string;
   classCode: string;
   className: string;
-  records: AttendanceRecord[];
+  records?: AttendanceRecord[];
   isDark?: boolean;
 }
 
-export default function AttendanceGraph({ classId, classCode, className, records, isDark: propIsDark }: AttendanceGraphProps) {
+export default function AttendanceGraph({ classId, classCode, className, records = [], isDark: propIsDark }: AttendanceGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstanceRef = useRef<Chart | null>(null);
 
   // Compute theme dynamically inside rendering
   const activeIsDark = propIsDark !== undefined ? propIsDark : document.documentElement.classList.contains('dark');
 
+  const safeRecords = Array.isArray(records) ? records : [];
+
   // Filter records for this class
-  const classRecords = records
+  const classRecords = safeRecords
     .filter(r => r.classId === classId)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 

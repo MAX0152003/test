@@ -14,7 +14,6 @@ import {
   Sun, 
   Moon, 
   ArrowLeft,
-  Smartphone,
   Sparkles,
   RefreshCw,
   Mail,
