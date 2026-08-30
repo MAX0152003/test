@@ -22,7 +22,8 @@ import {
   Camera,
   Lock,
   Key,
-  QrCode
+  QrCode,
+  Smartphone
 } from 'lucide-react';
 import { UserProfile, AccessibilityConfig, ClassSession, ViewDensity } from '../types';
 import { speakText } from './AccessibilitySettings';

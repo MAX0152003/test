@@ -1724,11 +1724,55 @@ export default function App() {
   // Profile Update callback - ensures propagation to enrollments globally
   const handleUpdateProfile = (updatedProfile: UserProfile) => {
     setUser(updatedProfile);
+
+    // 1. Persist active user session locally
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('classpulse_active_user', JSON.stringify(updatedProfile));
+        localStorage.setItem('classpulse_active_role', updatedProfile.role);
+
+        // 2. Synchronize to registered_users local cache
+        const regUsers: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
+        let found = false;
+        const mappedUsers = regUsers.map(u => {
+          if (
+            u.id === updatedProfile.id || 
+            (u.email && updatedProfile.email && u.email.toLowerCase() === updatedProfile.email.toLowerCase()) ||
+            (u.uid && (u.uid === updatedProfile.studentId || u.uid === updatedProfile.facultyId))
+          ) {
+            found = true;
+            return {
+              ...u,
+              ...updatedProfile,
+              uid: updatedProfile.studentId || updatedProfile.facultyId || u.uid || updatedProfile.id
+            };
+          }
+          return u;
+        });
+
+        if (!found) {
+          mappedUsers.push({
+            ...updatedProfile,
+            uid: updatedProfile.studentId || updatedProfile.facultyId || updatedProfile.id
+          });
+        }
+
+        localStorage.setItem('classpulse_registered_users', JSON.stringify(mappedUsers));
+        localStorage.setItem('classpulse_registered_admins', JSON.stringify(mappedUsers.filter(u => u.role === 'admin')));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('registered-users-changed'));
+        }
+      } catch (err) {
+        console.error("Local storage sync error on profile update:", err);
+      }
+    }
+
+    // 3. Save to Firestore (persists to both 'users' and 'registered_users')
     saveUserProfileToFirestore(false, updatedProfile).catch(err => console.error("Firestore update profile error:", err));
 
-    // Update the local enrollments list matching this student IDs
+    // 4. Update the local enrollments list matching this student IDs
     setEnrollments(prev => prev.map(e => {
-      if (e.studentId === updatedProfile.studentId || e.studentEmail === updatedProfile.email) {
+      if (e.studentId === updatedProfile.studentId || e.studentEmail === updatedProfile.email || (updatedProfile.id && e.studentId === updatedProfile.id)) {
         return {
           ...e,
           studentName: updatedProfile.name,
@@ -1739,10 +1783,22 @@ export default function App() {
       return e;
     }));
 
-    // If faculty, update faculty statuses array
+    // 5. Update attendance records reflecting student identity
+    setAttendanceRecords(prev => prev.map(r => {
+      if (r.studentId === updatedProfile.studentId || r.studentName === user?.name || r.studentId === updatedProfile.id) {
+        return {
+          ...r,
+          studentName: updatedProfile.name,
+          studentAvatar: updatedProfile.avatar
+        };
+      }
+      return r;
+    }));
+
+    // 6. If faculty, update faculty statuses array and courses taught
     if (updatedProfile.role === 'faculty') {
       setFacultyStatuses(prev => prev.map(f => {
-        if (f.id === updatedProfile.facultyId || f.name === user?.name) {
+        if (f.id === updatedProfile.facultyId || f.name === user?.name || f.id === updatedProfile.id) {
           return {
             ...f,
             name: updatedProfile.name,
@@ -1750,6 +1806,16 @@ export default function App() {
           };
         }
         return f;
+      }));
+
+      setClasses(prev => prev.map(c => {
+        if (c.facultyId === updatedProfile.facultyId || c.facultyId === updatedProfile.id || c.facultyName === user?.name) {
+          return {
+            ...c,
+            facultyName: updatedProfile.name
+          };
+        }
+        return c;
       }));
     }
 
@@ -2257,7 +2323,6 @@ export default function App() {
                 : excuseLetters.filter(e => e.status === 'pending').length
             }
             accessibility={accessibility}
-            onOpenDownloadApp={() => setIsDownloadAppModalOpen(true)}
           />
 
           {/* Primary View Workspace */}
@@ -2976,7 +3041,6 @@ export default function App() {
                       setScreen={handleSetScreen}
                       classes={classes}
                       onOpenAccountLinkQR={() => setIsAccountLinkModalOpen(true)}
-                      onOpenDownloadApp={() => setIsDownloadAppModalOpen(true)}
                       isOffline={isOffline}
                     />
                   </motion.div>
@@ -2987,7 +3051,9 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                    className="w-full flex-1 flex flex-col text-left"
+                    className={`w-full flex-1 flex flex-col text-left ${
+                      activeScreen === 'messages' || activeScreen === 'tickets' ? 'h-full min-h-0 overflow-hidden' : ''
+                    }`}
                   >
                     {user.role === 'student' && (
                       <DashboardStudent
@@ -3121,7 +3187,7 @@ export default function App() {
 
             {/* Mobile Bottom Navigation Bar (Deeply Adaptive, Thumb-Friendly Dock with iOS Safe-Area support) */}
             <div className={`md:hidden fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-6 sm:right-6 max-w-lg mx-auto z-40 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-2 py-1 flex justify-around items-center h-14 rounded-2xl shadow-2xl shadow-zinc-950/20 transition-all duration-300 ease-in-out transform ${
-              isKeyboardOpen || (activeScreen === 'messages' && isInsideChatThread)
+              isKeyboardOpen || activeScreen === 'messages' || activeScreen === 'tickets'
                 ? 'hidden opacity-0 pointer-events-none' 
                 : isMobileBarVisible 
                   ? 'translate-y-0 opacity-100' 

@@ -558,8 +558,42 @@ export async function saveUserProfileToFirestore(
     `saveUserProfile:${profile.id}`,
     async () => {
       try {
-        await setDoc(doc(db, colPath, profile.id), sanitizeForFirestore(profile), { merge: true });
-        console.log(`User profile for ${profile.name} updated in Firestore.`);
+        const cleanProfile = sanitizeForFirestore(profile);
+        await setDoc(doc(db, colPath, profile.id), cleanProfile, { merge: true });
+        
+        // Also sync to registered_users collection so admin directory and other clients receive it
+        const regUserDoc = {
+          ...cleanProfile,
+          uid: profile.studentId || profile.facultyId || profile.id
+        };
+        await setDoc(doc(db, 'registered_users', profile.id), regUserDoc, { merge: true });
+
+        // Update local registered users cache
+        if (typeof localStorage !== 'undefined') {
+          try {
+            const currentReg: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
+            let matched = false;
+            const updatedReg = currentReg.map(u => {
+              if (u.id === profile.id || (u.email && profile.email && u.email.toLowerCase() === profile.email.toLowerCase())) {
+                matched = true;
+                return { ...u, ...regUserDoc };
+              }
+              return u;
+            });
+            if (!matched) {
+              updatedReg.push(regUserDoc);
+            }
+            localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedReg));
+            localStorage.setItem('classpulse_registered_admins', JSON.stringify(updatedReg.filter(u => u.role === 'admin')));
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('registered-users-changed'));
+            }
+          } catch (storageErr) {
+            console.warn("Storage sync warning in saveUserProfileToFirestore:", storageErr);
+          }
+        }
+
+        console.log(`User profile for ${profile.name} updated in Firestore (users & registered_users).`);
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, `${colPath}/${profile.id}`);
       }
