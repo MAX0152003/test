@@ -20,6 +20,7 @@ import {
   Zap,
   Info,
   Camera,
+  Crop,
   Lock,
   Key,
   QrCode,
@@ -30,6 +31,10 @@ import { speakText } from './AccessibilitySettings';
 import { saveUserCredentialToFirestore, saveUserProfileToFirestore } from '../lib/firestoreSync';
 import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
 import { triggerTestDeviceAlarm, requestSystemNotificationPermission } from '../lib/classAlarmScheduler';
+import { nativeAlarmBridge } from '../lib/nativeAlarmBridge';
+import NativeAlarmManagerModal from './NativeAlarmManagerModal';
+import { Enrollment } from '../types';
+import { ImageCropModal } from './ImageCropModal';
 
 interface SettingsProps {
   userProfile: UserProfile;
@@ -41,6 +46,7 @@ interface SettingsProps {
   onUpdateColorAccent?: (accent: string) => void;
   setScreen: (screen: string) => void;
   classes?: ClassSession[];
+  enrollments?: Enrollment[];
   onOpenAccountLinkQR?: () => void;
   isOffline?: boolean;
 }
@@ -54,10 +60,13 @@ export default function Settings({
   onUpdateCompactMode,
   onUpdateColorAccent,
   setScreen,
+  classes = [],
+  enrollments = [],
   onOpenAccountLinkQR
 }: SettingsProps) {
   // 1. Current category selection
   const [activeCategory, setActiveCategory] = React.useState<'account' | 'appearance' | 'notifications' | 'security'>('account');
+  const [isAlarmModalOpen, setIsAlarmModalOpen] = React.useState(false);
 
   // 2. Account Profile Form states (requires manual save)
   const [name, setName] = React.useState(userProfile.name);
@@ -67,6 +76,8 @@ export default function Settings({
   const [phone, setPhone] = React.useState(userProfile.phone || '');
   const [bio, setBio] = React.useState(userProfile.bio || '');
   const [avatar, setAvatar] = React.useState(userProfile.avatar);
+  const [cropModalOpen, setCropModalOpen] = React.useState(false);
+  const [cropImageSrc, setCropImageSrc] = React.useState<string | null>(null);
 
   // States to track save state
   const [isSaving, setIsSaving] = React.useState(false);
@@ -516,17 +527,45 @@ export default function Settings({
               <form onSubmit={handleSaveAccount} className="space-y-4">
                 {/* Profile Portrait Selector */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 py-1.5">
-                  <img
-                    src={avatar}
-                    alt={name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-zinc-300 dark:border-zinc-800"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">
-                      Academic Avatar Template
-                    </label>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="relative group shrink-0">
+                    <img
+                      src={avatar}
+                      alt={name}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-zinc-300 dark:border-zinc-800 shadow-sm"
+                      referrerPolicy="no-referrer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCropImageSrc(avatar);
+                        setCropModalOpen(true);
+                      }}
+                      className="absolute inset-0 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      title="Click to crop & align image"
+                    >
+                      <Crop className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-black uppercase text-zinc-500 tracking-wider">
+                        Academic Avatar & Portrait
+                      </label>
+                      {avatar && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCropImageSrc(avatar);
+                            setCropModalOpen(true);
+                          }}
+                          className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Crop className="w-3 h-3" />
+                          <span>Crop / Re-align</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                       {[
                         'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
                         'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
@@ -548,9 +587,9 @@ export default function Settings({
                         </button>
                       ))}
 
-                      {/* Custom Photo Upload Input */}
+                      {/* Custom Photo Upload Input with auto-crop opener */}
                       <label 
-                        className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-900 border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center cursor-pointer transition-all hover:scale-105 shrink-0"
+                        className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-900 border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center cursor-pointer transition-all hover:scale-105 shrink-0 hover:border-emerald-500"
                         title="Upload Custom Photo from Phone/Device"
                       >
                         <Camera className="w-4 h-4 text-zinc-550 dark:text-zinc-400" />
@@ -562,8 +601,10 @@ export default function Settings({
                             if (file) {
                               const reader = new FileReader();
                               reader.onloadend = () => {
-                                setAvatar(reader.result as string);
-                                speakText("Custom phone/device photo processed as profile preview.", accessibility.readAloud);
+                                const rawSrc = reader.result as string;
+                                setCropImageSrc(rawSrc);
+                                setCropModalOpen(true);
+                                speakText("Photo loaded. You can now adjust zoom, orientation, and alignment.", accessibility.readAloud);
                               };
                               reader.readAsDataURL(file);
                             }
@@ -1090,7 +1131,35 @@ export default function Settings({
                   </button>
                 </div>
 
-                {/* 5. Device Native Notification Permissions & Testing Suite */}
+                {/* 5. Native Phone Mobile Alarm & Scheduled Background Alerts Subsystem */}
+                <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-left space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-5 h-5 text-emerald-500" />
+                      <span className="text-[11px] font-black uppercase text-zinc-900 dark:text-zinc-100 tracking-wider">
+                        Native Smartphone Alarm & Notification Engine
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                      ANDROID / iOS
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    Integrate your enrolled class schedule directly with your phone's native alarm subsystem, device lock screen wake-up, ringtone sound chime, and vibration patterns even when the browser or app is closed.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsAlarmModalOpen(true)}
+                      className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl cursor-pointer active:scale-95 transition-all shadow-md flex items-center gap-1.5"
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      Manage Scheduled Phone Alarms & Triggers
+                    </button>
+                  </div>
+                </div>
+
+                {/* 6. Device Native Notification Permissions & Testing Suite */}
                 <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-left space-y-3 mt-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 tracking-wider">
@@ -1107,8 +1176,8 @@ export default function Settings({
                     <button
                       type="button"
                       onClick={async () => {
-                        const res = await requestSystemNotificationPermission();
-                        if (res) {
+                        const res迷 = await nativeAlarmBridge.requestPermissions();
+                        if (res迷.notifications === 'granted') {
                           if (typeof window !== 'undefined' && (window as any).showToast) {
                             (window as any).showToast("Screen notifications enabled!", "success");
                           }
@@ -1135,6 +1204,32 @@ export default function Settings({
 
         </div>
       </div>
+
+      {/* Native Smartphone Alarm & Background Alert Manager Modal */}
+      <NativeAlarmManagerModal
+        isOpen={isAlarmModalOpen}
+        onClose={() => setIsAlarmModalOpen(false)}
+        classes={classes}
+        enrollments={enrollments}
+        userProfile={userProfile}
+        readAloudEnabled={accessibility.readAloud}
+      />
+
+      {/* Image Cropping & Re-alignment Modal */}
+      <ImageCropModal
+        isOpen={cropModalOpen}
+        onClose={() => {
+          setCropModalOpen(false);
+          setCropImageSrc(null);
+        }}
+        imageSrc={cropImageSrc}
+        onCropComplete={(croppedDataUrl) => {
+          setAvatar(croppedDataUrl);
+          speakText("Cropped photo applied to your profile preview. Remember to click save changes to persist.", accessibility.readAloud);
+        }}
+        title="Crop & Align Profile Portrait"
+        readAloudEnabled={accessibility.readAloud}
+      />
     </motion.div>
   );
 }

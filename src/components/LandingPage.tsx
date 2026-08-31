@@ -94,15 +94,17 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
       <div className="block lg:hidden w-full pb-12 text-left">
         
         {/* Mobile App Header */}
-        <header id="mobile-landing-header" className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/90 dark:bg-zinc-950/90 border-b border-zinc-200/80 dark:border-zinc-800/80 px-4 py-3 flex items-center justify-between">
+        <header id="mobile-landing-header" className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200/80 dark:border-zinc-800/80 px-4 py-3 flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-black font-black font-mono text-sm shadow-xs shadow-emerald-500/20">
-              CP
+            <div className="w-8 h-8 rounded-xl bg-emerald-500 text-black flex items-center justify-center font-black shadow-md shadow-emerald-500/20 shrink-0">
+              <Activity className="w-4.5 h-4.5 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-black text-sm text-zinc-900 dark:text-zinc-100 font-mono">ClassPulse</span>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">MSU</span>
+                <span className="font-black text-sm text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">
+                  Class<span className="text-emerald-500">Pulse</span>
+                </span>
+                <span className="text-[9px] font-mono font-black px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">MSU</span>
               </div>
               <p className="text-[10px] text-zinc-400 font-medium">Mindanao State University</p>
             </div>
@@ -426,51 +428,66 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
       {/* ========================================================================== */}
       <div className="hidden lg:block w-full">
         
-        {/* 1. TOP NAVIGATION BAR */}
-        <header id="desktop-landing-header" className="sticky top-0 z-50 w-full backdrop-blur-xl bg-white/80 dark:bg-zinc-950/80 border-b border-zinc-200/80 dark:border-zinc-800/80 transition-all">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8 h-18 flex items-center justify-between gap-4">
+        {/* 1. TOP NAVIGATION BAR - Maximized, Refined High-Contrast Institutional Header */}
+        <header id="desktop-landing-header" className="sticky top-0 z-50 w-full backdrop-blur-2xl bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200/80 dark:border-zinc-800/80 transition-all shadow-xs">
+          <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 h-18 lg:h-20 flex items-center justify-between gap-3 lg:gap-6 flex-nowrap">
             
-            {/* Brand Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/20 text-black font-black font-mono text-lg shrink-0">
-                CP
-              </div>
-              <div className="text-left">
+            {/* Brand Logo & Institution Info */}
+            <div className="flex items-center gap-3 shrink-0">
+              <motion.div 
+                whileHover={{ scale: 1.05, rotate: 2 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-10 h-10 lg:w-11 lg:h-11 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-black shadow-md shadow-emerald-500/25 shrink-0 cursor-pointer"
+              >
+                <Activity className="w-5 h-5 lg:w-6 lg:h-6 stroke-[2.5]" />
+              </motion.div>
+              <div className="text-left shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-black text-base tracking-tight text-zinc-900 dark:text-zinc-100 font-mono">
-                    ClassPulse
+                  <span className="font-black text-base lg:text-lg tracking-tight text-zinc-900 dark:text-zinc-100 uppercase font-sans whitespace-nowrap">
+                    Class<span className="text-emerald-500 font-extrabold">Pulse</span>
                   </span>
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono">
-                    MSU v2.0
+                  <span className="text-[9px] lg:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-mono whitespace-nowrap">
+                    MSU Main Campus
                   </span>
                 </div>
-                <p className="text-[11px] font-semibold text-zinc-400 dark:text-zinc-500">
-                  Mindanao State University • Main Campus
+                <p className="hidden xl:block text-[11px] font-semibold text-zinc-400 dark:text-zinc-500 tracking-tight whitespace-nowrap">
+                  Academic Timetable & Attendance Suite
                 </p>
               </div>
             </div>
 
-            {/* Desktop Nav Links */}
-            <nav className="flex items-center gap-6 text-xs font-bold text-zinc-600 dark:text-zinc-300">
-              <a href="#features" className="hover:text-emerald-500 transition-colors">Core Capabilities</a>
-              <a href="#system-features" className="hover:text-emerald-500 transition-colors">System Features</a>
-              <a href="#matrix" className="hover:text-emerald-500 transition-colors">Timetable Matrix</a>
-              <a href="#roles" className="hover:text-emerald-500 transition-colors">Role Portals</a>
-              <a href="#faq" className="hover:text-emerald-500 transition-colors">Campus FAQs</a>
+            {/* Desktop Nav Links - Only on 2XL wide screens to guarantee zero header clutter */}
+            <nav className="hidden 2xl:flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-bold text-zinc-600 dark:text-zinc-300 shrink-0">
+              <a href="#features" className="px-3 py-1 rounded-full hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-800 transition-all whitespace-nowrap">
+                Capabilities
+              </a>
+              <a href="#system-features" className="px-3 py-1 rounded-full hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-800 transition-all whitespace-nowrap">
+                Features
+              </a>
+              <a href="#matrix" className="px-3 py-1 rounded-full hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-800 transition-all whitespace-nowrap">
+                Timetable
+              </a>
+              <a href="#roles" className="px-3 py-1 rounded-full hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-800 transition-all whitespace-nowrap">
+                Portals
+              </a>
+              <a href="#faq" className="px-3 py-1 rounded-full hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-800 transition-all whitespace-nowrap">
+                FAQs
+              </a>
             </nav>
 
-            {/* Action CTAs */}
-            <div className="flex items-center gap-3">
+            {/* Action CTAs - Guaranteed No Overlap */}
+            <div className="flex items-center gap-2 lg:gap-3 shrink-0 flex-nowrap">
               {onOpenDownloadApp && (
                 <button
                   id="desktop-header-download-apk-btn"
                   onClick={onOpenDownloadApp}
                   type="button"
-                  className="px-3.5 py-2.5 text-xs font-bold rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-3 lg:px-3.5 py-2 lg:py-2.5 text-xs font-extrabold rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-350 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95 whitespace-nowrap shrink-0"
                   title="Download Android APK / Install App"
                 >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span>Download APK</span>
+                  <Smartphone className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-emerald-500 shrink-0" />
+                  <span className="hidden sm:inline">Download APK</span>
+                  <span className="sm:hidden">APK</span>
                 </button>
               )}
 
@@ -478,7 +495,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 id="desktop-toggle-theme-btn"
                 onClick={onToggleTheme}
                 type="button"
-                className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/80 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 hover:border-emerald-500/40 transition-all cursor-pointer"
+                className="p-2 lg:p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100/80 dark:bg-zinc-900/80 text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 hover:border-emerald-500/40 transition-all cursor-pointer shadow-2xs shrink-0"
                 title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -488,7 +505,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 id="desktop-header-signin-btn"
                 onClick={() => onEnterPortal('login')}
                 type="button"
-                className="px-4 py-2.5 text-xs font-black rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:text-emerald-500 transition-all cursor-pointer shadow-2xs"
+                className="px-3.5 lg:px-4 py-2 lg:py-2.5 text-xs font-black rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 hover:text-emerald-500 transition-all cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap shrink-0"
               >
                 Sign In
               </button>
@@ -497,10 +514,10 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 id="desktop-header-launch-btn"
                 onClick={() => onEnterPortal('register')}
                 type="button"
-                className="px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black shadow-md shadow-emerald-500/25 transition-all cursor-pointer active:scale-95 flex items-center gap-2"
+                className="px-4 lg:px-5 py-2 lg:py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black shadow-md shadow-emerald-500/25 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 whitespace-nowrap shrink-0"
               >
                 <span>Launch Portal</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-3.5 h-3.5 lg:w-4 lg:h-4 stroke-[2.5]" />
               </button>
             </div>
 

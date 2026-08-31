@@ -911,7 +911,7 @@ export default function DashboardStudent({
       // 3. If still not matched, fallback to currently active / detected class session
       if (!matchedClass) {
         const detected = getDetectedClass();
-        if (detected && (cleanText.toUpperCase().startsWith('CODE_') || cleanText.toUpperCase().startsWith('QR_KEY_') || cleanText.toUpperCase().startsWith('CLASS_') || cleanText.length >= 3)) {
+        if (detected && (cleanText.toUpperCase().startsWith('ROT_') || cleanText.toUpperCase().startsWith('CODE_') || cleanText.toUpperCase().startsWith('QR_KEY_') || cleanText.toUpperCase().startsWith('CLASS_') || cleanText.length >= 3)) {
           matchedClass = detected;
         }
       }
@@ -932,7 +932,16 @@ export default function DashboardStudent({
         return;
       }
 
-      const status = Math.random() > 0.85 ? 'late' : 'present';
+      // Dynamic grace period status check
+      let status: 'present' | 'late' = 'present';
+      if (parsedJson?.ts && matchedClass?.qrGeneratedAt) {
+        const elapsedMins = (Date.now() - matchedClass.qrGeneratedAt) / (1000 * 60);
+        const graceMins = matchedClass.gracePeriodMinutes ?? 15;
+        if (elapsedMins > graceMins) {
+          status = 'late';
+        }
+      }
+
       onRecordAttendance(matchedClass.id, status);
 
       // Trigger subtle screen flash / check-mark visual animation on camera viewfinder

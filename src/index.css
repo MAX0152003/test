@@ -385,5 +385,30 @@ html, body {
   }
 }
 
+/* Enhanced Viewport & Keyboard Scroll Margins for Message & Profile Fields */
+.app-active-focused-input,
+.app-message-profile-focused,
+[data-message-input="true"]:focus,
+[data-profile-input="true"]:focus,
+textarea[placeholder*="message" i]:focus,
+input[placeholder*="message" i]:focus,
+textarea[placeholder*="Type" i]:focus,
+input[placeholder*="Type" i]:focus,
+input[name="bio"]:focus,
+textarea[name="bio"]:focus,
+input[name="phone"]:focus,
+input[name="contactNumber"]:focus {
+  scroll-margin-top: 14vh !important;
+  scroll-margin-bottom: 36vh !important;
+  z-index: 30;
+  position: relative;
+}
+
+/* Ensure message thread input container always maintains full clearance above virtual keyboards */
+.message-composer-wrapper,
+#messages-bottom-composer {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem)) !important;
+}
+
 
 

@@ -9,7 +9,10 @@ import {
   Tooltip as RechartsTooltip,
   CartesianGrid,
   BarChart,
-  Bar
+  Bar,
+  Legend,
+  Cell,
+  ReferenceLine
 } from 'recharts';
 import { 
   ClassSession, 
@@ -354,6 +357,56 @@ const ClearanceTooltip = ({ active, payload }: any) => {
             <span className="text-zinc-650 dark:text-zinc-400">Success rate:</span>
             <span className="text-indigo-600 dark:text-indigo-400">{Math.round((data.cleared / data.total) * 100)}%</span>
           </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const LabOccupancyTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isOver = data.isOverloaded;
+    return (
+      <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col gap-1 w-52 text-left text-xs z-50">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1">
+          <span className="text-[10px] font-mono font-black text-zinc-900 dark:text-zinc-100 truncate max-w-[120px]">{data.fullName || data.name}</span>
+          <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded ${
+            data.status === 'maintenance'
+              ? 'bg-amber-500/10 text-amber-500'
+              : isOver
+              ? 'bg-red-500 text-white'
+              : data.occupancyPercent >= 85
+              ? 'bg-red-500/10 text-red-500'
+              : data.occupancyPercent >= 60
+              ? 'bg-amber-500/10 text-amber-500'
+              : 'bg-emerald-500/10 text-emerald-500'
+          }`}>
+            {data.status === 'maintenance' ? 'MAINT' : isOver ? 'OVERLOAD' : `${data.occupancyPercent}%`}
+          </span>
+        </div>
+        <div className="space-y-1.5 text-[10px]">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Live Occupancy:</span>
+            <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{data.occupancy} students</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Rated Capacity:</span>
+            <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{data.capacity} max</span>
+          </div>
+          {data.devicesCount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-500">Workstations:</span>
+              <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{data.devicesCount} terminals</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-1 mt-1">
+            <span className="text-zinc-500">Facility Status:</span>
+            <span className={`font-bold ${isOver ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
+              {isOver ? `Overcrowded (+${data.occupancy - data.capacity})` : data.status === 'maintenance' ? 'Maintenance' : 'Within Safety Limits'}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -2682,25 +2735,135 @@ export default function DashboardAdmin({
                 </div>
               )}
 
-              {/* Dynamic horizontal metrics: Room Utilization */}
+              {/* Dynamic horizontal metrics: Room Utilization & Real-time Recharts Bar Chart */}
               <div className="grid grid-cols-1 gap-5 pt-4 border-t border-zinc-100 dark:border-zinc-900 text-left">
                 
                 {/* Laboratory/Room occupied coordinates meters - Dynamic based on actual labRooms and enrolled students */}
-                <div className="space-y-3 w-full">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-4 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
-                      <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-widest font-mono">Laboratory Room Utilization</h4>
-                      <p className="text-[10px] text-zinc-400 leading-normal">Real-time room occupancy and student enrollment capacity</p>
+                      <h4 className="text-xs font-black text-zinc-800 dark:text-zinc-100 uppercase tracking-widest font-mono flex items-center gap-1.5">
+                        <BarChart className="w-3.5 h-3.5 text-emerald-500" />
+                        Laboratory Room Utilization & Capacity Bar Chart
+                      </h4>
+                      <p className="text-[10px] text-zinc-400 leading-normal">Real-time room occupancy versus rated capacity across university laboratories</p>
                     </div>
-                    <span className="text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {labRooms.filter(r => r.status === 'occupied').length} / {labRooms.length} Active Labs
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {labRooms.some(r => r.capacity > 0 && r.currentOccupancy > r.capacity) && (
+                        <span className="text-[9px] font-mono font-black bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-red-500" />
+                          Overcrowding Detected
+                        </span>
+                      )}
+                      <span className="text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-500 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                        {labRooms.filter(r => r.status === 'occupied').length} / {labRooms.length} Active Labs
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Recharts Bar Chart: Occupancy vs Capacity */}
+                  {(() => {
+                    const labChartData = labRooms.map(r => {
+                      const occ = r.status === 'maintenance' ? 0 : r.currentOccupancy;
+                      const cap = r.capacity || 0;
+                      const isOver = cap > 0 && occ > cap;
+                      const pct = cap > 0 ? Math.round((occ / cap) * 100) : 0;
+                      return {
+                        id: r.id,
+                        name: r.name.length > 12 ? r.name.substring(0, 11) + '…' : r.name,
+                        fullName: r.name,
+                        occupancy: occ,
+                        capacity: cap,
+                        devicesCount: r.devicesCount || 0,
+                        status: r.status,
+                        isOverloaded: isOver,
+                        occupancyPercent: pct
+                      };
+                    });
+
+                    const anyOvercrowded = labChartData.some(d => d.isOverloaded);
+
+                    return (
+                      <div className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-850 bg-zinc-50/60 dark:bg-zinc-900/40 space-y-3">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider font-mono">
+                            Live Capacity Comparison (Pax)
+                          </span>
+                          <div className="flex items-center gap-3 font-mono text-[9px]">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-[3px] bg-emerald-500 inline-block" />
+                              <span className="text-zinc-500">Live Occupancy</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-[3px] bg-zinc-300 dark:bg-zinc-700 inline-block" />
+                              <span className="text-zinc-500">Rated Capacity</span>
+                            </div>
+                            {anyOvercrowded && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-[3px] bg-red-500 inline-block" />
+                                <span className="text-red-500 font-bold">Overcrowded</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="w-full h-48 mt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={labChartData}
+                              margin={{ top: 12, right: 12, left: -20, bottom: 0 }}
+                              barGap={4}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-850" />
+                              <XAxis 
+                                dataKey="name" 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tick={{ fill: '#888888', fontSize: 10, fontWeight: 700 }}
+                              />
+                              <YAxis 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tick={{ fill: '#888888', fontSize: 10, fontWeight: 600 }}
+                              />
+                              <RechartsTooltip content={<LabOccupancyTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 6 }} />
+                              <Bar 
+                                dataKey="occupancy" 
+                                name="Current Occupancy"
+                                radius={[4, 4, 0, 0]}
+                              >
+                                {labChartData.map((entry, index) => {
+                                  let fillColor = '#10b981'; // default emerald
+                                  if (entry.status === 'maintenance') {
+                                    fillColor = '#f59e0b';
+                                  } else if (entry.isOverloaded) {
+                                    fillColor = '#ef4444'; // red overload
+                                  } else if (entry.occupancyPercent >= 85) {
+                                    fillColor = '#f97316'; // orange high
+                                  } else if (entry.occupancyPercent >= 60) {
+                                    fillColor = '#eab308'; // yellow moderate
+                                  }
+                                  return <Cell key={`cell-occ-${index}`} fill={fillColor} />;
+                                })}
+                              </Bar>
+                              <Bar 
+                                dataKey="capacity" 
+                                name="Rated Capacity"
+                                fill="#a1a1aa" 
+                                opacity={0.45}
+                                radius={[4, 4, 0, 0]} 
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     {labRooms.map((rm) => {
                       const isOverloaded = rm.capacity > 0 && rm.currentOccupancy > rm.capacity;
-                      const occupancyPercent = typeof rm.capacity === 'number' && rm.capacity > 0 
+                      const occupancyPercentOk = typeof rm.capacity === 'number' && rm.capacity > 0 
                         ? Math.min(100, Math.round((rm.currentOccupancy / rm.capacity) * 100)) 
                         : 0;
                       const displayScale = rm.status === 'maintenance' 
@@ -2715,8 +2878,8 @@ export default function DashboardAdmin({
                         <div key={rm.id} className={`space-y-1 bg-zinc-50 dark:bg-zinc-900/40 p-3 rounded-xl border flex flex-col justify-between transition-all ${
                           rm.status === 'maintenance' ? 'border-amber-500/30' :
                           isOverloaded ? 'border-red-500/50 bg-red-500/[0.02]' :
-                          occupancyPercent >= 85 ? 'border-red-500/30' :
-                          occupancyPercent >= 60 ? 'border-amber-500/30' :
+                          occupancyPercentOk >= 85 ? 'border-red-500/30' :
+                          occupancyPercentOk >= 60 ? 'border-amber-500/30' :
                           'border-emerald-500/20'
                         }`}>
                           <div className="space-y-1">
@@ -2724,16 +2887,16 @@ export default function DashboardAdmin({
                               <span className="font-bold text-[10px] text-zinc-700 dark:text-zinc-200 line-clamp-1">{rm.name}</span>
                               <span className={`px-1.5 py-0.5 rounded-[4px] text-[8px] font-mono font-bold shrink-0 uppercase tracking-wider ${
                                 rm.status === 'maintenance' 
-                                  ? 'bg-amber-500/10 text-amber-500' 
+                                   ? 'bg-amber-500/10 text-amber-500' 
                                   : isOverloaded
                                   ? 'bg-red-500 text-white animate-pulse'
-                                  : occupancyPercent >= 85
+                                  : occupancyPercentOk >= 85
                                   ? 'bg-red-500/10 text-red-500'
-                                  : occupancyPercent >= 60
+                                  : occupancyPercentOk >= 60
                                   ? 'bg-amber-500/10 text-amber-500'
                                   : 'bg-emerald-500/10 text-emerald-500'
                               }`}>
-                                {rm.status === 'maintenance' ? '⚠️ Maint' : isOverloaded ? '⚠️ OVERLOAD' : occupancyPercent >= 85 ? '🔴 High Occ' : occupancyPercent >= 60 ? '🟠 Mod Occ' : '🟢 Optimal'}
+                                {rm.status === 'maintenance' ? '⚠️ Maint' : isOverloaded ? '⚠️ OVERLOAD' : occupancyPercentOk >= 85 ? '🔴 High Occ' : occupancyPercentOk >= 60 ? '🟠 Mod Occ' : '🟢 Optimal'}
                               </span>
                             </div>
                             {rm.floor && (
@@ -2749,11 +2912,11 @@ export default function DashboardAdmin({
                                   className={`h-full rounded-full transition-all duration-500 ${
                                     rm.status === 'maintenance' ? 'bg-amber-500' :
                                     isOverloaded ? 'bg-red-600' :
-                                    occupancyPercent >= 85 ? 'bg-red-500' :
-                                    occupancyPercent >= 60 ? 'bg-amber-500' :
+                                    occupancyPercentOk >= 85 ? 'bg-red-500' :
+                                    occupancyPercentOk >= 60 ? 'bg-amber-500' :
                                     'bg-emerald-500'
                                   }`}
-                                  style={{ width: `${rm.status === 'maintenance' ? 100 : Math.min(100, occupancyPercent)}%` }}
+                                  style={{ width: `${rm.status === 'maintenance' ? 100 : Math.min(100, occupancyPercentOk)}%` }}
                                 />
                               </div>
                               <span className="font-mono text-[9px] text-zinc-450 dark:text-zinc-400 text-right shrink-0">
@@ -5841,7 +6004,7 @@ export default function DashboardAdmin({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="h-[calc(100vh-4.2rem)] md:h-[calc(100vh-4.5rem)] flex flex-col text-left overflow-hidden space-y-3 pb-0"
+            className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
           >
           <div className="pb-3 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-4 shrink-0">
             <button 

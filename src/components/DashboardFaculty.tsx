@@ -57,6 +57,7 @@ import {
   Play,
   Square,
   RotateCcw,
+  RefreshCw,
   ChevronRight,
   Lock,
   Unlock,
@@ -496,6 +497,8 @@ export default function DashboardFaculty({
     return matched?.id || '';
   });
   const [qrToken, setQrToken] = React.useState<string>('STANDBY'); // Default STANDBY until Generate is clicked
+  const [isRollingEnabled, setIsRollingEnabled] = React.useState<boolean>(true); // Anti-proxy dynamic 15s token rotation
+  const [rotationCountdown, setRotationCountdown] = React.useState<number>(15); // Seconds until next rotation
   const [qrIntervalId, setQrIntervalId] = React.useState<any>(null);
   
   // Manual class override state when no scheduled class is active/near
@@ -1000,10 +1003,9 @@ export default function DashboardFaculty({
     return getFacultyClassScheduleProximity(classes, userProfile?.id, userProfile?.name, 45);
   }, [classes, userProfile]);
 
-  // Interval timer for the broadcasted QR expiration count and automatic 15-sec rotation (Real-Time QR Codes!)
+  // Interval timer for the broadcasted QR expiration count and automatic 15-sec rotation (Real-Time Dynamic QR Codes)
   React.useEffect(() => {
     let interval: any = null;
-    let rotationInterval: any = null;
 
     if (activeScreen === 'qr-generator' && timeLeft > 0 && qrToken && qrToken !== 'STANDBY' && qrToken !== 'EXPIRED') {
       // 1. Expiration Countdown (ticks every 1 second)
@@ -1016,33 +1018,38 @@ export default function DashboardFaculty({
           }
           return prev - 1;
         });
-      }, 1000);
 
-      // 2. Dynamic Real-time Token Rotation (rotates every 15 seconds to ensure robust, secure anti-proxy scanning)
-      rotationInterval = setInterval(() => {
-        const targetClass = (isManualOverrideActive && manualOverrideClassId 
-          ? classes.find(c => c.id === manualOverrideClassId) 
-          : proximityInfo.activeOrNearClass) || classes.find(c => c.id === activeQRClass) || classes[0];
-        
-        if (targetClass) {
-          const generatedKey = 'CODE_' + targetClass.code.toUpperCase() + '_' + Math.random().toString(36).substring(4, 9).toUpperCase();
-          
-          // Propagate fresh security key rotation to parent class state
-          onEditClass({
-            ...targetClass,
-            qrToken: generatedKey,
-            qrGeneratedAt: Date.now()
+        // 2. Dynamic Real-time Token Rotation (rotates every 15 seconds when enabled to prevent proxy scanning)
+        if (isRollingEnabled) {
+          setRotationCountdown(prevCount => {
+            if (prevCount <= 1) {
+              const targetClass = (isManualOverrideActive && manualOverrideClassId 
+                ? classes.find(c => c.id === manualOverrideClassId) 
+                : proximityInfo.activeOrNearClass) || classes.find(c => c.id === activeQRClass) || classes[0];
+              
+              if (targetClass) {
+                const generatedKey = 'ROT_' + targetClass.code.toUpperCase() + '_' + Math.random().toString(36).substring(3, 8).toUpperCase();
+                
+                // Propagate fresh security key rotation to parent class state
+                onEditClass({
+                  ...targetClass,
+                  qrToken: generatedKey,
+                  qrGeneratedAt: Date.now()
+                });
+                setQrToken(generatedKey);
+              }
+              return 15;
+            }
+            return prevCount - 1;
           });
-          setQrToken(generatedKey);
         }
-      }, 15000);
+      }, 1000);
     }
 
     return () => {
       if (interval) clearInterval(interval);
-      if (rotationInterval) clearInterval(rotationInterval);
     };
-  }, [activeScreen, timeLeft, qrToken, activeQRClass, isManualOverrideActive, manualOverrideClassId, proximityInfo, classes, onEditClass, accessibility.readAloud]);
+  }, [activeScreen, timeLeft, qrToken, isRollingEnabled, activeQRClass, isManualOverrideActive, manualOverrideClassId, proximityInfo, classes, onEditClass, accessibility.readAloud]);
 
   const handleStartQrSession = (targetClass: ClassSession) => {
     if (!targetClass) return;
@@ -2501,12 +2508,36 @@ export default function DashboardFaculty({
 
                     {/* QR CODE MATRIX & REAL-TIME CONTROLLER */}
                     <div className="p-6 border border-zinc-200 dark:border-zinc-850 rounded-2xl flex flex-col items-center justify-center space-y-4 relative bg-zinc-50 dark:bg-zinc-950/40 shadow-xs">
+                      {/* Rolling Security Mode Toggle */}
+                      <div className="w-full max-w-sm flex items-center justify-between p-2.5 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🛡️</span>
+                          <span className="font-bold text-zinc-800 dark:text-zinc-200 text-[11px]">
+                            Anti-Proxy Dynamic QR (15s Rotation)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isSessionRunning}
+                          onClick={() => setIsRollingEnabled(!isRollingEnabled)}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+                            isRollingEnabled ? 'bg-blue-600' : 'bg-zinc-300 dark:bg-zinc-700'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isRollingEnabled ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
                       {/* QR Display */}
                       <div className="p-2 bg-white dark:bg-zinc-900 rounded-xl shadow-xs border border-zinc-200 dark:border-zinc-800">
                         {isSessionRunning ? (
                           <div className="relative">
                             <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=2&data=${encodeURIComponent(JSON.stringify({ classId: targetSubject.id, qrToken: qrToken }))}`}
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=2&data=${encodeURIComponent(JSON.stringify({ classId: targetSubject.id, qrToken: qrToken, code: targetSubject.code, name: targetSubject.name, ts: Date.now(), expiresAt: Date.now() + 35000 }))}`}
                               alt="ClassPulse Active Session QR Code"
                               className="w-48 h-48 rounded-lg object-contain filter brightness-[0.95] contrast-125 dark:brightness-[0.85] dark:contrast-[1.10]"
                               referrerPolicy="no-referrer"
@@ -2548,6 +2579,19 @@ export default function DashboardFaculty({
                         {/* Real-time progress bar & countdown timer */}
                         {isSessionRunning && (
                           <div className="space-y-2 pt-2">
+                            {/* Rotation Sub-Countdown Indicator */}
+                            {isRollingEnabled && (
+                              <div className="flex items-center justify-between text-[10px] font-bold text-zinc-500 dark:text-zinc-400 px-3 py-1.5 bg-blue-500/5 rounded-lg border border-blue-500/10">
+                                <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                  Anti-Proxy Key Rotation:
+                                </span>
+                                <span className="font-mono text-blue-600 dark:text-blue-400 font-black">
+                                  {rotationCountdown}s
+                                </span>
+                              </div>
+                            )}
+
                             {/* Countdown badge */}
                             <div className="text-xs text-zinc-600 dark:text-zinc-300 font-bold flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
                               <Clock className="w-4 h-4 text-blue-500 animate-[spin_4s_linear_infinite]" />

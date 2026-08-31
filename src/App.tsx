@@ -76,6 +76,8 @@ import LandingPage from './components/LandingPage';
 import AccessibilitySettings, { speakText } from './components/AccessibilitySettings';
 import SettingsPage from './components/Settings';
 import { idbStorage } from './lib/idbStorage';
+import { offlineAttendanceBuffer } from './lib/offlineAttendanceBuffer';
+import { nativeAlarmBridge } from './lib/nativeAlarmBridge';
 import { 
   Wifi, 
   WifiOff, 
@@ -243,20 +245,83 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
+    // Intelligent viewport centering and focus management specifically for message and profile inputs
+    const centerElementInViewport = (targetEl?: HTMLElement | null) => {
+      const el = targetEl || (document.activeElement as HTMLElement | null);
+      if (!el || !(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+
+      // Add active focus class
+      el.classList.add('app-active-focused-input');
+      
+      const elName = (el as HTMLInputElement).name?.toLowerCase() || el.getAttribute('name')?.toLowerCase() || '';
+      const isMessageOrProfileField = 
+        el.getAttribute('data-message-input') === 'true' ||
+        el.getAttribute('data-profile-input') === 'true' ||
+        el.id?.toLowerCase().includes('message') ||
+        el.id?.toLowerCase().includes('profile') ||
+        el.id?.toLowerCase().includes('chat') ||
+        el.id?.toLowerCase().includes('bio') ||
+        elName.includes('message') ||
+        elName.includes('profile') ||
+        elName.includes('bio') ||
+        elName.includes('phone') ||
+        elName.includes('contact') ||
+        el.closest('[data-chat-thread="true"]') !== null ||
+        el.closest('#profile-tab-content') !== null ||
+        el.closest('.message-composer-wrapper') !== null ||
+        el.closest('form') !== null;
+
+      if (isMessageOrProfileField) {
+        el.classList.add('app-message-profile-focused');
+      }
+
+      // First fast scroll into center
+      setTimeout(() => {
+        try {
+          el.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        } catch (e) {
+          el.scrollIntoView(false);
+        }
+      }, 80);
+
+      // Second scroll after mobile OS virtual keyboard has finished sliding in (300ms)
+      setTimeout(() => {
+        if (document.activeElement === el) {
+          try {
+            el.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+              inline: 'nearest'
+            });
+          } catch (e) {}
+        }
+      }, 300);
+    };
+
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         setIsKeyboardOpen(true);
+        centerElementInViewport(target);
       }
     };
 
-    const handleFocusOut = () => {
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        target.classList.remove('app-active-focused-input');
+        target.classList.remove('app-message-profile-focused');
+      }
       setTimeout(() => {
         const active = document.activeElement as HTMLElement | null;
         if (!active || !(active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
           setIsKeyboardOpen(false);
         }
-      }, 100);
+      }, 120);
     };
 
     window.addEventListener('focusin', handleFocusIn);
@@ -264,15 +329,20 @@ export default function App() {
 
     const handleViewportResize = () => {
       if (window.visualViewport) {
-        const isShrunk = window.innerHeight - window.visualViewport.height > 120;
+        const isShrunk = window.innerHeight - window.visualViewport.height > 100;
         if (isShrunk) {
           setIsKeyboardOpen(true);
+          const active = document.activeElement as HTMLElement | null;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+            centerElementInViewport(active);
+          }
         }
       }
     };
 
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
     }
 
     return () => {
@@ -280,6 +350,7 @@ export default function App() {
       window.removeEventListener('focusout', handleFocusOut);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleViewportResize);
+        window.visualViewport.removeEventListener('scroll', handleViewportResize);
       }
     };
   }, []);
@@ -1003,6 +1074,15 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user?.id]);
 
+  // Synchronize scheduled classes with native phone alarm subsystem
+  React.useEffect(() => {
+    if (user && classes.length > 0) {
+      nativeAlarmBridge.syncClassSchedulesToNativeAlarms(classes, enrollments, user).catch(err => {
+        console.warn('[NativeAlarmBridge] Sync error:', err);
+      });
+    }
+  }, [classes, enrollments, user?.id]);
+
   // Listen to custom navigation events from notifications & service worker
   React.useEffect(() => {
     const handleNavEvent = (e: any) => {
@@ -1153,6 +1233,16 @@ export default function App() {
           safeStorage.removeItem('cp_pending_attendance_queue');
           setOfflineQueueCount(0);
         }
+      }
+
+      // Also drain any records in the IndexedDB offline buffer
+      try {
+        const idbSynced = await offlineAttendanceBuffer.flushBuffer();
+        if (idbSynced > 0) {
+          uploadedCount += idbSynced;
+        }
+      } catch (err) {
+        console.warn("[OfflineBuffer] Flush error:", err);
       }
 
       try {
@@ -1516,6 +1606,9 @@ export default function App() {
     const isCurrentlyOffline = isOffline || (typeof navigator !== 'undefined' && !navigator.onLine);
 
     if (isCurrentlyOffline) {
+      // Buffer in IndexedDB buffer engine
+      offlineAttendanceBuffer.bufferRecord(finalRecord).catch(err => console.warn("Buffer error:", err));
+
       let pendingQueue: AttendanceRecord[] = [];
       try {
         pendingQueue = JSON.parse(safeStorage.getItem('cp_pending_attendance_queue') || '[]');
@@ -1537,14 +1630,17 @@ export default function App() {
       const offlineNotif: AppNotification = {
         id: 'notif-offline-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
         title: 'Offline Attendance Cached',
-        message: `Saved QR scan for ${matchedClass.code} (${status.toUpperCase()}) in local queue. Will automatically upload to Firestore database once reconnected online!`,
+        message: `Saved QR scan for ${matchedClass.code} (${status.toUpperCase()}) in local offline buffer. Will automatically upload to Firestore database once reconnected online!`,
         timestamp: 'Just Now',
         type: 'info',
         read: false
       };
       setNotifications(prev => [offlineNotif, ...prev]);
     } else {
-      saveAttendanceToFirestore(false, finalRecord).catch(err => console.error("Firestore save attendance error:", err));
+      saveAttendanceToFirestore(false, finalRecord).catch(err => {
+        console.error("Firestore save attendance error, falling back to offline buffer:", err);
+        offlineAttendanceBuffer.bufferRecord(finalRecord);
+      });
     }
 
     // Send warning if late, else success
@@ -3040,6 +3136,7 @@ export default function App() {
                       onUpdateColorAccent={setColorAccent}
                       setScreen={handleSetScreen}
                       classes={classes}
+                      enrollments={enrollments}
                       onOpenAccountLinkQR={() => setIsAccountLinkModalOpen(true)}
                       isOffline={isOffline}
                     />
