@@ -7,9 +7,13 @@ import {
   getDocFromServer, 
   persistentLocalCache, 
   persistentMultipleTabManager,
+  setLogLevel,
   Firestore 
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+
+// Silence non-fatal WebChannel transport/reconnect warning noise
+setLogLevel('error');
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
@@ -22,7 +26,7 @@ try {
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
     }),
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   }, firestoreDbId);
 } catch {
   // If already initialized with settings, get existing instance

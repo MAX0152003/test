@@ -458,26 +458,64 @@ export default function DashboardStudent({
 
   // Reactive faculty class updates
   const [activeAlertClass, setActiveAlertClass] = React.useState<ClassSession | null>(null);
-  const [alertDismissedIds, setAlertDismissedIds] = React.useState<string[]>([]);
+  const [alertDismissedIds, setAlertDismissedIds] = React.useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('classpulse_student_dismissed_alerts');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleDismissAlert = React.useCallback((cls: ClassSession) => {
+    const keysToAdd: string[] = [
+      cls.id,
+      `${cls.id}-${cls.facultyStatusUpdate}`,
+      `${cls.id}-${cls.lastUpdateTimestamp || '0'}`,
+      `${cls.id}-${cls.facultyStatusUpdate}-${cls.lastUpdateTimestamp || '0'}`
+    ];
+    setAlertDismissedIds(prev => {
+      const next = Array.from(new Set([...prev, ...keysToAdd]));
+      try {
+        localStorage.setItem('classpulse_student_dismissed_alerts', JSON.stringify(next));
+      } catch (err) {
+        console.warn('Failed to save dismissed alerts to localStorage:', err);
+      }
+      return next;
+    });
+    setActiveAlertClass(null);
+    speakText("Alert acknowledged", accessibility.readAloud);
+  }, [accessibility.readAloud]);
 
   React.useEffect(() => {
     const studentEnrolledIds = enrollments
       .filter(e => e.studentId === userProfile.studentId || e.studentEmail === userProfile.email)
       .map(e => e.classId);
 
-    const updatedCls = classes.find(c => 
-      studentEnrolledIds.includes(c.id) && 
-      c.facultyStatusUpdate && 
-      c.facultyStatusUpdate !== 'none' && 
-      c.lastUpdateTimestamp &&
-      !alertDismissedIds.includes(`${c.id}-${c.lastUpdateTimestamp}`)
-    );
+    const updatedCls = classes.find(c => {
+      if (!studentEnrolledIds.includes(c.id)) return false;
+      if (!c.facultyStatusUpdate || c.facultyStatusUpdate === 'none') return false;
+
+      const keyWithTs = `${c.id}-${c.lastUpdateTimestamp}`;
+      const keyWithStatusAndTs = `${c.id}-${c.facultyStatusUpdate}-${c.lastUpdateTimestamp || '0'}`;
+      const keyWithStatus = `${c.id}-${c.facultyStatusUpdate}`;
+      const keyClassOnly = c.id;
+
+      const isDismissed = alertDismissedIds.includes(keyWithTs) ||
+                          alertDismissedIds.includes(keyWithStatusAndTs) ||
+                          alertDismissedIds.includes(keyWithStatus) ||
+                          (alertDismissedIds.includes(keyClassOnly) && !c.lastUpdateTimestamp);
+
+      return !isDismissed;
+    });
 
     if (updatedCls) {
       setActiveAlertClass(updatedCls);
       triggerNativeChime();
       const textToSpeak = `Attention! Instructor has posted an update for your course ${updatedCls.code}. Status declared is: ${updatedCls.facultyStatusUpdate.toUpperCase() === 'LATENEW' ? 'LATE ARRIVAL' : updatedCls.facultyStatusUpdate.toUpperCase()}. Please check details.`;
       speakText(textToSpeak, accessibility.readAloud);
+    } else {
+      setActiveAlertClass(null);
     }
   }, [classes, enrollments, userProfile, alertDismissedIds, accessibility.readAloud]);
   
@@ -2954,8 +2992,17 @@ export default function DashboardStudent({
 
       {/* Active student notification pop-up alarm */}
       {activeAlertClass && (
-        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="w-full max-w-md p-6 rounded-3.5xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-5 text-left border-2 border-emerald-500/35">
+            <button
+              type="button"
+              onClick={() => handleDismissAlert(activeAlertClass)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              title="Dismiss Alert"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
             <div className="w-14 h-14 bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center font-bold mx-auto animate-bounce text-lg font-mono">
               ⏰
             </div>
@@ -3002,15 +3049,9 @@ export default function DashboardStudent({
             </div>
 
             <button
-              onClick={() => {
-                if (activeAlertClass.lastUpdateTimestamp) {
-                  setAlertDismissedIds(prev => [...prev, `${activeAlertClass.id}-${activeAlertClass.lastUpdateTimestamp}`]);
-                }
-                setActiveAlertClass(null);
-                speakText("Alert acknowledged", accessibility.readAloud);
-              }}
+              onClick={() => handleDismissAlert(activeAlertClass)}
               type="button"
-              className="w-full text-center py-2.5 bg-emerald-500 text-black text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-emerald-400 transition-colors"
+              className="w-full text-center py-2.5 bg-emerald-500 text-black text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-emerald-400 transition-colors active:scale-98 shadow-sm"
             >
               Acknowledge & Confirm Timing
             </button>
