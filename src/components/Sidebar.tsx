@@ -233,29 +233,30 @@ export default function Sidebar({
     switch (role) {
       case 'student':
         return {
-          activeClass: 'text-[#03213D] dark:text-sky-400 font-extrabold shadow-xs',
-          bgClass: 'bg-[#03213D]/8 dark:bg-sky-500/10 border-l-4 border-[#03213D] dark:border-sky-400',
-          badgeClass: 'bg-[#03213D] text-white',
-          roleLabel: 'text-[#03213D] dark:text-[#38bdf8]'
+          activeClass: 'text-emerald-600 dark:text-emerald-400 font-extrabold shadow-2xs',
+          bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/15 ring-1 ring-emerald-500/25',
+          badgeClass: 'bg-emerald-500 text-black font-bold',
+          roleLabel: 'text-emerald-600 dark:text-emerald-400'
         };
       case 'faculty':
         return {
-          activeClass: 'text-emerald-800 dark:text-emerald-400 font-extrabold shadow-xs',
-          bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/10 border-l-4 border-emerald-500 dark:border-emerald-555',
-          badgeClass: 'bg-emerald-600 text-white',
-          roleLabel: 'text-emerald-700 dark:text-emerald-400'
+          activeClass: 'text-emerald-700 dark:text-emerald-400 font-extrabold shadow-2xs',
+          bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/15 ring-1 ring-emerald-500/25',
+          badgeClass: 'bg-emerald-500 text-black font-bold',
+          roleLabel: 'text-emerald-600 dark:text-emerald-400'
         };
       case 'admin':
         return {
-          activeClass: 'text-[#CC762A] dark:text-amber-400 font-extrabold shadow-xs',
-          bgClass: 'bg-[#CC762A]/10 dark:bg-amber-550/10 border-l-4 border-[#CC762A] dark:border-amber-400',
-          badgeClass: 'bg-[#CC762A] text-white',
-          roleLabel: 'text-[#CC762A] dark:text-amber-400'
+          activeClass: 'text-amber-700 dark:text-amber-400 font-extrabold shadow-2xs',
+          bgClass: 'bg-amber-500/10 dark:bg-amber-500/15 ring-1 ring-amber-500/25',
+          badgeClass: 'bg-amber-500 text-black font-bold',
+          roleLabel: 'text-amber-600 dark:text-amber-400'
         };
     }
   };
 
   const navSections = getNavSections();
+  const roleNav = getRoleNavColors();
 
   const handleNavClick = (screenId: string, label: string) => {
     setScreen(screenId);
@@ -345,7 +346,7 @@ export default function Sidebar({
             {navSections.map((section, idx) => (
               <div key={section.title} className="space-y-1">
                 {!isEffectiveCollapsed ? (
-                  <div className="px-3 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wider text-zinc-400 dark:text-zinc-500">
                     {section.title}
                   </div>
                 ) : (
@@ -360,10 +361,10 @@ export default function Sidebar({
                       onClick={() => handleNavClick(item.id, item.label)}
                       type="button"
                       title={isEffectiveCollapsed ? item.label : undefined}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 group relative isolate ${
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 group relative isolate ${
                         isActive 
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-extrabold' 
-                          : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/60 hover:text-zinc-900 dark:hover:text-zinc-100'
+                          ? `${roleNav.bgClass} ${roleNav.activeClass}` 
+                          : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-900/70 hover:text-zinc-900 dark:hover:text-zinc-100'
                       } ${isEffectiveCollapsed ? 'justify-center px-1' : ''}`}
                     >
                       <div className="flex items-center gap-3 relative z-10 min-w-0">
@@ -374,7 +375,7 @@ export default function Sidebar({
                       </div>
 
                       {!isEffectiveCollapsed && item.badge !== undefined && item.badge > 0 && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500 text-black shrink-0 font-mono">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 font-mono shadow-2xs ${roleNav.badgeClass}`}>
                           {item.badge}
                         </span>
                       )}

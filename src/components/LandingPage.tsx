@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   QrCode,
@@ -29,7 +29,9 @@ import {
   Award,
   Users,
   Bell,
-  Cpu
+  Cpu,
+  UserCheck,
+  Shield
 } from 'lucide-react';
 import { AccessibilityConfig } from '../types';
 
@@ -45,6 +47,37 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
   const [activeMatrixDay, setActiveMatrixDay] = useState<'mon' | 'wed' | 'fri'>('mon');
   const [mobileFeatureTab, setMobileFeatureTab] = useState<'qr' | 'matrix' | 'offline'>('qr');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+
+  // Dynamic Real-time Campus Clock & Rolling Token Simulator
+  const [currentTime, setCurrentTime] = useState<string>('09:42:15 AM');
+  const [tokenCountdown, setTokenCountdown] = useState<number>(14);
+  const [simulatedScanned, setSimulatedScanned] = useState<boolean>(false);
+  const [scanFeedback, setScanFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const countdownTimer = setInterval(() => {
+      setTokenCountdown((prev) => (prev <= 1 ? 15 : prev - 1));
+    }, 1000);
+    return () => clearInterval(countdownTimer);
+  }, []);
+
+  const handleSimulateScan = () => {
+    setSimulatedScanned(true);
+    setScanFeedback("Verified: Present (Attendance Recorded)");
+    setTimeout(() => {
+      setScanFeedback(null);
+    }, 3500);
+  };
 
   const isDark = accessibility.theme === 'dark';
 
@@ -456,8 +489,8 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
               </div>
             </div>
 
-            {/* Desktop Nav Links - Only on 2XL wide screens to guarantee zero header clutter */}
-            <nav className="hidden 2xl:flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-bold text-zinc-600 dark:text-zinc-300 shrink-0">
+            {/* Desktop Nav Links - Visible on lg and above for full desktop navigation */}
+            <nav className="hidden lg:flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100/80 dark:bg-zinc-900/80 border border-zinc-200/60 dark:border-zinc-800/60 text-xs font-bold text-zinc-600 dark:text-zinc-300 shrink-0">
               <a href="#features" className="px-3 py-1 rounded-full hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white dark:hover:bg-zinc-800 transition-all whitespace-nowrap">
                 Capabilities
               </a>
@@ -539,12 +572,12 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold font-mono">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Next-Generation Academic Operations Platform</span>
+                  <span>Mindanao State University Academic Operations</span>
                 </div>
 
-                <h1 className="text-4xl xl:text-5xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-[1.15]">
+                <h1 className="text-4xl xl:text-5xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-[1.18]">
                   Smart Timetable Matrix & <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 via-teal-400 to-indigo-500">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">
                     Instant Attendance Check-In
                   </span>
                 </h1>
@@ -554,12 +587,12 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 </p>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3.5 pt-2">
+                <div className="flex items-center gap-3.5 pt-2 flex-wrap">
                   <button
                     id="desktop-hero-launch-btn"
                     onClick={() => onEnterPortal('register')}
                     type="button"
-                    className="px-7 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2.5"
+                    className="px-7 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-2xl cursor-pointer transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2.5"
                   >
                     <GraduationCap className="w-4 h-4 stroke-[2.5]" />
                     <span>Enter Student / Faculty Portal</span>
@@ -568,7 +601,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
 
                   <a
                     href="#matrix"
-                    className="px-6 py-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-xl cursor-pointer transition-all flex items-center justify-center gap-2 hover:text-emerald-500 shadow-2xs"
+                    className="px-6 py-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-2xl cursor-pointer transition-all flex items-center justify-center gap-2 hover:text-emerald-500 shadow-2xs"
                   >
                     <Calendar className="w-4 h-4 text-emerald-500" />
                     <span>Preview Live Timetable</span>
@@ -599,25 +632,27 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                   
                   <div className="rounded-[22px] bg-white dark:bg-zinc-950 p-6 text-left space-y-4 border border-zinc-100 dark:border-zinc-900">
                     
-                    {/* Top Bar */}
+                    {/* Top Bar with Real-time Clock */}
                     <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-850">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-red-400" />
-                        <div className="w-3 h-3 rounded-full bg-amber-400" />
-                        <div className="w-3 h-3 rounded-full bg-emerald-400" />
-                        <span className="text-[10px] font-mono font-bold text-zinc-400 ml-2">MSU-Portal-Live</span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                        <span className="text-[10px] font-mono font-bold text-zinc-400 ml-1">MSU-ClassPulse-Live</span>
                       </div>
-                      <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Connected
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          {currentTime}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Active Simulated Schedule Item */}
                     <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500 text-black font-mono">
-                          Active Now
+                          Active Course
                         </span>
                         <span className="text-[10px] font-mono font-bold text-zinc-400 flex items-center gap-1">
                           <Clock className="w-3 h-3 text-emerald-500" />
@@ -640,44 +675,102 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                           <span className="text-[10px] font-bold text-zinc-400">Instructor:</span>
                           <span className="text-[10px] font-black text-zinc-800 dark:text-zinc-200">Dr. Ahmad Khan</span>
                         </div>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-mono">
-                          Present • On Time
+                        <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full font-mono transition-all ${
+                          simulatedScanned 
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 animate-pulse'
+                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                        }`}>
+                          {simulatedScanned ? '✓ Verified: Present' : 'Waiting for Check-In'}
                         </span>
                       </div>
                     </div>
 
-                    {/* QR Scan Action Card Simulation */}
-                    <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-emerald-500 text-black shrink-0">
-                          <QrCode className="w-5 h-5 stroke-[2.5]" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-black text-zinc-900 dark:text-zinc-100">
-                            Single-Use QR Scanner
+                    {/* QR Scan Action Card Simulation with Rolling Token Progress */}
+                    <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-xl bg-emerald-500 text-black shrink-0 shadow-md shadow-emerald-500/20">
+                            <QrCode className="w-5 h-5 stroke-[2.5]" />
                           </div>
-                          <div className="text-[10px] text-zinc-500 font-medium">
-                            Anti-proxy rolling cryptographic token
+                          <div>
+                            <div className="text-xs font-black text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              <span>Rolling QR Token: CP-8921</span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                            </div>
+                            <div className="text-[10px] text-zinc-500 font-medium">
+                              Anti-proxy token rotates in {tokenCountdown}s
+                            </div>
                           </div>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={handleSimulateScan}
+                          className="px-3.5 py-2 rounded-xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black text-[10px] font-black uppercase tracking-wider hover:bg-emerald-500 hover:text-black transition-all cursor-pointer active:scale-95 shadow-xs"
+                        >
+                          {simulatedScanned ? 'Re-scan' : 'Test Scan'}
+                        </button>
                       </div>
-                      <button
-                        onClick={() => onEnterPortal('login')}
-                        className="px-3 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black text-[10px] font-black uppercase tracking-wider hover:bg-emerald-500 hover:text-black transition-colors cursor-pointer"
-                      >
-                        Scan
-                      </button>
+
+                      {/* Rotating Token Progress Bar */}
+                      <div className="space-y-1">
+                        <div className="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className="bg-emerald-500 h-full rounded-full transition-all duration-1000 ease-linear"
+                            style={{ width: `${(tokenCountdown / 15) * 100}%` }}
+                          />
+                        </div>
+                        {scanFeedback && (
+                          <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 animate-fade-in flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" />
+                            <span>{scanFeedback}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Standing / Safety Indicator */}
-                    <div className="p-3.5 rounded-xl bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-between text-xs font-bold">
-                      <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
-                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                        <span>Academic Safety Status</span>
+                    {/* Standing / Safety Indicator with Visual Circular Gauge */}
+                    <div className="p-3.5 rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
+                          <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                            <path
+                              className="text-zinc-200 dark:text-zinc-800"
+                              strokeWidth="3.5"
+                              stroke="currentColor"
+                              fill="none"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                            <path
+                              className="text-emerald-500 transition-all duration-1000"
+                              strokeDasharray="96.4, 100"
+                              strokeWidth="3.5"
+                              strokeLinecap="round"
+                              stroke="currentColor"
+                              fill="none"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            />
+                          </svg>
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 absolute inset-0 m-auto" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
+                            Academic Standing
+                          </div>
+                          <div className="text-[10px] text-zinc-400">
+                            Min. 85% requirement exceeded
+                          </div>
+                        </div>
                       </div>
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black">
-                        96.4% Good Standing
-                      </span>
+
+                      <div className="text-right">
+                        <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                          96.4%
+                        </span>
+                        <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">
+                          Good Standing
+                        </div>
+                      </div>
                     </div>
 
                   </div>

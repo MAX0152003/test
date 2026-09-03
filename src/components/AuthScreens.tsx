@@ -12,7 +12,10 @@ import {
   X,
   CheckCircle,
   Hash,
-  ArrowLeft
+  ArrowLeft,
+  GraduationCap,
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion } from 'motion/react';
@@ -889,55 +892,77 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       )}
       
       {/* Brand Launcher Logo Header */}
-      <div className="mb-7 text-center z-10 space-y-2">
+      <div className="mb-6 text-center z-10 space-y-2">
         <div className="relative inline-block group">
           <motion.div
-            initial={{ opacity: 0, scale: 0.85, rotate: 3 }}
-            animate={{ 
-              opacity: [0, 0.2, 0.08, 0.75, 0.25, 0.95, 0.55, 0.98, 0.85, 1], 
-              scale: [0.85, 0.95, 0.9, 1.05, 0.98, 1.02, 0.99, 1],
-              rotate: [3, 3, 2, 4, 2, 3.5, 2.8, 3]
-            }}
-            transition={{
-              opacity: { duration: 1.3, times: [0, 0.1, 0.15, 0.3, 0.4, 0.6, 0.75, 0.85, 0.92, 1], ease: 'easeOut' },
-              scale: { duration: 1.3, times: [0, 0.1, 0.15, 0.3, 0.4, 0.6, 0.75, 1], ease: 'easeOut' },
-              rotate: { duration: 1.3, times: [0, 0.1, 0.15, 0.3, 0.4, 0.6, 0.75, 1], ease: 'easeOut' }
-            }}
+            initial={{ opacity: 0, scale: 0.88, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 220, damping: 20 }}
             whileHover={{ 
-              scale: 1.06, 
-              rotate: 0,
-              boxShadow: '0 0 25px rgba(16, 185, 129, 0.7), 0 0 10px rgba(16, 185, 129, 0.4), 0 12px 28px rgba(16, 185, 129, 0.4)'
+              scale: 1.08, 
+              rotate: 2,
+              boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)'
             }}
-            whileTap={{ scale: 0.96 }}
-            className="relative w-14 h-14 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-bold text-2xl mx-auto cursor-pointer"
-            style={{
-              boxShadow: '0 8px 16px rgba(16, 185, 129, 0.15), 0 0 8px rgba(16, 185, 129, 0.15)'
-            }}
+            whileTap={{ scale: 0.95 }}
+            className="relative w-14 h-14 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-bold text-2xl mx-auto cursor-pointer shadow-lg shadow-emerald-500/25"
           >
             <Activity className="w-7 h-7 stroke-[2.5]" />
           </motion.div>
         </div>
         <div className="pt-2 mx-auto max-w-sm">
-          <h1 className="text-3xl font-black tracking-tight text-zinc-850 dark:text-zinc-100 uppercase">
+          <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
             Class<span className="text-emerald-500 font-extrabold">Pulse</span>
           </h1>
-          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 font-bold flex items-center justify-center gap-1.5 uppercase tracking-wider">
+          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 font-bold flex items-center justify-center gap-1.5 uppercase tracking-wider font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            Mindanao State University • Attendance Suite
+            Mindanao State University • Academic Suite
           </p>
         </div>
       </div>
 
       {/* Main Form Box Container */}
       <motion.div 
-        initial={{ opacity: 0, y: 30, scale: 0.98 }}
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -30, scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 100, damping: 15 }}
-        whileHover={{ boxShadow: "0 20px 40px -15px rgba(16, 185, 129, 0.08)" }}
-        className="w-full max-w-md p-8 rounded-[2rem] border bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md border-zinc-200/80 dark:border-zinc-850/80 shadow-[0_8px_30px_rgb(0,0,0,0.02)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.5)] transition-all duration-300 z-10 text-left relative overflow-hidden group"
+        exit={{ opacity: 0, y: -24, scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 120, damping: 18 }}
+        className="w-full max-w-md p-7 sm:p-8 rounded-3xl border bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-zinc-200/80 dark:border-zinc-800 shadow-2xl transition-all duration-300 z-10 text-left relative overflow-hidden group"
       >
-        <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-400 opacity-90" />
+        <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 opacity-90" />
+
+        {/* Top Segmented Mode Switcher */}
+        {!isForgotPwdView && (
+          <div className="flex p-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 mb-6">
+            <button
+              type="button"
+              onClick={() => {
+                setIsLoginView(true);
+                speakText("Switched to Sign In", accessibility.readAloud);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                isLoginView
+                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsLoginView(false);
+                speakText("Switched to Create Account", accessibility.readAloud);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                !isLoginView
+                  ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+        )}
 
         {isForgotPwdView ? (
           /* ================= FORGOT PASSWORD SCREEN ================= */
@@ -1198,11 +1223,9 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
           /* ================= LOGIN SCREEN ================= */
           <div className="space-y-5">
             <div className="text-left space-y-1">
-              <h2 className="text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100">Portal Authentication</h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">ClassPulse MSU Marawi Campus schedule & secure attendance tracking ledger.</p>
+              <h2 className="text-xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">Welcome Back</h2>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Access your MSU class schedule, dynamic QR scanner, and academic standing.</p>
             </div>
-
-
 
             {isCheckingCredentials ? (
               <div className="flex flex-col items-center justify-center py-10 space-y-4">
@@ -1215,7 +1238,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                     Verifying Credentials...
                   </p>
                   <p className="text-[10px] text-zinc-400 max-w-[240px] mx-auto font-sans leading-relaxed">
-                    Querying secure institutional ledger records.
+                    Connecting to Mindanao State University cloud registry.
                   </p>
                 </div>
               </div>
@@ -1223,24 +1246,24 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
               <form onSubmit={handleLoginSubmit} className="space-y-4">
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Academic Email</label>
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Academic Email or MSU ID</label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
                       <Mail className="w-4 h-4" />
                     </span>
                     <input
-                      type="email"
+                      type="text"
                       value={loginEmail}
                       onChange={(e) => {
                         setLoginEmail(e.target.value);
                         setLoginEmailError(false);
                         if (!loginPasswordError) setLoginErrorMessage(null);
                       }}
-                      placeholder="student@msu.edu.ph"
-                      className={`pl-9 pr-4 py-2.5 border rounded-full text-xs w-full focus:outline-none transition-all ${
+                      placeholder="student@msu.edu.ph or 2023-XXXXX"
+                      className={`pl-10 pr-4 py-3 border rounded-2xl text-xs w-full focus:outline-none transition-all ${
                         loginEmailError 
                           ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
-                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                       }`}
                       required
                     />
@@ -1250,7 +1273,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Password</label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
                       <Lock className="w-4 h-4" />
                     </span>
                     <input
@@ -1261,17 +1284,17 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                         setLoginPasswordError(false);
                         if (!loginEmailError) setLoginErrorMessage(null);
                       }}
-                      placeholder="Enter account security key"
-                      className={`pl-9 pr-10 py-2.5 border rounded-full text-xs w-full focus:outline-none transition-all ${
+                      placeholder="Enter your account password"
+                      className={`pl-10 pr-11 py-3 border rounded-2xl text-xs w-full focus:outline-none transition-all ${
                         loginPasswordError 
                           ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
-                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 select-none cursor-pointer"
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 select-none cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -1284,9 +1307,9 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       type="checkbox" 
                       checked={rememberMe} 
                       onChange={() => setRememberMe(!rememberMe)}
-                      className="rounded border-zinc-300 dark:border-zinc-700 text-emerald-550 dark:text-emerald-400 cursor-pointer accent-emerald-500"
+                      className="rounded border-zinc-300 dark:border-zinc-700 text-emerald-500 cursor-pointer accent-emerald-500"
                     />
-                    Remember credentials
+                    <span>Remember credentials</span>
                   </label>
                   <button 
                     type="button" 
@@ -1297,7 +1320,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       setFpErrorMsg(null);
                       setApprovedResetRequest(null);
                       setFpResetSuccess(false);
-                      speakText("Navigating to Password Recovery ledger.", accessibility.readAloud);
+                      speakText("Navigating to Password Recovery.", accessibility.readAloud);
                     }}
                     className="text-emerald-500 font-extrabold hover:underline cursor-pointer"
                   >
@@ -1307,17 +1330,17 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 text-black shadow-xs hover:shadow-sm cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                  className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 text-black shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/25 cursor-pointer transition-all flex items-center justify-center gap-2 active:scale-95"
                 >
-                  Log In
+                  <span>Sign In</span>
                   <ChevronRight className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </form>
             )}
 
-            <div className="relative flex py-2 items-center">
+            <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-              <span className="flex-shrink mx-4 text-zinc-450 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-wider">or continue with</span>
+              <span className="flex-shrink mx-4 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-wider">or continue with</span>
               <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
             </div>
 
@@ -1326,7 +1349,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                 type="button"
                 onClick={handleRealGoogleSignIn}
                 disabled={googleIsLoading}
-                className="w-full py-2.5 border rounded-full text-xs font-bold bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-850 dark:text-zinc-200 transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                className="w-full py-3 border rounded-2xl text-xs font-bold bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-800 dark:text-zinc-200 transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-95 disabled:opacity-50 shadow-2xs"
               >
                 {googleIsLoading ? (
                   <span>Authenticating...</span>
@@ -1338,22 +1361,71 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.22-.66-.35-1.36-.35-2.09z" />
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                     </svg>
-                    Sign In with Google
+                    <span>Sign In with Google</span>
                   </>
                 )}
               </button>
+
+              {/* Quick Demo Access Bar for rapid testing */}
+              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800 space-y-2 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                    Quick Demo Access
+                  </span>
+                  <span className="text-[9px] text-zinc-400 font-mono">1-tap demo portal</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('john.doe@msu.edu.ph');
+                      setLoginPassword('student123');
+                      startLoginFlow('student', 'John Doe', 'john.doe@msu.edu.ph');
+                    }}
+                    className="py-2 px-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs group"
+                  >
+                    <GraduationCap className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
+                    <span>Student</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('ahmad.khan@msu.edu.ph');
+                      setLoginPassword('faculty123');
+                      startLoginFlow('faculty', 'Dr. Ahmad Khan', 'ahmad.khan@msu.edu.ph');
+                    }}
+                    className="py-2 px-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs group"
+                  >
+                    <UserCheck className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
+                    <span>Faculty</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('admin@msu.edu.ph');
+                      setLoginPassword('admin123');
+                      startLoginFlow('admin', 'Master Admin', 'admin@msu.edu.ph');
+                    }}
+                    className="py-2 px-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs group"
+                  >
+                    <Shield className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+                    <span>Admin</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="text-center pt-1.5">
+            <div className="text-center pt-1">
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Need an academic profile?{' '}
                 <button
                   type="button"
                   onClick={() => {
                     setIsLoginView(false);
-                    speakText("Navigating to Account Creation Ledger.", accessibility.readAloud);
+                    speakText("Navigating to Account Creation.", accessibility.readAloud);
                   }}
-                  className="text-emerald-550 dark:text-emerald-400 font-extrabold hover:underline cursor-pointer"
+                  className="text-emerald-500 dark:text-emerald-400 font-extrabold hover:underline cursor-pointer"
                 >
                   Create Account
                 </button>
@@ -1365,15 +1437,67 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
           <div className="space-y-6">
             <div className="text-left space-y-1">
               <h2 className="text-xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">Create Account</h2>
-              <p className="text-xs text-zinc-455 dark:text-zinc-400">Join academic ClassPulse integrated rosters today.</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Join the official Mindanao State University academic operations suite.</p>
             </div>
 
             <form onSubmit={handleSignUpSubmit} className="space-y-4">
 
+              {/* Modern Role Selector Pill Tabs */}
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">Select Your Academic Role</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRegRole('student')}
+                    className={`py-2.5 px-2 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      regRole === 'student'
+                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20 shadow-xs'
+                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                    }`}
+                  >
+                    <GraduationCap className="w-4 h-4 text-emerald-500" />
+                    <span>Student</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRegRole('faculty')}
+                    className={`py-2.5 px-2 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      regRole === 'faculty'
+                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20 shadow-xs'
+                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                    }`}
+                  >
+                    <UserCheck className="w-4 h-4 text-indigo-500" />
+                    <span>Faculty</span>
+                  </button>
+
+                  {adminCount === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setRegRole('admin')}
+                      className={`py-2.5 px-2 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        regRole === 'admin'
+                          ? 'bg-emerald-500/10 border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/20 shadow-xs'
+                          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300'
+                      }`}
+                    >
+                      <Shield className="w-4 h-4 text-amber-500" />
+                      <span>Admin</span>
+                    </button>
+                  ) : (
+                    <div className="py-2.5 px-2 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-300 dark:text-zinc-600 text-xs font-bold flex flex-col items-center justify-center gap-1.5 opacity-50 cursor-not-allowed">
+                      <Shield className="w-4 h-4" />
+                      <span>Admin Set</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Full Name</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
                     <User className="w-4 h-4" />
                   </span>
                   <input
@@ -1384,11 +1508,11 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       setRegNameError(false);
                       setRegErrorMessage(null);
                     }}
-                    placeholder="Rachel Green"
-                    className={`pl-9 pr-4 py-2.5 border rounded-xl text-xs w-full focus:outline-none transition-all ${
+                    placeholder="e.g. Sittie Norhana"
+                    className={`pl-10 pr-4 py-3 border rounded-2xl text-xs w-full focus:outline-none transition-all ${
                       regNameError 
                         ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
-                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                     }`}
                     required
                   />
@@ -1398,7 +1522,7 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Academic Email</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
                     <Mail className="w-4 h-4" />
                   </span>
                   <input
@@ -1409,40 +1533,25 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       setRegEmailError(false);
                       setRegErrorMessage(null);
                     }}
-                    placeholder="student@msu.edu.ph"
-                    className={`pl-9 pr-4 py-2.5 border rounded-xl text-xs w-full focus:outline-none transition-all ${
+                    placeholder="name@msu.edu.ph"
+                    className={`pl-10 pr-4 py-3 border rounded-2xl text-xs w-full focus:outline-none transition-all ${
                       regEmailError 
                         ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
-                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                     }`}
                     required
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5 block">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Academic Role</label>
-                <select
-                  value={regRole}
-                  onChange={(e) => setRegRole(e.target.value as Role)}
-                  className="w-full text-xs p-2.5 rounded-xl border focus:outline-none border-zinc-200 bg-white dark:border-zinc-805 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 font-bold"
-                >
-                  <option value="student">Student</option>
-                  <option value="faculty">Faculty</option>
-                  {adminCount === 0 && (
-                    <option value="admin">Admin</option>
-                  )}
-                </select>
-              </div>
-
               {regRole === 'student' && (
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">MSU Student ID Number</label>
-                    <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400">YYYY-XXXXX</span>
+                    <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">YYYY-XXXXX</span>
                   </div>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-400">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
                       <Hash className="w-4 h-4" />
                     </span>
                     <input
@@ -1456,21 +1565,21 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       }}
                       maxLength={10}
                       placeholder="e.g. 2023-10492"
-                      className={`pl-9 pr-4 py-2.5 border rounded-xl text-xs font-mono w-full focus:outline-none transition-all ${
+                      className={`pl-10 pr-4 py-3 border rounded-2xl text-xs font-mono w-full focus:outline-none transition-all ${
                         regStudentIdError 
                           ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
-                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                          : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                       }`}
                     />
                   </div>
-                  <p className="text-[10px] text-zinc-400">Official Mindanao State University ID pattern (leave blank to auto-generate).</p>
+                  <p className="text-[10px] text-zinc-400 text-left">Official Mindanao State University ID format (auto-generated if left blank).</p>
                 </div>
               )}
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block text-left">Password</label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-450">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-zinc-400">
                     <Lock className="w-4 h-4" />
                   </span>
                   <input
@@ -1481,11 +1590,11 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                       setRegPasswordError(false);
                       setRegErrorMessage(null);
                     }}
-                    placeholder="Set custom secure credentials"
-                    className={`pl-9 pr-4 py-2.5 border rounded-xl text-xs w-full focus:outline-none transition-all ${
+                    placeholder="Create a secure password"
+                    className={`pl-10 pr-4 py-3 border rounded-2xl text-xs w-full focus:outline-none transition-all ${
                       regPasswordError 
                         ? 'border-rose-500 ring-2 ring-rose-500/10 bg-rose-500/[0.02] text-rose-700 dark:text-rose-400 focus:border-rose-500 focus:ring-rose-500/20' 
-                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-650 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20'
+                        : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20'
                     }`}
                     required
                   />
@@ -1496,35 +1605,35 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                 <input 
                   type="checkbox" 
                   defaultChecked 
-                  className="rounded border-zinc-300 dark:border-zinc-700 text-emerald-555 dark:text-emerald-400 cursor-pointer accent-emerald-500" 
+                  className="rounded border-zinc-300 dark:border-zinc-700 text-emerald-500 cursor-pointer accent-emerald-500 mt-0.5" 
                   required
                 />
                 <span className="text-left">
-                  I agree to the <span className="font-extrabold text-emerald-555 cursor-pointer">Terms of Service</span> and <span className="font-extrabold text-[#10b981] cursor-pointer">Privacy Policy</span>.
+                  I agree to the <span className="font-extrabold text-emerald-500 hover:underline cursor-pointer">Terms of Service</span> and <span className="font-extrabold text-emerald-500 hover:underline cursor-pointer">Privacy Policy</span>.
                 </span>
               </div>
 
               {/* Secure notification badge noting the verification bypass constraint */}
-              <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl flex gap-2 items-start text-emerald-500 text-left">
-                <Shield className="w-4.5 h-4.5 shrink-0 text-emerald-500 mt-1" />
+              <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex gap-2 items-start text-emerald-600 dark:text-emerald-400 text-left">
+                <Shield className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest">Instant Auto-activation</p>
-                  <p className="text-[10px] opacity-80 leading-relaxed mt-0.5">Verification flows are skipped as requested. Account registers instantly to the campus ledger.</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider">Instant Account Provisioning</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed mt-0.5">Your profile is registered directly with local-first offline support and cloud synchronization.</p>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 text-black shadow-md cursor-pointer transition-all flex items-center justify-center gap-1.5 active:scale-95"
+                className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider bg-emerald-500 hover:bg-emerald-400 text-black shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/25 cursor-pointer transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                Sign Up & Launch
+                <span>Create Academic Account</span>
                 <ChevronRight className="w-4 h-4 stroke-[2.5]" />
               </button>
             </form>
 
-            <div className="relative flex py-2 items-center">
+            <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-              <span className="flex-shrink mx-4 text-zinc-450 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-wider">or continue with</span>
+              <span className="flex-shrink mx-4 text-zinc-400 dark:text-zinc-500 text-[10px] uppercase font-bold tracking-wider">or continue with</span>
               <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
             </div>
 
@@ -1532,32 +1641,32 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
               type="button"
               onClick={handleRealGoogleSignUp}
               disabled={googleIsLoading}
-              className="w-full py-2.5 border rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-850 dark:text-zinc-200 transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-95 disabled:opacity-50"
+              className="w-full py-3 border rounded-2xl text-xs font-bold bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-800 dark:text-zinc-200 transition-all flex items-center justify-center gap-2.5 cursor-pointer active:scale-95 disabled:opacity-50 shadow-2xs"
             >
               {googleIsLoading ? (
                 <span>Authenticating...</span>
               ) : (
                 <>
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92(3.28-4.74 3.28-8.09z)" />
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22c-.22-.66-.35-1.36-.35-2.09z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                   </svg>
-                  Sign Up with Google
+                  <span>Sign Up with Google</span>
                 </>
               )}
             </button>
 
-            <div className="pt-2 text-center">
-              <p className="text-xs text-zinc-400">
+            <div className="pt-1 text-center">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Already have an academic account? {' '}
                 <button
                   type="button"
                   onClick={() => setIsLoginView(true)}
                   className="text-emerald-500 font-extrabold hover:underline cursor-pointer"
                 >
-                  Log In directly
+                  Sign In directly
                 </button>
               </p>
             </div>

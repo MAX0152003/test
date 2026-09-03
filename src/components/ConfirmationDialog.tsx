@@ -122,7 +122,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirmation-dialog-title"
@@ -136,14 +136,17 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
           />
 
-          {/* Modal Card */}
+          {/* Modal Card / Mobile Sheet */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-2xl overflow-hidden z-10 text-left space-y-5"
+            className="relative w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl z-10 text-left space-y-5 max-h-[92vh] overflow-y-auto"
           >
+            {/* Mobile Sheet Handle */}
+            <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto -mt-2 mb-2 sm:hidden" />
+
             {/* Close Button */}
             <button
               onClick={onClose}

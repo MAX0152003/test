@@ -20,6 +20,7 @@ import ConsultationsView from './ConsultationsView';
 import { getFacultyInClassDetails } from '../lib/facultyTimeUtils';
 import { playSuccessChime, playWarningChime, triggerHapticFeedback } from '../lib/soundUtils';
 import { compressImage } from '../lib/imageUtils';
+import { downloadScheduleICS } from '../lib/calendarExport';
 import { EmptyState } from './EmptyState';
 import { VirtualList } from './VirtualList';
 import { ConfirmationDialog } from './ConfirmationDialog';
@@ -1077,6 +1078,31 @@ export default function DashboardStudent({
     facultySearchQuery
   });
 
+  const nextOrActiveLecture = React.useMemo(() => {
+    const activeQR = classes.find(c => c.qrToken && c.qrToken !== 'EXPIRED' && c.qrToken !== 'STANDBY');
+    if (activeQR && (studentEnrolledClassIds.has(activeQR.id) || classes.length <= 2)) {
+      return { cls: activeQR, status: 'in_session' as const };
+    }
+
+    const now = new Date();
+    const dayLabels = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const todayLabel = dayLabels[now.getDay()];
+
+    const candidatePool = studentEnrolledClasses.length > 0 ? studentEnrolledClasses : classes;
+
+    const todayMatch = candidatePool.find(c => {
+      const daysArr = Array.isArray(c.days) ? c.days : [c.days || ''];
+      const exp = expandDaysToSpecificOnesVal(daysArr);
+      return exp.includes(todayLabel);
+    });
+
+    if (todayMatch) {
+      return { cls: todayMatch, status: 'today' as const };
+    }
+
+    return candidatePool.length > 0 ? { cls: candidatePool[0], status: 'upcoming' as const } : null;
+  }, [classes, studentEnrolledClasses, studentEnrolledClassIds]);
+
   const handleDownloadReport = () => {
     const studentRecs = enrolledStudentRecords;
 
@@ -1176,6 +1202,82 @@ export default function DashboardStudent({
               <Scan className="w-36 h-36 text-white" />
             </div>
           </div>
+
+          {/* Next Up / Live Class Quick Check-in Card */}
+          {nextOrActiveLecture && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs hover:shadow-md transition-all text-left space-y-3 relative overflow-hidden group">
+              <div className={`absolute top-0 left-0 right-0 h-1 ${
+                nextOrActiveLecture.status === 'in_session'
+                  ? 'bg-emerald-500 animate-pulse'
+                  : nextOrActiveLecture.status === 'today'
+                  ? 'bg-blue-500'
+                  : 'bg-zinc-300 dark:bg-zinc-700'
+              }`} />
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {nextOrActiveLecture.status === 'in_session' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Attendance QR Active Now
+                    </span>
+                  ) : nextOrActiveLecture.status === 'today' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <Clock className="w-3 h-3" />
+                      Scheduled Today • {nextOrActiveLecture.cls.startTime} - {nextOrActiveLecture.cls.endTime || ''}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                      <Calendar className="w-3 h-3 text-zinc-400" />
+                      Next Registered Course
+                    </span>
+                  )}
+
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 bg-zinc-100 dark:bg-zinc-800/80 px-2 py-0.5 rounded-md">
+                    <MapPin className="w-3 h-3 text-zinc-400" />
+                    Room: {nextOrActiveLecture.cls.room || 'TBA'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => downloadScheduleICS(studentEnrolledClasses.length > 0 ? studentEnrolledClasses : classes, userProfile.name)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                    title="Export timetable to Apple or Google Calendar (.ics)"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Sync to Calendar (.ics)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                <div className="space-y-0.5">
+                  <h3 className="text-base sm:text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                    {nextOrActiveLecture.cls.code} : {nextOrActiveLecture.cls.name}
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-2 flex-wrap">
+                    <span>Instructor: <strong>{nextOrActiveLecture.cls.facultyName || 'Faculty Professor'}</strong></span>
+                    <span>•</span>
+                    <span>Days: <strong>{Array.isArray(nextOrActiveLecture.cls.days) ? nextOrActiveLecture.cls.days.join(', ') : nextOrActiveLecture.cls.days}</strong></span>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScreen('attendance');
+                    speakText("Opening camera scanner for attendance verification", accessibility.readAloud);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider transition-all cursor-pointer active:scale-95 shadow-md shadow-emerald-500/20 shrink-0"
+                >
+                  <Scan className="w-4 h-4 stroke-[2.5]" />
+                  <span>Scan Attendance QR</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Targeted Administrative Announcements */}
           {announcements.filter(ann => ann.target === 'all' || ann.target === 'student').length > 0 && (
@@ -1879,8 +1981,18 @@ export default function DashboardStudent({
               </div>
             </div>
 
-            {/* Search input */}
+            {/* Search input & Calendar Sync */}
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => downloadScheduleICS(studentEnrolledClasses.length > 0 ? studentEnrolledClasses : classes, userProfile.name)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-xl border border-zinc-200 dark:border-zinc-800 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                title="Export schedule to Apple or Google Calendar (.ics)"
+              >
+                <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Sync (.ics)</span>
+              </button>
+
               <div className="relative flex-1 sm:w-64">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400 pointer-events-none">
                   <Search className="w-4 h-4 text-emerald-500" />
@@ -2992,8 +3104,11 @@ export default function DashboardStudent({
 
       {/* Active student notification pop-up alarm */}
       {activeAlertClass && (
-        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-md p-6 rounded-3.5xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-5 text-left border-2 border-emerald-500/35">
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
+          <div className="w-full max-w-md p-6 rounded-t-3xl sm:rounded-3.5xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-5 text-left border-2 border-emerald-500/35 max-h-[92vh] overflow-y-auto">
+            {/* Mobile Sheet Handle */}
+            <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto -mt-2 mb-2 sm:hidden" />
+            
             <button
               type="button"
               onClick={() => handleDismissAlert(activeAlertClass)}
@@ -3008,22 +3123,22 @@ export default function DashboardStudent({
             </div>
 
             <div className="text-center space-y-2 pb-1 border-b border-zinc-150 dark:border-zinc-900">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 animate-pulse">
-                FACULTY CLASS BROADCAST
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 animate-pulse">
+                Faculty Schedule Broadcast
               </span>
-              <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">Class Status Alarm!</h3>
-              <p className="text-xs text-zinc-455 mt-1">Professor {activeAlertClass.facultyName} has declared a schedule update.</p>
+              <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100">Class Schedule Update</h3>
+              <p className="text-xs text-zinc-455 mt-1">Professor {activeAlertClass.facultyName} posted an update for your upcoming lecture.</p>
             </div>
 
             <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900/65 border border-zinc-200 dark:border-zinc-800 space-y-3 font-sans">
               <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase font-bold">SUBJECT INFO</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase">Subject Info</p>
                 <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">{activeAlertClass.code} : {activeAlertClass.name}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase font-bold">DECLARED UPDATE</p>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Declared Update</p>
                   <p className={`text-xs font-black uppercase ${
                     activeAlertClass.facultyStatusUpdate === 'cancel' 
                       ? 'text-red-500' 
@@ -3032,14 +3147,14 @@ export default function DashboardStudent({
                       : 'text-emerald-500'
                   }`}>
                     {activeAlertClass.facultyStatusUpdate === 'cancel' 
-                      ? '🚫 CANCEL CLASS' 
+                      ? '🚫 Class Cancelled' 
                       : activeAlertClass.facultyStatusUpdate === 'late' 
-                      ? '🕒 LATE ARRIVAL' 
-                      : '✅ WILL ATTEND'}
+                      ? '🕒 Late Arrival' 
+                      : '✅ Will Attend'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase font-bold">LECTURE ROOM</p>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase">Lecture Room</p>
                   <p className="text-xs font-extrabold text-zinc-950 dark:text-zinc-100 flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5 text-zinc-400" />
                     {activeAlertClass.room}
@@ -3053,7 +3168,7 @@ export default function DashboardStudent({
               type="button"
               className="w-full text-center py-2.5 bg-emerald-500 text-black text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer hover:bg-emerald-400 transition-colors active:scale-98 shadow-sm"
             >
-              Acknowledge & Confirm Timing
+              Understood • Confirm Schedule
             </button>
           </div>
         </div>
@@ -3061,8 +3176,10 @@ export default function DashboardStudent({
 
       {/* 🔒 SCREENSHOT DETECTED & BLOCKED SECURITY WARNING MODAL */}
       {showScreenshotWarning && (
-        <div className="fixed inset-0 z-55 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-red-50 dark:bg-zinc-950 border-2 border-red-500 p-6 rounded-3xl max-w-md w-full text-center space-y-4 shadow-2xl relative overflow-hidden animate-fade-in">
+        <div className="fixed inset-0 z-55 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-red-50 dark:bg-zinc-950 border-2 border-red-500 p-6 rounded-t-3xl sm:rounded-3xl max-w-md w-full text-center space-y-4 shadow-2xl relative overflow-hidden animate-fade-in max-h-[92vh] overflow-y-auto">
+            {/* Mobile Sheet Handle */}
+            <div className="w-10 h-1 rounded-full bg-red-400/40 mx-auto -mt-2 mb-2 sm:hidden" />
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-red-500" />
             
             <div className="w-16 h-16 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto text-2xl font-black animate-pulse">
@@ -3106,7 +3223,7 @@ export default function DashboardStudent({
               onClick={() => setShowScreenshotWarning(false)}
               className="w-full py-2.5 bg-red-550 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-95 shadow-md shadow-red-500/20"
             >
-              Acknowledge & Return to Terminal
+              Understood • Return to Dashboard
             </button>
           </div>
         </div>

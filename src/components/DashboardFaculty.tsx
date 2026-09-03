@@ -61,8 +61,11 @@ import {
   ChevronRight,
   Lock,
   Unlock,
-  Award
+  Award,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
+import { downloadScheduleICS } from '../lib/calendarExport';
 import { speakText } from './AccessibilitySettings';
 import AlarmClock from './AlarmClock';
 import SubjectDetailModal from './SubjectDetailModal';
@@ -500,6 +503,18 @@ export default function DashboardFaculty({
   const [isRollingEnabled, setIsRollingEnabled] = React.useState<boolean>(true); // Anti-proxy dynamic 15s token rotation
   const [rotationCountdown, setRotationCountdown] = React.useState<number>(15); // Seconds until next rotation
   const [qrIntervalId, setQrIntervalId] = React.useState<any>(null);
+  const [isProjectorModeOpen, setIsProjectorModeOpen] = React.useState<boolean>(false);
+
+  // Close projector mode on Escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isProjectorModeOpen) {
+        setIsProjectorModeOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isProjectorModeOpen]);
   
   // Manual class override state when no scheduled class is active/near
   const [isManualOverrideActive, setIsManualOverrideActive] = React.useState<boolean>(false);
@@ -1961,6 +1976,16 @@ export default function DashboardFaculty({
 
                   <div className="flex flex-wrap items-center gap-2">
                     <button
+                      type="button"
+                      onClick={() => downloadScheduleICS(classes, userProfile.name)}
+                      className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-200 font-bold rounded-xl border border-zinc-200 dark:border-zinc-800 transition-all flex items-center gap-1.5 cursor-pointer px-3.5 py-2 text-xs active:scale-95 shadow-2xs"
+                      title="Export teaching timetable to Apple / Google Calendar (.ics)"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                      Sync to Calendar (.ics)
+                    </button>
+
+                    <button
                       onClick={handleOpenAddForm}
                       type="button"
                       className="bg-emerald-500 text-black font-black uppercase tracking-wider rounded-xl hover:bg-emerald-400 transition-all flex items-center gap-1.5 cursor-pointer animate-fade-in px-4 py-2 text-xs w-full sm:w-auto justify-center"
@@ -2640,6 +2665,16 @@ export default function DashboardFaculty({
                               </button>
                             </div>
 
+                            {/* Full-Screen Projector Mode (Theater View) */}
+                            <button
+                              type="button"
+                              onClick={() => setIsProjectorModeOpen(true)}
+                              className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 shadow-md shadow-emerald-600/20"
+                            >
+                              <Maximize2 className="w-4 h-4" />
+                              Projector Mode (Full-Screen Hall View)
+                            </button>
+
                             {/* Offline PNG export */}
                             <button
                               type="button"
@@ -2731,6 +2766,100 @@ export default function DashboardFaculty({
                         </button>
                       </div>
                     )}
+
+                    {/* Full-Screen Projector Mode (Theater View) for Lecture Halls */}
+                    <AnimatePresence>
+                      {isProjectorModeOpen && isSessionRunning && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.98 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.98 }}
+                          transition={{ duration: 0.2 }}
+                          className="fixed inset-0 z-50 bg-zinc-950/98 backdrop-blur-xl flex flex-col justify-between p-6 sm:p-10 text-white select-none"
+                        >
+                          {/* Top Bar */}
+                          <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
+                            <div className="flex items-center gap-3 sm:gap-4">
+                              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/25">
+                                    Live Lecture Broadcast
+                                  </span>
+                                  <span className="text-xs font-mono text-zinc-400">
+                                    Room: {targetSubject.room}
+                                  </span>
+                                </div>
+                                <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                                  {targetSubject.code} : {targetSubject.name}
+                                </h2>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                              <div className="text-right font-mono hidden sm:block">
+                                <div className="text-[11px] text-zinc-400">Time Remaining</div>
+                                <div className="text-xl font-black text-emerald-400">
+                                  {formatSecondsToMMSS(timeLeft)}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setIsProjectorModeOpen(false)}
+                                className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center gap-1.5 text-xs font-bold border border-zinc-700/60 shadow-xs"
+                                title="Exit Projector Mode (Esc)"
+                              >
+                                <Minimize2 className="w-4 h-4" />
+                                <span className="hidden sm:inline">Exit (Esc)</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Center Stage: High-Contrast Big QR Code */}
+                          <div className="flex-1 flex flex-col items-center justify-center my-4 space-y-6">
+                            <div className="p-6 sm:p-8 bg-white rounded-3xl shadow-2xl ring-8 ring-emerald-500/20 max-w-sm sm:max-w-md w-full flex flex-col items-center">
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=2&data=${encodeURIComponent(JSON.stringify({ classId: targetSubject.id, qrToken: qrToken, code: targetSubject.code, name: targetSubject.name, ts: Date.now(), expiresAt: Date.now() + 35000 }))}`}
+                                alt="ClassPulse Projector QR Code"
+                                className="w-60 h-60 sm:w-76 sm:h-76 object-contain rounded-xl"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div className="mt-4 flex items-center justify-between w-full px-2 text-zinc-800 font-mono text-xs">
+                                <span className="font-bold text-zinc-500">DYNAMIC PASS KEY</span>
+                                <span className="font-black text-emerald-600 tracking-widest text-base bg-emerald-50 px-2.5 py-0.5 rounded">{qrToken}</span>
+                              </div>
+                            </div>
+
+                            {/* Indicators */}
+                            <div className="flex flex-wrap items-center justify-center gap-3">
+                              {isRollingEnabled && (
+                                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono font-bold text-zinc-300">
+                                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                                  <span>Rolling key refresh: <strong className="text-emerald-400">{rotationCountdown}s</strong></span>
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-mono font-bold text-emerald-400">
+                                <UserCheck className="w-3.5 h-3.5" />
+                                <span>
+                                  {attendanceRecords.filter(r => r.classId === targetSubject.id && r.date === new Date().toISOString().split('T')[0]).length} Students Recorded
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-400 sm:hidden">
+                                <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{formatSecondsToMMSS(timeLeft)} left</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Footer Info */}
+                          <div className="text-center text-xs text-zinc-500 font-medium pb-2">
+                            Scan with ClassPulse mobile camera • Press <strong>Esc</strong> or click <strong>Exit</strong> to return to dashboard
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 );
               })()
