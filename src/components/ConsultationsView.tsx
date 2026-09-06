@@ -403,62 +403,93 @@ export default function ConsultationsView({
         <button
           type="button"
           onClick={() => { setFilterStatus('all'); setSelectedDateFilter(null); }}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer bg-white dark:bg-zinc-950 ${
             filterStatus === 'all' && !selectedDateFilter
-              ? 'bg-zinc-900 text-white dark:bg-white dark:text-black border-transparent shadow-md'
-              : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+              ? 'border-emerald-500/80 dark:border-emerald-400/80 ring-2 ring-emerald-500/15 shadow-sm'
+              : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/70'
           }`}
         >
-          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70 block">Total Consultations</span>
-          <span className="text-2xl font-black font-mono mt-1 block">{relevantBookings.length}</span>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${
+              filterStatus === 'all' && !selectedDateFilter
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-zinc-600 dark:text-zinc-400'
+            }`}>
+              Total Consultations
+            </span>
+            <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-colors ${
+              filterStatus === 'all' && !selectedDateFilter
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-400 dark:text-zinc-500'
+            }`}>
+              <CalendarDays className="w-3 h-3" />
+            </div>
+          </div>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-black font-mono text-zinc-900 dark:text-zinc-100 block">
+              {relevantBookings.length}
+            </span>
+            <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
+              All slots
+            </span>
+          </div>
         </button>
 
         <button
           type="button"
           onClick={() => { setFilterStatus('pending'); setSelectedDateFilter(null); }}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer bg-white dark:bg-zinc-950 ${
             filterStatus === 'pending'
-              ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400 shadow-sm'
-              : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+              ? 'bg-amber-500/10 dark:bg-amber-950/20 border-amber-500 text-amber-600 dark:text-amber-400 ring-2 ring-amber-500/15 shadow-sm'
+              : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/70'
           }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Pending Review</span>
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           </div>
-          <span className="text-2xl font-black font-mono text-amber-600 dark:text-amber-400 mt-1 block">{pendingCount}</span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-black font-mono text-amber-600 dark:text-amber-400 block">{pendingCount}</span>
+            <span className="text-[10px] font-semibold text-amber-600/70 dark:text-amber-400/70">Awaiting</span>
+          </div>
         </button>
 
         <button
           type="button"
           onClick={() => { setFilterStatus('confirmed'); setSelectedDateFilter(null); }}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer bg-white dark:bg-zinc-950 ${
             filterStatus === 'confirmed'
-              ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400 shadow-sm'
-              : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+              ? 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/15 shadow-sm'
+              : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/70'
           }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Confirmed Slots</span>
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
           </div>
-          <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-1 block">{confirmedCount}</span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 block">{confirmedCount}</span>
+            <span className="text-[10px] font-semibold text-emerald-600/70 dark:text-emerald-400/70">Approved</span>
+          </div>
         </button>
 
         <button
           type="button"
           onClick={() => { setFilterStatus('completed'); setSelectedDateFilter(null); }}
-          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+          className={`p-4 rounded-2xl border text-left transition-all cursor-pointer bg-white dark:bg-zinc-950 ${
             filterStatus === 'completed'
-              ? 'bg-sky-500/15 border-sky-500 text-sky-600 dark:text-sky-400 shadow-sm'
-              : 'bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+              ? 'bg-sky-500/10 dark:bg-sky-950/20 border-sky-500 text-sky-600 dark:text-sky-400 ring-2 ring-sky-500/15 shadow-sm'
+              : 'border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-900/70'
           }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Completed</span>
             <span className="w-2 h-2 rounded-full bg-sky-500" />
           </div>
-          <span className="text-2xl font-black font-mono text-sky-600 dark:text-sky-400 mt-1 block">{completedCount}</span>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-2xl font-black font-mono text-sky-600 dark:text-sky-400 block">{completedCount}</span>
+            <span className="text-[10px] font-semibold text-sky-600/70 dark:text-sky-400/70">Concluded</span>
+          </div>
         </button>
       </div>
 

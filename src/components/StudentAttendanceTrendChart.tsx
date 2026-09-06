@@ -255,44 +255,70 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
     };
   }, [studentRecords, trendData]);
 
-  // Custom Interactive Tooltip
+  // Custom Interactive Tooltip with ClassPulse Branding
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as TrendPoint;
+      const isGoodStanding = data.cumulativeRate >= 80;
+      const totalDayLogs = data.present + data.late + data.absent;
+
       return (
-        <div className="bg-white dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl text-left text-xs min-w-[200px] space-y-2 pointer-events-none">
+        <div className="bg-white dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl text-left text-xs min-w-[210px] space-y-2 pointer-events-none z-50">
           <div className="border-b border-zinc-150 dark:border-zinc-850 pb-1.5 flex items-center justify-between">
-            <span className="font-extrabold text-zinc-900 dark:text-zinc-100">{data.displayDate}</span>
-            <span className="text-[10px] font-mono text-zinc-400">{data.rawDate}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                ClassPulse • Trend Log
+              </span>
+            </div>
+            <span className="text-[9px] font-mono text-zinc-400">{data.rawDate}</span>
           </div>
 
-          <div className="space-y-1 font-mono text-[11px]">
-            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                Cumulative Rate:
-              </span>
-              <span className="font-black text-xs">{data.cumulativeRate}%</span>
+          <div>
+            <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">Session Date</span>
+            <p className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 mt-0.5">{data.displayDate}</p>
+          </div>
+
+          <div className="space-y-1.5 font-mono text-[11px]">
+            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800">
+              <span className="text-zinc-500 font-medium">Cumulative Rate:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-xs text-emerald-600 dark:text-emerald-400">{data.cumulativeRate}%</span>
+                <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded font-mono ${
+                  isGoodStanding ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/15 text-red-600 dark:text-red-400'
+                }`}>
+                  {isGoodStanding ? 'Good' : 'At Risk'}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
-              <span>Day Check-ins:</span>
+            <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400 px-1 text-[10px]">
+              <span>Enrolled Courses:</span>
               <span className="font-bold text-zinc-900 dark:text-zinc-100">{data.sessionCount} class{data.sessionCount > 1 ? 'es' : ''}</span>
             </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-900 text-[10px]">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">Present: {data.present}</span>
-              <span className="text-amber-500 font-bold">Late: {data.late}</span>
-              <span className="text-red-500 font-bold">Absent: {data.absent}</span>
+            <div className="grid grid-cols-3 gap-1 pt-1 border-t border-zinc-100 dark:border-zinc-850 text-[10px]">
+              <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 p-1 rounded-lg text-center font-bold">
+                <p className="text-[7.5px] uppercase text-emerald-600/70 dark:text-emerald-400/70">Pres</p>
+                <p>{data.present}</p>
+              </div>
+              <div className="bg-amber-500/10 text-amber-700 dark:text-amber-300 p-1 rounded-lg text-center font-bold">
+                <p className="text-[7.5px] uppercase text-amber-600/70 dark:text-amber-400/70">Late</p>
+                <p>{data.late}</p>
+              </div>
+              <div className="bg-red-500/10 text-red-700 dark:text-red-300 p-1 rounded-lg text-center font-bold">
+                <p className="text-[7.5px] uppercase text-red-600/70 dark:text-red-400/70">Abs</p>
+                <p>{data.absent}</p>
+              </div>
             </div>
           </div>
 
           {data.classNames.length > 0 && (
-            <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1">
+            <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-850 flex flex-wrap gap-1">
               {data.classNames.map((cName, idx) => (
                 <span 
                   key={idx}
-                  className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-zinc-100 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300"
+                  className="px-1.5 py-0.5 rounded text-[8.5px] font-mono font-bold bg-zinc-100 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300"
                 >
                   {cName}
                 </span>
@@ -573,8 +599,8 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
                   <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="dailyRateGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#71717a" opacity={0.15} />
@@ -621,17 +647,18 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
                 strokeWidth={3}
                 fillOpacity={1} 
                 fill="url(#attendanceRateGrad)"
+                dot={{ r: 4, strokeWidth: 1.5, stroke: '#ffffff', fill: '#10b981' }}
                 activeDot={{ r: 6, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
               />
               <Line 
                 type="monotone" 
                 dataKey="dailyRate" 
                 name="Session Day %" 
-                stroke="#3b82f6" 
+                stroke="#0ea5e9" 
                 strokeWidth={1.5}
-                strokeDasharray="2 2"
-                dot={{ r: 3, fill: '#3b82f6' }}
-                activeDot={{ r: 5, fill: '#3b82f6', stroke: '#ffffff', strokeWidth: 2 }}
+                strokeDasharray="3 3"
+                dot={{ r: 3.5, strokeWidth: 1.5, stroke: '#ffffff', fill: '#0ea5e9' }}
+                activeDot={{ r: 5.5, fill: '#0ea5e9', stroke: '#ffffff', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -683,6 +710,8 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
                 stroke="#10b981" 
                 strokeWidth={2}
                 fill="url(#presentGrad)"
+                dot={{ r: 3, strokeWidth: 1, stroke: '#ffffff', fill: '#10b981' }}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: '#ffffff', fill: '#10b981' }}
               />
               <Area 
                 type="monotone" 
@@ -692,6 +721,8 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
                 stroke="#f59e0b" 
                 strokeWidth={2}
                 fill="url(#lateGrad)"
+                dot={{ r: 3, strokeWidth: 1, stroke: '#ffffff', fill: '#f59e0b' }}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: '#ffffff', fill: '#f59e0b' }}
               />
               <Area 
                 type="monotone" 
@@ -701,6 +732,8 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
                 stroke="#ef4444" 
                 strokeWidth={2}
                 fill="url(#absentGrad)"
+                dot={{ r: 3, strokeWidth: 1, stroke: '#ffffff', fill: '#ef4444' }}
+                activeDot={{ r: 5, strokeWidth: 2, stroke: '#ffffff', fill: '#ef4444' }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -735,16 +768,16 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
                 y={90} 
                 stroke="#10b981" 
                 strokeDasharray="3 3" 
-                label={{ value: '90% Punctuality Target', fill: '#10b981', fontSize: 10, fontWeight: 700 }}
+                label={{ value: '90% Punctuality Target', position: 'insideTopLeft', fill: '#10b981', fontSize: 10, fontWeight: 700 }}
               />
               <Line 
                 type="monotone" 
                 dataKey="punctualityRate" 
                 name="On-Time Punctuality %" 
-                stroke="#8b5cf6" 
+                stroke="#0ea5e9" 
                 strokeWidth={2.5}
-                dot={{ r: 4, fill: '#8b5cf6' }}
-                activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#ffffff', strokeWidth: 2 }}
+                dot={{ r: 4, strokeWidth: 1.5, stroke: '#ffffff', fill: '#0ea5e9' }}
+                activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#ffffff', strokeWidth: 2 }}
               />
             </LineChart>
           </ResponsiveContainer>

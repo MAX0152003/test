@@ -188,57 +188,90 @@ export default function StudentWeeklyAttendanceChart({
     };
   }, [weeklyTrendData]);
 
-  // Custom Recharts Tooltip
+  // Custom Recharts Tooltip with ClassPulse branding
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as WeekData;
+      const isTargetMet = data.rate >= 80;
+      const presPct = data.total > 0 ? Math.round((data.present / data.total) * 100) : 0;
+      const latePct = data.total > 0 ? Math.round((data.late / data.total) * 100) : 0;
+      const excPct = data.total > 0 ? Math.round((data.excused / data.total) * 100) : 0;
+      const absPct = data.total > 0 ? Math.round((data.absent / data.total) * 100) : 0;
+
       return (
-        <div className="bg-white dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl text-left text-xs min-w-[190px] space-y-2">
-          <div className="border-b border-zinc-100 dark:border-zinc-900 pb-1.5 flex items-center justify-between">
-            <span className="font-extrabold text-zinc-900 dark:text-zinc-100">{data.weekLabel}</span>
-            <span className="text-[10px] font-mono text-zinc-400">{data.dateRange}</span>
+        <div className="bg-white dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl text-left text-xs min-w-[210px] space-y-2.5 pointer-events-none z-50">
+          <div className="border-b border-zinc-150 dark:border-zinc-850 pb-1.5 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                ClassPulse • Weekly Breakdown
+              </span>
+            </div>
+            <span className="text-[9px] font-mono text-zinc-400">{data.weekLabel}</span>
           </div>
-          <div className="space-y-1 font-mono text-[11px]">
-            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Present:</span>
-              <span className="font-black">{data.present}</span>
-            </div>
-            {data.late > 0 && (
-              <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" /> Late:</span>
-                <span className="font-black">{data.late}</span>
-              </div>
-            )}
-            {data.excused > 0 && (
-              <div className="flex items-center justify-between text-blue-600 dark:text-blue-400">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Excused:</span>
-                <span className="font-black">{data.excused}</span>
-              </div>
-            )}
-            {data.absent > 0 && (
-              <div className="flex items-center justify-between text-red-600 dark:text-red-400">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Absent:</span>
-                <span className="font-black">{data.absent}</span>
-              </div>
-            )}
-            <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-900 text-zinc-600 dark:text-zinc-400">
-              <span>Total Sessions:</span>
-              <span className="font-black text-zinc-900 dark:text-zinc-100">{data.total}</span>
-            </div>
-            <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
-              <span>Weekly Rate:</span>
-              <span className="font-black text-emerald-500">{data.rate}%</span>
+
+          <div>
+            <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">Calendar Range</span>
+            <p className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 mt-0.5">{data.dateRange}</p>
+          </div>
+
+          <div className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 text-[11px] font-mono">
+            <span className="text-zinc-500 font-medium">Weekly Rate:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-emerald-500 font-black text-xs">{data.rate}%</span>
+              <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded font-mono ${
+                isTargetMet ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/15 text-red-600 dark:text-red-400'
+              }`}>
+                {isTargetMet ? 'Target Met' : 'Needs Focus'}
+              </span>
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[10px] font-mono">
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Present
+              </span>
+              <span className="font-bold">{data.present} ({presPct}%)</span>
+            </div>
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Late
+              </span>
+              <span className="font-bold">{data.late} ({latePct}%)</span>
+            </div>
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                Excused
+              </span>
+              <span className="font-bold">{data.excused} ({excPct}%)</span>
+            </div>
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-red-500/10 text-red-700 dark:text-red-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                Absent
+              </span>
+              <span className="font-bold">{data.absent} ({absPct}%)</span>
+            </div>
+          </div>
+
+          <div className="pt-1.5 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+            <span>Total Logged Sessions:</span>
+            <span className="font-black text-zinc-900 dark:text-zinc-100">{data.total}</span>
+          </div>
+
           {data.issues.length > 0 && (
-            <div className="pt-1.5 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1">
+            <div className="pt-1 border-t border-zinc-100 dark:border-zinc-850 flex flex-wrap gap-1">
               {data.issues.map((iss, idx) => (
                 <span 
                   key={`${iss}-${idx}`}
-                  className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                  className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold ${
                     iss.includes('Absent') ? 'bg-red-500/10 text-red-500' :
                     iss.includes('Late') ? 'bg-amber-500/10 text-amber-500' :
-                    iss.includes('Excused') ? 'bg-blue-500/10 text-blue-500' :
+                    iss.includes('Excused') ? 'bg-sky-500/10 text-sky-500' :
                     'bg-emerald-500/10 text-emerald-500'
                   }`}
                 >
@@ -388,7 +421,7 @@ export default function StudentWeeklyAttendanceChart({
             />
             <Tooltip 
               content={<CustomTooltip />} 
-              cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }}
+              cursor={{ fill: 'rgba(16, 185, 129, 0.08)', radius: 8 }}
             />
             <Legend 
               verticalAlign="top" 
@@ -406,7 +439,7 @@ export default function StudentWeeklyAttendanceChart({
             <Bar 
               dataKey="excused" 
               name="Excused" 
-              fill="#3b82f6" 
+              fill="#0ea5e9" 
               radius={[0, 0, 0, 0]} 
               stackId="a"
             />

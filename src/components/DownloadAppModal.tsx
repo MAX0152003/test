@@ -7,13 +7,12 @@ import {
   Laptop,
   Check,
   Zap,
-  ArrowDownToLine,
   Activity,
-  Download,
-  Globe,
-  Sparkles,
-  Info,
-  CheckCircle2
+  Copy,
+  Terminal,
+  ExternalLink,
+  CheckCircle2,
+  Share2
 } from 'lucide-react';
 
 interface DownloadAppModalProps {
@@ -21,125 +20,15 @@ interface DownloadAppModalProps {
   onClose: () => void;
 }
 
-// Helper to build a completely valid ZIP/APK archive structure in pure JS
-function generateValidApkZip(files: Array<{ name: string; content: Uint8Array | string }>): Blob {
-  const encoder = new TextEncoder();
-  const fileEntries = files.map(f => {
-    const data = typeof f.content === 'string' ? encoder.encode(f.content) : f.content;
-    const nameBytes = encoder.encode(f.name);
-    return { name: f.name, nameBytes, data, size: data.length };
-  });
-
-  // Calculate CRC32 for standard compliance
-  const crcTable = (() => {
-    let c;
-    const table = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      c = n;
-      for (let k = 0; k < 8; k++) {
-        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      }
-      table[n] = c;
-    }
-    return table;
-  })();
-
-  function crc32(buf: Uint8Array): number {
-    let crc = 0 ^ (-1);
-    for (let i = 0; i < buf.length; i++) {
-      crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xFF];
-    }
-    return (crc ^ (-1)) >>> 0;
-  }
-
-  const parts: Uint8Array[] = [];
-  const centralDirEntries: Uint8Array[] = [];
-  let offset = 0;
-
-  for (const entry of fileEntries) {
-    const fileCrc = crc32(entry.data);
-    const date = new Date();
-    const time = ((date.getHours() << 11) | (date.getMinutes() << 5) | (date.getSeconds() >> 1)) & 0xFFFF;
-    const d = (((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()) & 0xFFFF;
-
-    // Local Header (30 bytes + filename)
-    const localHeader = new Uint8Array(30 + entry.nameBytes.length);
-    const lv = new DataView(localHeader.buffer);
-    lv.setUint32(0, 0x04034b50, true); // Local header signature
-    lv.setUint16(4, 20, true);         // Version needed to extract (2.0)
-    lv.setUint16(6, 0, true);          // General purpose bit flag
-    lv.setUint16(8, 0, true);          // Compression method (0 = store)
-    lv.setUint16(10, time, true);
-    lv.setUint16(12, d, true);
-    lv.setUint32(14, fileCrc, true);   // CRC-32
-    lv.setUint32(18, entry.size, true); // Compressed size
-    lv.setUint32(22, entry.size, true); // Uncompressed size
-    lv.setUint16(26, entry.nameBytes.length, true); // File name length
-    lv.setUint16(28, 0, true);          // Extra field length
-    localHeader.set(entry.nameBytes, 30);
-
-    parts.push(localHeader);
-    parts.push(entry.data);
-
-    // Central Directory Header (46 bytes + filename)
-    const centralHeader = new Uint8Array(46 + entry.nameBytes.length);
-    const cv = new DataView(centralHeader.buffer);
-    cv.setUint32(0, 0x02014b50, true); // Central directory signature
-    cv.setUint16(4, 20, true);         // Version made by
-    cv.setUint16(6, 20, true);         // Version needed
-    cv.setUint16(8, 0, true);          // Flag
-    cv.setUint16(10, 0, true);         // Compression (0 = store)
-    cv.setUint16(12, time, true);
-    cv.setUint16(14, d, true);
-    cv.setUint32(16, fileCrc, true);
-    cv.setUint32(20, entry.size, true);
-    cv.setUint32(24, entry.size, true);
-    cv.setUint16(28, entry.nameBytes.length, true);
-    cv.setUint16(30, 0, true);         // Extra field length
-    cv.setUint16(32, 0, true);         // Comment length
-    cv.setUint16(34, 0, true);         // Disk start
-    cv.setUint16(36, 0, true);         // Internal attributes
-    cv.setUint32(38, 0, true);         // External attributes
-    cv.setUint32(42, offset, true);    // Relative offset of local header
-    centralHeader.set(entry.nameBytes, 46);
-
-    centralDirEntries.push(centralHeader);
-    offset += localHeader.length + entry.data.length;
-  }
-
-  const centralDirOffset = offset;
-  let centralDirSize = 0;
-  for (const c of centralDirEntries) {
-    parts.push(c);
-    centralDirSize += c.length;
-  }
-
-  // End of Central Directory Record (22 bytes)
-  const eocd = new Uint8Array(22);
-  const ev = new DataView(eocd.buffer);
-  ev.setUint32(0, 0x06054b50, true); // EOCD signature
-  ev.setUint16(4, 0, true);          // Disk number
-  ev.setUint16(6, 0, true);          // Central dir disk
-  ev.setUint16(8, fileEntries.length, true);  // Entries on this disk
-  ev.setUint16(10, fileEntries.length, true); // Total entries
-  ev.setUint32(12, centralDirSize, true);     // Size of central directory
-  ev.setUint32(16, centralDirOffset, true);   // Offset of central directory
-  ev.setUint16(20, 0, true);         // Comment length
-
-  parts.push(eocd);
-
-  return new Blob(parts, { type: 'application/vnd.android.package-archive' });
-}
-
 export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalProps) {
-  const [downloadStarted, setDownloadStarted] = useState(false);
-  const [activePlatformTab, setActivePlatformTab] = useState<'android' | 'ios' | 'pwa'>('android');
+  const [activePlatformTab, setActivePlatformTab] = useState<'android' | 'ios' | 'pwa' | 'capacitor'>('android');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [installStatusMessage, setInstallStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Listen for the native Android / Chrome PWA install prompt
+    // Listen for the browser's native PWA / WebAPK install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -148,6 +37,7 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      setInstallStatusMessage('ClassPulse is installed on your device!');
       try {
         localStorage.setItem('cp_is_installed', 'true');
       } catch (e) {}
@@ -164,7 +54,7 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
 
   if (!isOpen) return null;
 
-  // Direct Android WebAPK native prompt or APK package download
+  // Direct Android WebAPK native prompt
   const handleTriggerNativeInstall = async () => {
     if (deferredPrompt) {
       try {
@@ -172,101 +62,23 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
           setIsInstalled(true);
-          setDownloadSuccessMessage('ClassPulse is now installed on your device!');
+          setInstallStatusMessage('ClassPulse is now installed on your device!');
         }
         setDeferredPrompt(null);
       } catch (err) {
-        handleTriggerApkDownload();
+        console.error('Install prompt error:', err);
       }
     } else {
-      handleTriggerApkDownload();
+      setInstallStatusMessage('To install: Open your browser menu (⋮) and tap "Install app" or "Add to Home Screen".');
     }
   };
 
-  const handleTriggerApkDownload = () => {
-    setDownloadStarted(true);
-    setDownloadSuccessMessage(null);
-
-    try {
-      // Build a standard Android APK package containing manifest, dex stub, assets, and metadata
-      const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="ph.edu.msu.classpulse"
-    android:versionCode="200"
-    android:versionName="2.0.0">
-    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <application
-        android:label="ClassPulse MSU"
-        android:icon="@mipmap/ic_launcher"
-        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
-        android:hardwareAccelerated="true">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:configChanges="orientation|keyboardHidden|screenSize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>`;
-
-      const manifestJson = JSON.stringify({
-        short_name: "ClassPulse",
-        name: "ClassPulse MSU v2.0",
-        icons: [
-          { src: "/favicon.ico", sizes: "64x64 32x32 24x24 16x16", type: "image/x-icon" },
-          { src: "/icon-192.png", type: "image/png", sizes: "192x192" },
-          { src: "/icon-512.png", type: "image/png", sizes: "512x512" }
-        ],
-        start_url: "/?installed=true",
-        background_color: "#121212",
-        theme_color: "#10b981",
-        display: "standalone",
-        orientation: "portrait"
-      }, null, 2);
-
-      const metaManifest = `Manifest-Version: 1.0\nCreated-By: ClassPulse MSU Build System 2.0\nMain-Class: ph.edu.msu.classpulse.MainActivity\nPackage: ph.edu.msu.classpulse\n`;
-
-      const files = [
-        { name: 'AndroidManifest.xml', content: manifestXml },
-        { name: 'assets/manifest.json', content: manifestJson },
-        { name: 'META-INF/MANIFEST.MF', content: metaManifest },
-        { name: 'resources.arsc', content: new Uint8Array([0x02, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00]) },
-        { name: 'classes.dex', content: new Uint8Array([0x64, 0x65, 0x78, 0x0A, 0x30, 0x33, 0x39, 0x00]) }
-      ];
-
-      const apkBlob = generateValidApkZip(files);
-      const url = URL.createObjectURL(apkBlob);
-      const fileName = 'ClassPulse_v2.0_MSU.apk';
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = fileName;
-      link.setAttribute('download', fileName);
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-
-      setTimeout(() => {
-        try {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        } catch (e) {}
-        setDownloadStarted(false);
-        setDownloadSuccessMessage('ClassPulse APK downloaded successfully! Tap the file in your notification bar or downloads to install.');
-      }, 1500);
-
-    } catch (error) {
-      console.error("APK generation error:", error);
-      setDownloadStarted(false);
-      setDownloadSuccessMessage('Download initiated. Follow the installation guide below.');
-    }
+  const handleCopyLink = () => {
+    const url = window.location.origin;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    });
   };
 
   return (
@@ -307,10 +119,10 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tight font-sans uppercase">
-                  Class<span className="text-emerald-500">Pulse</span> Mobile
+                  Class<span className="text-emerald-500">Pulse</span> App
                 </h3>
                 <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                  v2.0 APK
+                  Cross-Platform
                 </span>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
@@ -319,8 +131,8 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
             </div>
           </div>
 
-          {/* Success Banner if Downloaded */}
-          {downloadSuccessMessage && (
+          {/* Status / Feedback Banner */}
+          {installStatusMessage && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -328,49 +140,61 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold block">Download Ready!</span>
-                <span>{downloadSuccessMessage}</span>
+                <span className="font-bold block">Installation Notice</span>
+                <span>{installStatusMessage}</span>
               </div>
             </motion.div>
           )}
 
           {/* Platform Selection Tabs */}
-          <div className="grid grid-cols-3 gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl">
+          <div className="grid grid-cols-4 gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl">
             <button
               type="button"
               onClick={() => setActivePlatformTab('android')}
-              className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
                 activePlatformTab === 'android'
                   ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
                   : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
               }`}
             >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Android (APK)</span>
+              <Smartphone className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Android</span>
             </button>
             <button
               type="button"
               onClick={() => setActivePlatformTab('ios')}
-              className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
                 activePlatformTab === 'ios'
                   ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
                   : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
               }`}
             >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>iPhone / iOS</span>
+              <Smartphone className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">iOS</span>
             </button>
             <button
               type="button"
               onClick={() => setActivePlatformTab('pwa')}
-              className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
                 activePlatformTab === 'pwa'
                   ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
                   : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
               }`}
             >
-              <Laptop className="w-3.5 h-3.5" />
-              <span>PC / Web</span>
+              <Laptop className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Windows</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePlatformTab('capacitor')}
+              className={`py-2 px-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                activePlatformTab === 'capacitor'
+                  ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                  : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">APK Build</span>
             </button>
           </div>
 
@@ -382,55 +206,43 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                      ClassPulse Android Package (APK & WebAPK)
+                      Direct Android Installation (WebAPK)
                     </span>
-                    <span className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">Compatible with All Devices</span>
+                    <span className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Android 8.0+</span>
                   </div>
                   <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    Install ClassPulse directly on any Android phone or tablet (Samsung, Xiaomi, Oppo, Vivo, Google Pixel, Realme, etc.). Fully supports hardware camera QR scanning and local offline storage.
+                    Installs ClassPulse as a standalone app on your Android phone or tablet. Works completely full-screen with offline caching and hardware camera QR scanning.
                   </p>
                 </div>
 
-                {/* Main Action Buttons */}
+                {/* Main Action Button */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
-                    onClick={handleTriggerApkDownload}
-                    disabled={downloadStarted}
-                    className="flex-1 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer disabled:opacity-75"
+                    onClick={handleTriggerNativeInstall}
+                    className="flex-1 py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer"
                   >
-                    {downloadStarted ? (
-                      <>
-                        <Check className="w-4 h-4 text-black stroke-[3]" />
-                        <span>Packaging & Downloading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDownToLine className="w-4 h-4 stroke-[2.5]" />
-                        <span>Download APK Package</span>
-                      </>
-                    )}
+                    <Zap className="w-4 h-4 text-black stroke-[3]" />
+                    <span>{deferredPrompt ? '1-Tap Install on Android' : 'Install ClassPulse App'}</span>
                   </button>
-
-                  {deferredPrompt && (
-                    <button
-                      type="button"
-                      onClick={handleTriggerNativeInstall}
-                      className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-black text-xs font-bold flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer"
-                    >
-                      <Zap className="w-4 h-4 text-emerald-500" />
-                      <span>1-Click Install</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="py-3 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                    title="Copy direct portal link"
+                  >
+                    {copiedLink ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
+                  </button>
                 </div>
 
                 <div className="text-[11px] text-zinc-600 dark:text-zinc-400 bg-zinc-100/80 dark:bg-zinc-900/60 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-1.5">
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 block">Installation Instructions:</span>
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200 block">How to install via browser:</span>
                   <div className="space-y-1">
-                    <p>1. Tap <strong>Download APK Package</strong> above to save <code>ClassPulse_v2.0_MSU.apk</code>.</p>
-                    <p>2. Open your notification drawer or Downloads folder and tap the APK file.</p>
-                    <p>3. If prompted with "Install unknown apps", allow your browser or files app and tap <strong>Install</strong>.</p>
-                    <p>4. Or in Chrome / Samsung Internet: tap <strong>⋮ (Menu) &gt; Install App / Add to Home Screen</strong>.</p>
+                    <p>1. Open this page in <strong>Google Chrome</strong> or <strong>Samsung Internet</strong>.</p>
+                    <p>2. Tap the three-dot menu icon (<strong>⋮</strong>) in the top-right corner.</p>
+                    <p>3. Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>
+                    <p>4. Android automatically generates your native WebAPK launcher icon.</p>
                   </div>
                 </div>
               </div>
@@ -438,15 +250,25 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
 
             {activePlatformTab === 'ios' && (
               <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3 text-left">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Smartphone className="w-4 h-4 text-emerald-500" />
-                  Install on iPhone / iPad (Safari)
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-emerald-500" />
+                    Install on iPhone / iPad (Safari)
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleCopyLink}
+                    className="text-[11px] font-bold text-emerald-500 flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    {copiedLink ? <Check className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
+                    {copiedLink ? 'Copied!' : 'Copy Link'}
+                  </button>
+                </div>
                 <ol className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2 list-decimal pl-4 leading-relaxed">
-                  <li>Open ClassPulse in <strong>Safari</strong> on your Apple device.</li>
-                  <li>Tap the <strong>Share</strong> icon (the square with an upward arrow) at the bottom toolbar.</li>
-                  <li>Scroll down and select <strong>Add to Home Screen</strong>.</li>
-                  <li>Tap <strong>Add</strong> at top right. ClassPulse will install as a standalone native app.</li>
+                  <li>Open this link in <strong>Safari</strong> on your Apple device.</li>
+                  <li>Tap the <strong>Share</strong> button (the square with an upward arrow) in the bottom toolbar.</li>
+                  <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+                  <li>Tap <strong>Add</strong> at top right. ClassPulse opens as a dedicated full-screen app.</li>
                 </ol>
               </div>
             )}
@@ -455,16 +277,49 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
               <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3 text-left">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                   <Laptop className="w-4 h-4 text-emerald-500" />
-                  Install on Windows PC / Mac / ChromeOS
+                  Install on Windows PC / Mac
                 </h4>
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  In Google Chrome, Microsoft Edge, or Brave:
+                  In Microsoft Edge, Google Chrome, or Brave:
                 </p>
                 <ol className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2 list-decimal pl-4 leading-relaxed">
-                  <li>Look for the <strong>Install</strong> icon in your browser URL address bar (right side).</li>
+                  <li>Look for the <strong>Install</strong> icon in the address bar (right side).</li>
                   <li>Click <strong>Install ClassPulse</strong>.</li>
-                  <li>The app will run in its own dedicated, high-speed window with desktop notification support.</li>
+                  <li>ClassPulse will launch in its own window and can be pinned to your Windows Taskbar or Mac Dock.</li>
                 </ol>
+                {deferredPrompt && (
+                  <button
+                    type="button"
+                    onClick={handleTriggerNativeInstall}
+                    className="w-full py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-black text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4 text-emerald-500" />
+                    <span>Install ClassPulse on Desktop</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activePlatformTab === 'capacitor' && (
+              <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 space-y-3 text-left">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+                    <Terminal className="w-4 h-4 text-emerald-500" />
+                    Build Native Android APK (.apk)
+                  </h4>
+                  <span className="text-[10px] font-mono text-zinc-400">Capacitor CLI</span>
+                </div>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  To compile a standalone, signed APK for distribution or sideloading:
+                </p>
+                <div className="p-3 rounded-xl bg-zinc-900 text-zinc-200 font-mono text-[11px] space-y-1 overflow-x-auto">
+                  <p className="text-zinc-500"># 1. Build web bundle & initialize Capacitor</p>
+                  <p className="text-emerald-400">npm run build</p>
+                  <p className="text-emerald-400">npx cap init ClassPulse ph.edu.msu.classpulse</p>
+                  <p className="text-emerald-400">npx cap add android</p>
+                  <p className="text-zinc-500 mt-1"># 2. Build signed APK in Android Studio</p>
+                  <p className="text-emerald-400">npx cap open android</p>
+                </div>
               </div>
             )}
           </div>
@@ -472,7 +327,7 @@ export default function DownloadAppModal({ isOpen, onClose }: DownloadAppModalPr
           {/* Footer note */}
           <div className="pt-2 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-[11px] text-zinc-400">
             <span>Mindanao State University</span>
-            <span>Free & Open for MSU Community</span>
+            <span>Production Version 2.0</span>
           </div>
         </motion.div>
       </div>

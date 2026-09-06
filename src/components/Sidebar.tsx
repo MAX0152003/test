@@ -58,7 +58,6 @@ export default function Sidebar({
     return localStorage.getItem('cp_sidebar_collapsed') === 'true';
   });
   const [isHovered, setIsHovered] = React.useState(false);
-  const [, setFacultyCode] = React.useState('Faculty123');
   const [pendingResetsCount, setPendingResetsCount] = React.useState(0);
   const [pendingTicketsCount, setPendingTicketsCount] = React.useState(0);
 
@@ -119,18 +118,11 @@ export default function Sidebar({
     window.addEventListener('cp-support-tickets-changed', updateTicketsCount);
     window.addEventListener('storage', handleStorage);
 
-    const code = localStorage.getItem('classpulse_faculty_reg_code') || 'Faculty123';
-    setFacultyCode(code);
-
     const handleToggle = () => setIsOpen(prev => !prev);
     const handleClose = () => setIsOpen(false);
-    const handleCodeChange = (e: any) => {
-      if (e.detail) setFacultyCode(e.detail);
-    };
 
     window.addEventListener('toggle-mobile-sidebar', handleToggle);
     window.addEventListener('close-mobile-sidebar', handleClose);
-    window.addEventListener('faculty-code-changed', handleCodeChange);
 
     return () => {
       window.removeEventListener('password-reset-requests-changed', updateResetsCount);
@@ -138,7 +130,6 @@ export default function Sidebar({
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('toggle-mobile-sidebar', handleToggle);
       window.removeEventListener('close-mobile-sidebar', handleClose);
-      window.removeEventListener('faculty-code-changed', handleCodeChange);
     };
   }, []);
 

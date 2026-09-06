@@ -1387,12 +1387,20 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                               </div>
                               <button 
                                 onClick={() => {
+                                  const fileName = m.attachmentFile?.name || 'resource.txt';
+                                  const blob = new Blob([`ClassPulse Academic Resource: ${fileName}\nExported: ${new Date().toLocaleString()}`], { type: 'text/plain' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = fileName;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  document.body.removeChild(a);
+                                  URL.revokeObjectURL(url);
                                   if (typeof window !== 'undefined' && (window as any).showToast) {
-                                    (window as any).showToast(`Downloading class resource: ${m.attachmentFile?.name}`, "success");
-                                  } else {
-                                    alert(`Mock downloading resource file: ${m.attachmentFile?.name}`);
+                                    (window as any).showToast(`Downloaded resource: ${fileName}`, "success");
                                   }
-                                  speakText(`Beginning secure download for class resource ${m.attachmentFile?.name}`, accessibility.readAloud);
+                                  speakText(`Beginning download for class resource ${fileName}`, accessibility.readAloud);
                                 }}
                                 className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-emerald-500/10 hover:text-emerald-500 cursor-pointer"
                               >

@@ -228,7 +228,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
               </h3>
               <span className="text-[10px] text-emerald-500 font-mono font-bold flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live Demo
+                Active System
               </span>
             </div>
 

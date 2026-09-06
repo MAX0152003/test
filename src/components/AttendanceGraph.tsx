@@ -1,14 +1,19 @@
-import React, { useEffect, useRef } from 'react';
-import { Chart, registerables } from 'chart.js/auto';
+import React, { useState, useMemo } from 'react';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  CartesianGrid, 
+  ReferenceLine,
+  Legend 
+} from 'recharts';
 import { AttendanceRecord } from '../types';
-import { Activity, TrendingUp, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
-
-// Register standard Chart.js modules just in case
-try {
-  Chart.register(...registerables);
-} catch(e) {
-  // Silent fallback if already registered
-}
+import { TrendingUp, CheckCircle, Clock, AlertTriangle, Layers, BarChart2, Calendar } from 'lucide-react';
 
 interface AttendanceGraphProps {
   classId: string;
@@ -18,19 +23,28 @@ interface AttendanceGraphProps {
   isDark?: boolean;
 }
 
-export default function AttendanceGraph({ classId, classCode, className, records = [], isDark: propIsDark }: AttendanceGraphProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const chartInstanceRef = useRef<Chart | null>(null);
+export default function AttendanceGraph({ 
+  classId, 
+  classCode, 
+  className, 
+  records = [], 
+  isDark: propIsDark 
+}: AttendanceGraphProps) {
+  const [graphMode, setGraphMode] = useState<'pulse' | 'distribution'>('pulse');
 
   // Compute theme dynamically inside rendering
-  const activeIsDark = propIsDark !== undefined ? propIsDark : document.documentElement.classList.contains('dark');
+  const activeIsDark = propIsDark !== undefined 
+    ? propIsDark 
+    : typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
   const safeRecords = Array.isArray(records) ? records : [];
 
   // Filter records for this class
-  const classRecords = safeRecords
-    .filter(r => r.classId === classId)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const classRecords = useMemo(() => {
+    return safeRecords
+      .filter(r => r.classId === classId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [safeRecords, classId]);
 
   // Aggregate metrics
   const total = classRecords.length;
@@ -44,204 +58,140 @@ export default function AttendanceGraph({ classId, classCode, className, records
   const excusedPercent = total > 0 ? Math.round((excused / total) * 100) : 0;
   const absentPercent = total > 0 ? Math.round((absent / total) * 100) : 0;
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    // Destroy previous chart if existing to prevent canvas re-use errors
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.destroy();
+  // Aggregate by date for Recharts
+  const chartData = useMemo(() => {
+    if (classRecords.length === 0) {
+      // Return 4 reference sample dates if no records yet
+      return [
+        { date: 'Session 1', fullDate: 'Initial Roster', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Session 2', fullDate: 'Lecture 2', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Session 3', fullDate: 'Lecture 3', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Session 4', fullDate: 'Current', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+      ];
     }
 
-    // Prepare chronological data
-    const labels = classRecords.map(r => {
-      // Format YYYY-MM-DD to prettier format (e.g., "May 12")
+    const map = new Map<string, AttendanceRecord[]>();
+    classRecords.forEach(r => {
+      const arr = map.get(r.date) || [];
+      arr.push(r);
+      map.set(r.date, arr);
+    });
+
+    const dates = Array.from(map.keys()).sort();
+
+    return dates.map(dateStr => {
+      const recs = map.get(dateStr) || [];
+      const p = recs.filter(r => r.status === 'present').length;
+      const l = recs.filter(r => r.status === 'late').length;
+      const e = recs.filter(r => r.status === 'excused').length;
+      const a = recs.filter(r => r.status === 'absent').length;
+      const tot = recs.length;
+      const rate = tot > 0 ? Math.round(((p + e + l * 0.7) / tot) * 100) : 100;
+
+      let formattedDate = dateStr;
       try {
-        const d = new Date(r.date);
-        return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+        const d = new Date(dateStr + 'T00:00:00');
+        formattedDate = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
       } catch {
-        return r.date;
+        // fallback to dateStr
       }
+
+      return {
+        date: formattedDate,
+        rawDate: dateStr,
+        fullDate: dateStr,
+        rate,
+        present: p,
+        late: l,
+        excused: e,
+        absent: a,
+        total: tot
+      };
     });
+  }, [classRecords]);
 
-    // If empty classRecords, provide dynamic trend points so it looks complete and removes fixed weeks
-    const finalLabels = labels.length > 0 ? labels : Array.from({ length: 4 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (3 - i) * 7);
-      return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    });
-    
-    // Convert status to value for trending (Present = 100, Excused = 90, Late = 70, Absent = 0)
-    const trendValues = classRecords.map(r => {
-      if (r.status === 'present') return 100;
-      if (r.status === 'excused') return 90;
-      if (r.status === 'late') return 70;
-      return 0;
-    });
-    const finalTrendValues = trendValues.length > 0 ? trendValues : [100, 100, 100, 100];
+  // Custom rich tooltip with ClassPulse branding
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const dataItem = payload[0].payload;
+      const isBenchmarkMet = dataItem.rate >= 80;
+      const presPct = dataItem.total > 0 ? Math.round((dataItem.present / dataItem.total) * 100) : 0;
+      const latePct = dataItem.total > 0 ? Math.round((dataItem.late / dataItem.total) * 100) : 0;
+      const excPct = dataItem.total > 0 ? Math.round((dataItem.excused / dataItem.total) * 100) : 0;
+      const absPct = dataItem.total > 0 ? Math.round((dataItem.absent / dataItem.total) * 100) : 0;
 
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
+      return (
+        <div className="p-3.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl text-left text-xs space-y-2.5 min-w-[195px] pointer-events-none z-50">
+          <div className="flex items-center justify-between border-b border-zinc-150 dark:border-zinc-850 pb-1.5 font-bold">
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                ClassPulse • Session Pulse
+              </span>
+            </div>
+            <span className="text-[9px] font-mono text-zinc-400">{dataItem.total} logs</span>
+          </div>
 
-    // Create Gradient fill for Line Chart
-    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-    gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
-    gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+          <div>
+            <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">Session Date</span>
+            <p className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 mt-0.5">{dataItem.date} {dataItem.fullDate && dataItem.fullDate !== dataItem.date ? `(${dataItem.fullDate})` : ''}</p>
+          </div>
 
-    chartInstanceRef.current = new Chart(canvasRef.current, {
-      type: 'line',
-      data: {
-        labels: finalLabels,
-        datasets: [
-          {
-            label: 'Class Attendance Pulse (%)',
-            data: finalTrendValues,
-            borderColor: '#10b981',
-            borderWidth: 3,
-            backgroundColor: gradient,
-            fill: true,
-            tension: 0.4,
-            pointBackgroundColor: '#10b981',
-            pointBorderColor: activeIsDark ? '#09090b' : '#ffffff',
-            pointBorderWidth: 2,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            backgroundColor: activeIsDark ? '#09090b' : '#ffffff',
-            titleColor: activeIsDark ? '#f4f4f5' : '#18181b',
-            titleFont: {
-              family: 'JetBrains Mono, monospace',
-              size: 11,
-              weight: 'bold'
-            },
-            bodyFont: {
-              family: 'Inter, sans-serif',
-              size: 11
-            },
-            bodyColor: '#10b981',
-            borderColor: activeIsDark ? '#27272a' : '#e4e4e7',
-            borderWidth: 1.5,
-            padding: 12,
-            displayColors: false,
-            callbacks: {
-              title: (tooltipItems) => {
-                const index = tooltipItems[0].dataIndex;
-                if (classRecords[index]) {
-                  const r = classRecords[index];
-                  try {
-                    const d = new Date(r.date);
-                    return `🗓️ ${d.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
-                  } catch {
-                    return `🗓️ Date: ${r.date}`;
-                  }
-                }
-                return '🗓️ Reference Period';
-              },
-              label: (context) => {
-                const index = context.dataIndex;
-                if (classRecords[index]) {
-                  const r = classRecords[index];
-                  const statusLabel = r.status.toUpperCase();
-                  const timeInfo = r.time ? ` at ${r.time}` : ' (No logs)';
-                  return `Status: ${statusLabel}${timeInfo}`;
-                }
-                return 'Standard Status: PRESENT';
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            grid: {
-              color: activeIsDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-            },
-            ticks: {
-              color: activeIsDark ? '#a1a1aa' : '#71717a',
-              font: {
-                family: 'JetBrains Mono, monospace',
-                size: 9
-              }
-            }
-          },
-          y: {
-            min: 0,
-            max: 110,
-            grid: {
-              color: activeIsDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-            },
-            ticks: {
-              color: activeIsDark ? '#a1a1aa' : '#71717a',
-              font: {
-                family: 'JetBrains Mono, monospace',
-                size: 9
-              },
-              callback: (value) => {
-                if (value === 100) return 'Present';
-                if (value === 90) return 'Excused';
-                if (value === 70) return 'Late';
-                if (value === 0) return 'Absent';
-                return '';
-              }
-            }
-          }
-        }
-      }
-    });
+          <div className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 text-[11px] font-mono">
+            <span className="text-zinc-500 font-medium">Session Rate:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-emerald-500 font-black text-xs">{dataItem.rate}%</span>
+              <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded font-mono ${
+                isBenchmarkMet ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/15 text-red-600 dark:text-red-400'
+              }`}>
+                {isBenchmarkMet ? 'Met' : 'Below 80%'}
+              </span>
+            </div>
+          </div>
 
-    return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-      }
-    };
-  }, [classId, classRecords.length, activeIsDark]);
-
-  // ResizeObserver with 100ms debounced trigger to handle sudden layout/split-screen transitions
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const parent = canvasRef.current.parentElement;
-    if (!parent) return;
-
-    let timeoutId: any = null;
-
-    const observer = new ResizeObserver((entries) => {
-      if (!entries || entries.length === 0) return;
-      
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        if (chartInstanceRef.current) {
-          try {
-            chartInstanceRef.current.resize();
-          } catch (e) {
-            // Silently handle if chart is being destroyed/recreated
-          }
-        }
-      }, 100);
-    });
-
-    observer.observe(parent);
-
-    return () => {
-      observer.disconnect();
-      clearTimeout(timeoutId);
-    };
-  }, []);
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[10px] font-mono">
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Present
+              </span>
+              <span className="font-bold">{dataItem.present} ({presPct}%)</span>
+            </div>
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Late
+              </span>
+              <span className="font-bold">{dataItem.late} ({latePct}%)</span>
+            </div>
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-sky-500/10 text-sky-700 dark:text-sky-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                Excused
+              </span>
+              <span className="font-bold">{dataItem.excused} ({excPct}%)</span>
+            </div>
+            <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-red-500/10 text-red-700 dark:text-red-300">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                Absent
+              </span>
+              <span className="font-bold">{dataItem.absent} ({absPct}%)</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-4">
-      {/* Tally Cards */}
-      <div className={`grid ${excused > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-3`}>
-        <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
+      {/* Tally Metric Cards */}
+      <div className={`grid ${excused > 0 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2.5 sm:gap-3`}>
+        <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 text-left transition-all">
           <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
+            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
             <span className="text-[10px] font-bold uppercase tracking-wider">Present</span>
           </div>
           <div className="flex items-baseline gap-1">
@@ -250,9 +200,9 @@ export default function AttendanceGraph({ classId, classCode, className, records
           </div>
         </div>
 
-        <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
+        <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 text-left transition-all">
           <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-            <Clock className="w-4 h-4 text-amber-500" />
+            <Clock className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-[10px] font-bold uppercase tracking-wider">Late</span>
           </div>
           <div className="flex items-baseline gap-1">
@@ -262,9 +212,9 @@ export default function AttendanceGraph({ classId, classCode, className, records
         </div>
 
         {excused > 0 && (
-          <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
+          <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 text-left transition-all">
             <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-              <CheckCircle className="w-4 h-4 text-blue-500" />
+              <CheckCircle className="w-3.5 h-3.5 text-sky-500" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Excused</span>
             </div>
             <div className="flex items-baseline gap-1">
@@ -274,9 +224,9 @@ export default function AttendanceGraph({ classId, classCode, className, records
           </div>
         )}
 
-        <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850 text-left">
+        <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-850 text-left transition-all">
           <div className="flex items-center gap-1.5 text-zinc-500 mb-1">
-            <AlertTriangle className="w-4 h-4 text-red-500" />
+            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
             <span className="text-[10px] font-bold uppercase tracking-wider">Absent</span>
           </div>
           <div className="flex items-baseline gap-1">
@@ -286,21 +236,154 @@ export default function AttendanceGraph({ classId, classCode, className, records
         </div>
       </div>
 
-      {/* Main Canvas Graph Box */}
-      <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-850">
-        <div className="flex items-center justify-between mb-3 text-left">
+      {/* Main Recharts Graph Box */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200 dark:border-zinc-850">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 text-left">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-500" />
-            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-widest">Attendance Pulse Rate Trend</span>
+            <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider">
+              {classCode ? `${classCode} Attendance Analytics` : 'Attendance Pulse Trend'}
+            </span>
           </div>
-          <div className="text-[10px] font-mono text-emerald-500 flex items-center gap-1 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
-            {total} logs analyzed
+
+          <div className="flex items-center gap-2">
+            {/* Toggle Graph Mode */}
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-xl text-[10px] font-bold border border-zinc-200/60 dark:border-zinc-700/60">
+              <button
+                type="button"
+                onClick={() => setGraphMode('pulse')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  graphMode === 'pulse'
+                    ? 'bg-white dark:bg-zinc-700 text-emerald-500 shadow-2xs font-black'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                <TrendingUp className="w-3 h-3" />
+                <span>Rate (%)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGraphMode('distribution')}
+                className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                  graphMode === 'distribution'
+                    ? 'bg-white dark:bg-zinc-700 text-emerald-500 shadow-2xs font-black'
+                    : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                }`}
+              >
+                <BarChart2 className="w-3 h-3" />
+                <span>Counts</span>
+              </button>
+            </div>
+
+            <div className="text-[10px] font-mono text-emerald-500 flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-500/15 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              <span>{total} logs</span>
+            </div>
           </div>
         </div>
 
-        <div className="h-44 relative">
-          <canvas ref={canvasRef} />
+        {/* Responsive Recharts Display */}
+        <div className="h-48 sm:h-52 w-full pt-1">
+          <ResponsiveContainer width="100%" height="100%">
+            {graphMode === 'pulse' ? (
+              <AreaChart 
+                data={chartData} 
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="classAttendanceGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  vertical={false} 
+                  stroke={activeIsDark ? '#27272a' : '#e4e4e7'} 
+                />
+                <XAxis 
+                  dataKey="date" 
+                  tickLine={false} 
+                  axisLine={{ stroke: activeIsDark ? '#3f3f46' : '#d4d4d8' }}
+                  tick={{ fill: activeIsDark ? '#a1a1aa' : '#71717a', fontSize: 10, fontWeight: 600 }}
+                />
+                <YAxis 
+                  domain={[0, 100]}
+                  ticks={[0, 25, 50, 75, 80, 100]}
+                  tickLine={false} 
+                  axisLine={false} 
+                  tick={{ fill: activeIsDark ? '#a1a1aa' : '#71717a', fontSize: 10 }}
+                  unit="%"
+                />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: '#10b981', strokeWidth: 1.5, strokeDasharray: '3 3' }}
+                />
+                <ReferenceLine 
+                  y={80} 
+                  stroke="#10b981" 
+                  strokeDasharray="3 3" 
+                  strokeWidth={1.5}
+                  label={{ 
+                    value: '80% Benchmark', 
+                    position: 'insideTopLeft', 
+                    fill: '#10b981', 
+                    fontSize: 9, 
+                    fontWeight: 700 
+                  }} 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="rate" 
+                  name="Attendance Rate %" 
+                  stroke="#10b981" 
+                  strokeWidth={2.5}
+                  fillOpacity={1} 
+                  fill="url(#classAttendanceGrad)"
+                  dot={{ r: 4, strokeWidth: 1.5, stroke: '#ffffff', fill: '#10b981' }}
+                  activeDot={{ r: 6, fill: '#10b981', stroke: '#ffffff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            ) : (
+              <BarChart 
+                data={chartData} 
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                barGap={3}
+              >
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  vertical={false} 
+                  stroke={activeIsDark ? '#27272a' : '#e4e4e7'} 
+                />
+                <XAxis 
+                  dataKey="date" 
+                  tickLine={false} 
+                  axisLine={{ stroke: activeIsDark ? '#3f3f46' : '#d4d4d8' }}
+                  tick={{ fill: activeIsDark ? '#a1a1aa' : '#71717a', fontSize: 10, fontWeight: 600 }}
+                />
+                <YAxis 
+                  allowDecimals={false}
+                  tickLine={false} 
+                  axisLine={false} 
+                  tick={{ fill: activeIsDark ? '#a1a1aa' : '#71717a', fontSize: 10 }}
+                />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)', radius: 6 }}
+                />
+                <Legend 
+                  verticalAlign="top" 
+                  align="right"
+                  iconType="circle"
+                  wrapperStyle={{ paddingBottom: '8px', fontSize: '10px', fontWeight: 600 }}
+                />
+                <Bar name="Present" dataKey="present" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Bar name="Late" dataKey="late" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Bar name="Excused" dataKey="excused" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={24} />
+                <Bar name="Absent" dataKey="absent" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={24} />
+              </BarChart>
+            )}
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

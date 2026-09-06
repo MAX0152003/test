@@ -172,7 +172,7 @@ export default function AlarmClock({ readAloudEnabled, onAlarmTriggered }: Alarm
             className="flex-1 text-[11px] font-bold p-2 bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 rounded-xl focus:border-emerald-500 outline-none disabled:opacity-50"
           >
             <option value="5">5 Seconds (Instant chime)</option>
-            <option value="15">15 Seconds (Demonstration)</option>
+            <option value="15">15 Seconds (Quick interval)</option>
             <option value="30">30 Seconds</option>
             <option value="60">1 Minute (60s check-in)</option>
             <option value="300">5 Minutes (Standard lock)</option>

@@ -249,35 +249,75 @@ const StatCard = React.memo(function StatCard({ stat, idx }: StatCardProps) {
 });
 StatCard.displayName = 'StatCard';
 
-// Custom responsive tooltips for Recharts graphs
+// Custom responsive tooltips for Recharts graphs with ClassPulse branding
 const CustomRechartsTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const totalLogs = (data.active || 0) + (data.late || 0) + (data.absent || 0);
+    const presentPct = totalLogs > 0 ? Math.round(((data.active || 0) / totalLogs) * 100) : 0;
+    const latePct = totalLogs > 0 ? Math.round(((data.late || 0) / totalLogs) * 100) : 0;
+    const absentPct = totalLogs > 0 ? Math.round(((data.absent || 0) / totalLogs) * 100) : 0;
+    const isPassing = (data.value || 0) >= 80;
+
     return (
-      <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col gap-1 w-48 text-left text-xs">
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1">
-          <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{data.name} Logs</span>
-          <span className="text-[8px] font-mono text-zinc-400 dark:text-zinc-550">ADM CORE</span>
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col gap-2 w-52 text-left text-xs pointer-events-none z-50">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+              ClassPulse • Pulse
+            </span>
+          </div>
+          <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 text-zinc-500 dark:text-zinc-400">
+            ADM CORE
+          </span>
         </div>
-        <p className="text-[10px] font-black text-zinc-900 dark:text-zinc-100">{data.date}</p>
-        <div className="grid grid-cols-3 gap-1 mt-1 text-[9px] font-mono">
-          <div className="bg-emerald-500/10 p-1.5 rounded text-emerald-600 dark:text-emerald-300">
-            <p className="text-[7px] text-zinc-500 uppercase tracking-wider font-bold">Pres</p>
-            <p className="font-extrabold">{data.active}</p>
-          </div>
-          <div className="bg-amber-500/10 p-1.5 rounded text-amber-600 dark:text-amber-300">
-            <p className="text-[7px] text-zinc-500 uppercase tracking-wider font-bold">Late</p>
-            <p className="font-extrabold">{data.late}</p>
-          </div>
-          <div className="bg-red-500/10 p-1.5 rounded text-red-600 dark:text-red-300">
-            <p className="text-[7px] text-zinc-500 uppercase tracking-wider font-bold font-sans">Abs</p>
-            <p className="font-extrabold">{data.absent}</p>
+
+        <div>
+          <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">{data.name} Activity</span>
+          <p className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 leading-tight mt-0.5">{data.date}</p>
+        </div>
+
+        {/* Highlight Attendance Rate & Benchmark */}
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800">
+          <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Average Rate:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">
+              {data.value}%
+            </span>
+            <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded font-mono ${
+              isPassing 
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' 
+                : 'bg-red-500/15 text-red-600 dark:text-red-400'
+            }`}>
+              {isPassing ? 'Target Met' : 'Below 80%'}
+            </span>
           </div>
         </div>
-        <p className="text-[9px] text-zinc-550 dark:text-zinc-400 mt-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <span>Avg Attendance:</span>
-          <strong className="text-emerald-600 dark:text-emerald-400 text-xs">{data.value}%</strong>
-        </p>
+
+        {/* 3-Column Attendance Breakdown */}
+        <div className="grid grid-cols-3 gap-1.5 text-[9px] font-mono">
+          <div className="bg-emerald-500/10 dark:bg-emerald-500/15 p-1.5 rounded-xl border border-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+            <p className="text-[8px] uppercase tracking-wider font-bold text-emerald-600/80 dark:text-emerald-400/80">Present</p>
+            <p className="font-black text-[11px] mt-0.5">{data.active}</p>
+            <p className="text-[7.5px] opacity-75">{presentPct}%</p>
+          </div>
+          <div className="bg-amber-500/10 dark:bg-amber-500/15 p-1.5 rounded-xl border border-amber-500/20 text-amber-700 dark:text-amber-300">
+            <p className="text-[8px] uppercase tracking-wider font-bold text-amber-600/80 dark:text-amber-400/80">Late</p>
+            <p className="font-black text-[11px] mt-0.5">{data.late}</p>
+            <p className="text-[7.5px] opacity-75">{latePct}%</p>
+          </div>
+          <div className="bg-red-500/10 dark:bg-red-500/15 p-1.5 rounded-xl border border-red-500/20 text-red-700 dark:text-red-300">
+            <p className="text-[8px] uppercase tracking-wider font-bold text-red-600/80 dark:text-red-400/80">Absent</p>
+            <p className="font-black text-[11px] mt-0.5">{data.absent}</p>
+            <p className="text-[7.5px] opacity-75">{absentPct}%</p>
+          </div>
+        </div>
+
+        <div className="pt-1 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[9px] font-mono text-zinc-400">
+          <span>Total Session Logs:</span>
+          <span className="font-bold text-zinc-700 dark:text-zinc-300">{totalLogs} verified</span>
+        </div>
       </div>
     );
   }
@@ -287,18 +327,48 @@ const CustomRechartsTooltip = ({ active, payload }: any) => {
 const EnrollmentTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const targetCapacity = 900;
+    const progressPct = Math.min(100, Math.round((data.value / targetCapacity) * 100));
+
     return (
-      <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col gap-1 w-48 text-left text-xs">
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1">
-          <span className="text-[9px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{data.name} Roster</span>
-          <span className="text-[9px] font-mono text-indigo-500 dark:text-indigo-300 font-extrabold">{data.change}</span>
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col gap-2 w-52 text-left text-xs pointer-events-none z-50">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+              ClassPulse • Roster
+            </span>
+          </div>
+          <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-black px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+            {data.change}
+          </span>
         </div>
-        <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100">{data.date}</p>
-        <p className="text-[9.5px] text-zinc-500 dark:text-zinc-400 leading-tight mt-0.5">{data.desc}</p>
-        <p className="text-[9px] text-zinc-550 dark:text-zinc-400 mt-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <span>Total Enrolled:</span>
-          <strong className="text-indigo-600 dark:text-indigo-400 text-xs">{data.value}</strong>
-        </p>
+
+        <div>
+          <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">{data.name} Milestones</span>
+          <p className="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 leading-tight mt-0.5">{data.date}</p>
+          <p className="text-[9.5px] text-zinc-500 dark:text-zinc-400 leading-relaxed mt-1">{data.desc}</p>
+        </div>
+
+        <div className="px-2.5 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-800 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400">Total Enrolled:</span>
+            <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400">{data.value}</span>
+          </div>
+          {/* Target Capacity Progress */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[8.5px] font-mono text-zinc-400">
+              <span>Capacity Quota</span>
+              <span className="font-bold text-zinc-600 dark:text-zinc-300">{progressPct}% of {targetCapacity}</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+              <div 
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -308,27 +378,53 @@ const EnrollmentTooltip = ({ active, payload }: any) => {
 const RetentionTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const isOptimal = (data.value || 0) >= 85;
+
     return (
-      <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col gap-1 w-48 text-left text-xs">
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1">
-          <span className="text-[9px] font-mono font-bold text-cyan-500 uppercase tracking-widest">{data.label}</span>
-          <span className="text-[8px] font-mono text-zinc-400">TERM HIST</span>
-        </div>
-        <p className="text-[10px] font-bold text-zinc-900 dark:text-zinc-100">{data.date}</p>
-        <div className="grid grid-cols-2 gap-1.5 mt-1 text-[9px] font-mono">
-          <div className="bg-cyan-500/10 p-1.5 rounded text-cyan-600 dark:text-cyan-300">
-            <p className="text-[7px] text-zinc-500 uppercase tracking-wider">Avg Attended</p>
-            <p className="font-extrabold">{data.active}</p>
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col gap-2 w-52 text-left text-xs pointer-events-none z-50">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+            <span className="text-[9px] font-mono font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">
+              ClassPulse • Retention
+            </span>
           </div>
-          <div className="bg-amber-500/10 p-1.5 rounded text-amber-600 dark:text-amber-300">
-            <p className="text-[7px] text-zinc-500 uppercase tracking-wider">Absenteeism</p>
-            <p className="font-extrabold">{100 - data.value}%</p>
+          <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 text-zinc-500 dark:text-zinc-400">
+            TERM HIST
+          </span>
+        </div>
+
+        <div>
+          <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">{data.label}</span>
+          <p className="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">{data.date}</p>
+        </div>
+
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-teal-500/10 dark:bg-teal-500/15 border border-teal-500/20">
+          <span className="text-[10px] font-semibold text-teal-700 dark:text-teal-300">Semester Retention:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-black font-mono text-teal-600 dark:text-teal-400">
+              {data.value}%
+            </span>
+            <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded font-mono ${
+              isOptimal 
+                ? 'bg-teal-500/20 text-teal-700 dark:text-teal-300' 
+                : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+            }`}>
+              {isOptimal ? 'Optimal' : 'Standard'}
+            </span>
           </div>
         </div>
-        <p className="text-[9px] text-zinc-550 dark:text-zinc-400 mt-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <span>Retention rate:</span>
-          <strong className="text-cyan-600 dark:text-cyan-400 text-xs">{data.value}%</strong>
-        </p>
+
+        <div className="grid grid-cols-2 gap-1.5 font-mono text-[9px]">
+          <div className="bg-zinc-50 dark:bg-zinc-900 p-2 rounded-xl border border-zinc-150 dark:border-zinc-800">
+            <p className="text-[7.5px] uppercase tracking-wider font-bold text-zinc-400">Active Census</p>
+            <p className="font-black text-xs text-zinc-800 dark:text-zinc-100 mt-0.5">{data.active} students</p>
+          </div>
+          <div className="bg-zinc-50 dark:bg-zinc-900 p-2 rounded-xl border border-zinc-150 dark:border-zinc-800">
+            <p className="text-[7.5px] uppercase tracking-wider font-bold text-zinc-400">Drop/Attrition</p>
+            <p className="font-black text-xs text-amber-600 dark:text-amber-400 mt-0.5">{100 - data.value}%</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -338,25 +434,49 @@ const RetentionTooltip = ({ active, payload }: any) => {
 const ClearanceTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const rate = data.total > 0 ? Math.round((data.cleared / data.total) * 100) : 0;
+    const pendingCount = Math.max(0, data.total - data.cleared);
+
     return (
-      <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col gap-1 w-44 text-left text-xs">
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1">
-          <span className="text-[9px] font-mono font-bold text-blue-605 dark:text-blue-400 uppercase tracking-widest">{data.name} Term</span>
-          <span className="text-[8px] font-mono text-zinc-400">EXC clearance</span>
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col gap-2 w-52 text-left text-xs pointer-events-none z-50">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+              ClassPulse • Clearance
+            </span>
+          </div>
+          <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-850 text-zinc-500 dark:text-zinc-400">
+            {data.name} Term
+          </span>
         </div>
-        <div className="space-y-1 text-[10px]">
-          <p className="flex justify-between">
-            <span className="text-zinc-500">Total requests:</span>
-            <span className="font-bold text-zinc-900 dark:text-zinc-100">{data.total}</span>
-          </p>
-          <p className="flex justify-between">
-            <span className="text-zinc-500">Cleared successfully:</span>
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">{data.cleared}</span>
-          </p>
-          <p className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-1 mt-1 font-bold">
-            <span className="text-zinc-650 dark:text-zinc-400">Success rate:</span>
-            <span className="text-indigo-600 dark:text-indigo-400">{Math.round((data.cleared / data.total) * 100)}%</span>
-          </p>
+
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20">
+          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">Clearance Success:</span>
+          <span className="text-sm font-black font-mono text-emerald-600 dark:text-emerald-400">{rate}%</span>
+        </div>
+
+        <div className="space-y-1.5 text-[10px] font-mono">
+          <div className="flex items-center justify-between text-sky-600 dark:text-sky-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-sm bg-sky-500 inline-block" />
+              Total Filed:
+            </span>
+            <span className="font-bold">{data.total}</span>
+          </div>
+          <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" />
+              Cleared / Excused:
+            </span>
+            <span className="font-black">{data.cleared}</span>
+          </div>
+          {pendingCount > 0 && (
+            <div className="flex items-center justify-between text-zinc-500 pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
+              <span>Pending / Denied:</span>
+              <span className="font-bold text-zinc-700 dark:text-zinc-300">{pendingCount}</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -368,24 +488,33 @@ const LabOccupancyTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     const isOver = data.isOverloaded;
+    const headroom = data.capacity - data.occupancy;
+
     return (
-      <div className="p-3 rounded-2xl bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-xl flex flex-col gap-1 w-52 text-left text-xs z-50">
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-1 mb-1">
-          <span className="text-[10px] font-mono font-black text-zinc-900 dark:text-zinc-100 truncate max-w-[120px]">{data.fullName || data.name}</span>
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col gap-2 w-56 text-left text-xs pointer-events-none z-50">
+        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 pb-1.5">
+          <div className="flex items-center gap-1.5 truncate max-w-[130px]">
+            <span className={`w-1.5 h-1.5 rounded-full ${isOver ? 'bg-red-500 animate-ping' : 'bg-emerald-500'}`} />
+            <span className="text-[10px] font-mono font-black text-zinc-900 dark:text-zinc-100 truncate">
+              {data.fullName || data.name}
+            </span>
+          </div>
           <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded ${
             data.status === 'maintenance'
-              ? 'bg-amber-500/10 text-amber-500'
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
               : isOver
               ? 'bg-red-500 text-white'
               : data.occupancyPercent >= 85
-              ? 'bg-red-500/10 text-red-500'
+              ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400'
               : data.occupancyPercent >= 60
-              ? 'bg-amber-500/10 text-amber-500'
-              : 'bg-emerald-500/10 text-emerald-500'
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
           }`}>
-            {data.status === 'maintenance' ? 'MAINT' : isOver ? 'OVERLOAD' : `${data.occupancyPercent}%`}
+            {data.status === 'maintenance' ? 'MAINTENANCE' : isOver ? 'OVERLOAD' : `${data.occupancyPercent}% LOAD`}
           </span>
         </div>
+
+        {/* Real-time metrics */}
         <div className="space-y-1.5 text-[10px]">
           <div className="flex items-center justify-between">
             <span className="text-zinc-500">Live Occupancy:</span>
@@ -401,10 +530,31 @@ const LabOccupancyTooltip = ({ active, payload }: any) => {
               <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{data.devicesCount} terminals</span>
             </div>
           )}
-          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-1 mt-1">
-            <span className="text-zinc-500">Facility Status:</span>
-            <span className={`font-bold ${isOver ? 'text-red-500 animate-pulse' : 'text-emerald-500'}`}>
-              {isOver ? `Overcrowded (+${data.occupancy - data.capacity})` : data.status === 'maintenance' ? 'Maintenance' : 'Within Safety Limits'}
+
+          {/* Utilization progress bar */}
+          <div className="space-y-1 pt-1">
+            <div className="flex justify-between text-[8px] font-mono text-zinc-400">
+              <span>Facility Load</span>
+              <span className="font-bold text-zinc-600 dark:text-zinc-300">{data.occupancyPercent}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all ${
+                  isOver ? 'bg-red-500' : data.occupancyPercent >= 85 ? 'bg-orange-500' : data.occupancyPercent >= 60 ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+                style={{ width: `${Math.min(100, data.occupancyPercent)}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/80 pt-1.5 mt-1 font-mono text-[9px]">
+            <span className="text-zinc-500">Safety Headroom:</span>
+            <span className={`font-bold ${isOver ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              {isOver 
+                ? `Exceeded by +${Math.abs(headroom)}` 
+                : data.status === 'maintenance' 
+                ? 'Offline' 
+                : `${headroom} seats available`}
             </span>
           </div>
         </div>
@@ -1737,63 +1887,6 @@ export default function DashboardAdmin({
     });
   };
 
-  const handleSimulateScan = (action: 'IN' | 'OUT') => {
-    const activeRoom = labRooms.find(r => r.id === selectedRoomId);
-    if (!activeRoom) return;
-
-    const students = [
-      { id: '2023-14923', name: 'John Doe' },
-      { id: '2023-99124', name: 'Bob Carter' },
-      { id: '2023-10492', name: 'Farhan Makil' },
-      { id: '2023-11029', name: 'Alice Green' },
-      { id: '2023-90345', name: 'Jane Smith' }
-    ];
-
-    const randomStudent = students[Math.floor(Math.random() * students.length)];
-    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    
-    let newOccupancy = activeRoom.currentOccupancy;
-    if (action === 'IN') {
-      if (newOccupancy >= activeRoom.capacity) {
-        if (typeof window !== 'undefined' && (window as any).showToast) {
-          (window as any).showToast("Room integration capacity limit reached!", "warning");
-        }
-        return;
-      }
-      newOccupancy += 1;
-    } else {
-      newOccupancy = Math.max(0, newOccupancy - 1);
-    }
-
-    const newLog = {
-      id: `log-${Date.now()}`,
-      timestamp: nowStr,
-      studentId: randomStudent.id,
-      studentName: randomStudent.name,
-      action: action === 'IN' ? 'API Check-In' : 'API Check-Out',
-      status: 'Present'
-    };
-
-    const updatedRooms = labRooms.map(rm => {
-      if (rm.id === selectedRoomId) {
-        return {
-          ...rm,
-          currentOccupancy: newOccupancy,
-          status: newOccupancy > 0 ? ('occupied' as const) : ('available' as const),
-          activeClass: newOccupancy > 0 ? (rm.activeClass || 'Self-Guided Research') : '',
-          activeScannerLogs: [newLog, ...(rm.activeScannerLogs || [])].slice(0, 10)
-        };
-      }
-      return rm;
-    });
-
-    onUpdateLabRooms?.(updatedRooms);
-    speakText(`System API simulated check-in event processed for ${randomStudent.name} in ${activeRoom.name}`, accessibility.readAloud);
-    if (typeof window !== 'undefined' && (window as any).showToast) {
-      (window as any).showToast(`API Live Event processed: ${randomStudent.name} checked in`, "success");
-    }
-  };
-
   const handleToggleGlobalRosterLock = () => {
     setIsRosterLocked(!isRosterLocked);
     const msg = !isRosterLocked 
@@ -2546,13 +2639,14 @@ export default function DashboardAdmin({
                                     hide={true} 
                                     domain={[0, 100]}
                                   />
-                                  <RechartsTooltip content={<CustomRechartsTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
+                                  <RechartsTooltip content={<CustomRechartsTooltip />} cursor={{ fill: 'rgba(16, 185, 129, 0.08)', radius: 8 }} />
                                   <Area 
                                     type="monotone" 
                                     dataKey="value" 
                                     stroke="#10b981" 
                                     strokeWidth={3}
-                                    activeDot={{ r: 5, strokeWidth: 0, fill: '#10b981' }}
+                                    dot={{ r: 3.5, strokeWidth: 1.5, stroke: '#ffffff', fill: '#10b981' }}
+                                    activeDot={{ r: 6, strokeWidth: 2, stroke: '#ffffff', fill: '#10b981' }}
                                     fillOpacity={1} 
                                     fill="url(#attendanceGrad)" 
                                   />
@@ -2591,8 +2685,8 @@ export default function DashboardAdmin({
                         >
                           <defs>
                             <linearGradient id="enrollmentGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
-                              <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.25}/>
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-850" />
@@ -2600,7 +2694,7 @@ export default function DashboardAdmin({
                             dataKey="name" 
                             tickLine={false} 
                             axisLine={false} 
-                            tick={{ fill: '#888888', fontSize: 10 }}
+                            tick={{ fill: '#888888', fontSize: 10, fontWeight: 700 }}
                           />
                           <YAxis 
                             tickLine={false} 
@@ -2608,13 +2702,14 @@ export default function DashboardAdmin({
                             tick={{ fill: '#888888', fontSize: 10 }}
                             domain={[0, 1000]}
                           />
-                          <RechartsTooltip content={<EnrollmentTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
+                          <RechartsTooltip content={<EnrollmentTooltip />} cursor={{ fill: 'rgba(16, 185, 129, 0.08)', radius: 8 }} />
                           <Area 
                             type="monotone" 
                             dataKey="value" 
-                            stroke="#6366f1" 
+                            stroke="#10b981" 
                             strokeWidth={3}
-                            activeDot={{ r: 5, strokeWidth: 0, fill: '#6366f1' }}
+                            dot={{ r: 4, strokeWidth: 1.5, stroke: '#ffffff', fill: '#10b981' }}
+                            activeDot={{ r: 6, strokeWidth: 2, stroke: '#ffffff', fill: '#10b981' }}
                             fillOpacity={1} 
                             fill="url(#enrollmentGrad)" 
                           />
@@ -2653,8 +2748,8 @@ export default function DashboardAdmin({
                         >
                           <defs>
                             <linearGradient id="historyRetentionGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.2}/>
-                              <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                              <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.25}/>
+                              <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-850" />
@@ -2662,7 +2757,7 @@ export default function DashboardAdmin({
                             dataKey="name" 
                             tickLine={false} 
                             axisLine={false} 
-                            tick={{ fill: '#888888', fontSize: 10 }}
+                            tick={{ fill: '#888888', fontSize: 10, fontWeight: 700 }}
                           />
                           <YAxis 
                             tickLine={false} 
@@ -2670,13 +2765,14 @@ export default function DashboardAdmin({
                             tick={{ fill: '#888888', fontSize: 10 }}
                             domain={[0, 100]}
                           />
-                          <RechartsTooltip content={<RetentionTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
+                          <RechartsTooltip content={<RetentionTooltip />} cursor={{ fill: 'rgba(20, 184, 166, 0.08)', radius: 8 }} />
                           <Area 
                             type="monotone" 
                             dataKey="value" 
-                            stroke="#06b6d4" 
+                            stroke="#14b8a6" 
                             strokeWidth={3}
-                            activeDot={{ r: 5, strokeWidth: 0, fill: '#06b6d4' }}
+                            dot={{ r: 4, strokeWidth: 1.5, stroke: '#ffffff', fill: '#14b8a6' }}
+                            activeDot={{ r: 6, strokeWidth: 2, stroke: '#ffffff', fill: '#14b8a6' }}
                             fillOpacity={1} 
                             fill="url(#historyRetentionGrad)" 
                           />
@@ -2706,13 +2802,14 @@ export default function DashboardAdmin({
                             { name: '25-B', label: '25-B', total: 290, cleared: 270 }
                           ]} 
                           margin={{ top: 10, right: 10, left: -25, bottom: 0 }}
+                          barGap={3}
                         >
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" className="dark:stroke-zinc-850" />
                           <XAxis 
                             dataKey="name" 
                             tickLine={false} 
                             axisLine={false} 
-                            tick={{ fill: '#888888', fontSize: 10 }}
+                            tick={{ fill: '#888888', fontSize: 10, fontWeight: 700 }}
                           />
                           <YAxis 
                             tickLine={false} 
@@ -2720,15 +2817,15 @@ export default function DashboardAdmin({
                             tick={{ fill: '#888888', fontSize: 10 }}
                             domain={[0, 300]}
                           />
-                          <RechartsTooltip content={<ClearanceTooltip />} cursor={{ fill: 'rgba(161, 161, 170, 0.08)', radius: 8 }} />
-                          <Bar dataKey="total" fill="#60a5fa" radius={[3, 3, 0, 0]} />
-                          <Bar dataKey="cleared" fill="#34d399" radius={[3, 3, 0, 0]} />
+                          <RechartsTooltip content={<ClearanceTooltip />} cursor={{ fill: 'rgba(16, 185, 129, 0.08)', radius: 8 }} />
+                          <Bar dataKey="total" name="Total Filed" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                          <Bar dataKey="cleared" name="Cleared & Approved" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={28} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                     <div className="flex items-center justify-between text-[9px] text-zinc-400 mt-2 font-mono px-1">
-                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-blue-400 inline-block" /> Excuses Received</div>
-                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-emerald-400 inline-block" /> Approved/Cleared</div>
+                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-sky-500 inline-block" /> Total Requests Filed</div>
+                      <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" /> Approved & Cleared</div>
                     </div>
                   </div>
 
@@ -5798,7 +5895,7 @@ export default function DashboardAdmin({
                   <div className="py-12 border border-dashed border-zinc-200 dark:border-zinc-850 rounded-xl flex flex-col items-center justify-center text-center space-y-2">
                     <span className="text-2xl">⚡</span>
                     <h5 className="text-xs font-bold text-zinc-400 uppercase tracking-widest font-mono">No Logs Match Filter</h5>
-                    <p className="text-[10px] text-zinc-400 max-w-sm">No offline writes or conflicts are matching this category. Tap "Simulate Device Offline-Scan" to populate conflicts on mock terminals.</p>
+                    <p className="text-[10px] text-zinc-400 max-w-sm">No offline writes or pending sync conflicts match this category. All local device transactions are synchronized.</p>
                   </div>
                 ) : (
                   <AnimatePresence mode="popLayout">

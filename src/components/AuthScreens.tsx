@@ -1365,55 +1365,6 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
                   </>
                 )}
               </button>
-
-              {/* Quick Demo Access Bar for rapid testing */}
-              <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800 space-y-2 text-left">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                    Quick Demo Access
-                  </span>
-                  <span className="text-[9px] text-zinc-400 font-mono">1-tap demo portal</span>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('john.doe@msu.edu.ph');
-                      setLoginPassword('student123');
-                      startLoginFlow('student', 'John Doe', 'john.doe@msu.edu.ph');
-                    }}
-                    className="py-2 px-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs group"
-                  >
-                    <GraduationCap className="w-4 h-4 text-emerald-500 group-hover:scale-110 transition-transform" />
-                    <span>Student</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('ahmad.khan@msu.edu.ph');
-                      setLoginPassword('faculty123');
-                      startLoginFlow('faculty', 'Dr. Ahmad Khan', 'ahmad.khan@msu.edu.ph');
-                    }}
-                    className="py-2 px-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs group"
-                  >
-                    <UserCheck className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" />
-                    <span>Faculty</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('admin@msu.edu.ph');
-                      setLoginPassword('admin123');
-                      startLoginFlow('admin', 'Master Admin', 'admin@msu.edu.ph');
-                    }}
-                    className="py-2 px-1.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 text-zinc-700 dark:text-zinc-200 text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs group"
-                  >
-                    <Shield className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
-                    <span>Admin</span>
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div className="text-center pt-1">
