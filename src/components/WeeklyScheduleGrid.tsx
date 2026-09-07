@@ -279,8 +279,17 @@ export default function WeeklyScheduleGrid({
             description={searchQuery?.trim() ? `No course sessions matched "${searchQuery}". Check the subject code or day filter.` : "No class sessions are currently loaded for this schedule configuration."}
           />
         ) : (
-        <div className="w-full overflow-x-auto rounded-2xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 shadow-sm">
-          <table className="w-full min-w-[800px] border-collapse text-left">
+        <div className="w-full rounded-2xl border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-950 shadow-sm overflow-hidden">
+          {/* Mobile Swipe Notice Bar */}
+          <div className="md:hidden px-3 py-1.5 bg-zinc-100/90 dark:bg-zinc-900/90 border-b border-zinc-200/70 dark:border-zinc-800 text-[10px] text-zinc-600 dark:text-zinc-400 flex items-center justify-between font-mono">
+            <span className="flex items-center gap-1.5 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Swipe horizontally to view all week slots
+            </span>
+            <span className="text-[11px]">↔</span>
+          </div>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[800px] border-collapse text-left">
             <thead>
               <tr className="bg-zinc-100/80 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-850">
                 <th className="p-3 w-28 text-center text-[10px] font-black uppercase tracking-widest text-zinc-450 dark:text-zinc-500 border-r border-zinc-200/60 dark:border-zinc-850">
@@ -443,6 +452,7 @@ export default function WeeklyScheduleGrid({
               })}
             </tbody>
           </table>
+          </div>
         </div>
         )
       )}

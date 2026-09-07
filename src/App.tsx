@@ -3305,7 +3305,7 @@ export default function App() {
                       }
                     }}
                     type="button"
-                    className={`flex flex-col items-center justify-center gap-0.5 transition-all flex-1 py-1 cursor-pointer scale-100 active:scale-95 ${
+                    className={`flex flex-col items-center justify-center gap-0.5 transition-all flex-1 min-h-[44px] touch-manipulation py-1 cursor-pointer scale-100 active:scale-95 ${
                       isActive 
                         ? 'text-emerald-500 font-black' 
                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
@@ -3339,15 +3339,16 @@ export default function App() {
                 toast.type === 'error' ? 'bg-red-500 shadow-sm shadow-red-500/50' :
                 'bg-indigo-500 shadow-sm shadow-indigo-500/50'
               }`} />
-              <p className="text-xs font-bold tracking-tight text-zinc-100 truncate pr-2">
+              <p className="text-xs font-bold tracking-tight text-zinc-100 line-clamp-2 break-words [overflow-wrap:anywhere] pr-2">
                 {toast.message}
               </p>
             </div>
             
             <button
               onClick={() => setToast(null)}
-              className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer shrink-0 touch-manipulation"
               title="Close Notification"
+              aria-label="Close Notification"
             >
               <X className="w-4 h-4" />
             </button>

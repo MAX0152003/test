@@ -4391,8 +4391,8 @@ export default function DashboardFaculty({
 
       {/* Faculty Commencement Alarm Clock popup modal */}
       {isFacultyAlarmOpen && (
-        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md p-6 rounded-3.5xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-5 text-left border-2 border-emerald-500/25">
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-md p-6 rounded-3.5xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-2xl relative animate-scale-up space-y-5 text-left border-2 border-emerald-500/25 my-auto max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsFacultyAlarmOpen(false)}
               className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-650 cursor-pointer"

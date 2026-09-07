@@ -410,5 +410,33 @@ input[name="contactNumber"]:focus {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem)) !important;
 }
 
+/* iOS Safe-Area Inset Support Utilities */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+}
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0.5rem));
+}
+.bottom-safe {
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0.75rem));
+}
+
+/* Touch Target Sizing (44x44px Rule) Helper */
+.touch-target-44 {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+/* Skeleton Loading Shimmer Keyframes */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 
 

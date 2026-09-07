@@ -1328,7 +1328,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                           
                           {/* Inner standard text if available */}
                           {m.message && (
-                            <p className="leading-relaxed whitespace-pre-wrap text-white font-medium">{m.message}</p>
+                            <p className="leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-white font-medium">{m.message}</p>
                           )}
 
                           {/* Image Attachment wrapper */}
@@ -1917,12 +1917,12 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                   )
                 )}
                 <div>
-                  <div className={`p-3 rounded-2xl text-[12px] shadow-xs inline-block text-left ${
+                  <div className={`p-3 rounded-2xl text-[12px] shadow-xs inline-block text-left max-w-full ${
                     isAdmin 
                       ? 'bg-zinc-900 text-white dark:bg-zinc-800 border border-zinc-250 dark:border-zinc-700 rounded-tr-none font-medium' 
                       : 'bg-emerald-600 border border-emerald-500 text-white rounded-tl-none font-semibold'
                   }`}>
-                    <p className="leading-relaxed">{m.text}</p>
+                    <p className="leading-relaxed break-words [overflow-wrap:anywhere]">{m.text}</p>
                   </div>
                   <span className="block text-[8px] text-zinc-400 dark:text-zinc-500 mt-1 uppercase font-black tracking-wider px-1">
                     {isAdmin ? 'ADMIN REPLY' : 'USER'} • {m.timestamp}

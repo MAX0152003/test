@@ -133,12 +133,12 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
       </div>
 
       {/* Action Buttons Row */}
-      <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-200/70 dark:border-zinc-800/70 flex-wrap">
+      <div className="flex items-center gap-2 pt-2 border-t border-zinc-200/70 dark:border-zinc-800/70 flex-wrap">
         {fac.status !== 'available' && (
           <button
             type="button"
             onClick={() => onToggleWatch(fac.id, fac.name, fac.room)}
-            className={`flex-1 min-w-[110px] py-1.5 px-2 rounded-xl text-[10px] font-black tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+            className={`flex-1 min-w-[110px] min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl text-[10px] font-black tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:scale-95 ${
               isWatched
                 ? 'bg-emerald-500 text-black border border-emerald-400 shadow-xs'
                 : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30'
@@ -147,12 +147,12 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
           >
             {isWatched ? (
               <>
-                <BellRing className="w-3 h-3 text-black animate-bounce" />
+                <BellRing className="w-3.5 h-3.5 text-black animate-bounce" />
                 <span>Alert Active</span>
               </>
             ) : (
               <>
-                <Bell className="w-3 h-3" />
+                <Bell className="w-3.5 h-3.5" />
                 <span>Notify Me</span>
               </>
             )}
@@ -162,7 +162,7 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
         <button
           type="button"
           onClick={() => onBookSlot(fac.id, fac.name)}
-          className="flex-1 min-w-[100px] py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-700 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+          className="flex-1 min-w-[100px] min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-700 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer touch-manipulation active:scale-95"
           title={`Book a formal consultation slot with ${fac.name}`}
         >
           <CalendarClock className="w-3.5 h-3.5" />
@@ -172,7 +172,7 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
         <button
           type="button"
           onClick={() => onChat(fac.id, fac.name)}
-          className="py-1.5 px-2.5 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 shrink-0"
+          className="min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer touch-manipulation active:scale-95 shrink-0"
           title={`Message ${fac.name}`}
         >
           <MessageSquare className="w-3.5 h-3.5" />
@@ -259,8 +259,9 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
                 e.stopPropagation();
                 onDrop(cls);
               }}
-              className="p-1 h-6 w-6 mt-1 flex items-center justify-center rounded-md bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-80 sm:opacity-0 group-hover/card:opacity-100 animate-fade-in"
+              className="p-1.5 min-w-[32px] min-h-[32px] mt-1 relative after:absolute after:-inset-2 touch-manipulation flex items-center justify-center rounded-lg bg-zinc-100 hover:bg-red-500/10 dark:bg-zinc-805 text-zinc-400 hover:text-red-500 cursor-pointer border border-transparent hover:border-red-500/20 transition-all opacity-80 sm:opacity-0 group-hover/card:opacity-100 animate-fade-in"
               title="Delete/drop subject"
+              aria-label="Delete/drop subject"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -274,7 +275,7 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
                 e.stopPropagation();
                 onEnroll(cls.id);
               }}
-              className="mt-1.5 px-2.5 py-1 text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all whitespace-nowrap"
+              className="mt-1.5 px-3 py-1.5 min-h-[36px] touch-manipulation text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all whitespace-nowrap flex items-center justify-center"
               title="Enroll in this subject"
             >
               Enroll Now

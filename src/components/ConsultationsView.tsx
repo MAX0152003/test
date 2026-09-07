@@ -864,8 +864,8 @@ export default function ConsultationsView({
 
       {/* Booking Detail Modal */}
       {selectedBookingDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 text-left space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 text-left space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100">
                 Consultation Appointment Details
@@ -948,7 +948,7 @@ export default function ConsultationsView({
       {/* Book Appointment Modal (Student) */}
       {isBookModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-8 text-left space-y-5 overflow-hidden my-8">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-8 text-left space-y-5 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">

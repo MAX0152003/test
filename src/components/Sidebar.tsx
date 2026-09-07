@@ -282,7 +282,7 @@ export default function Sidebar({
         } bg-white dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-850 text-zinc-900 dark:text-zinc-100 md:relative md:translate-x-0 md:shadow-lg`}
       >
         {/* Top Area - Brand Logo & Integrated Header Collapse Button */}
-        <div className="relative shrink-0 border-b border-zinc-100 dark:border-zinc-900/60 p-3.5">
+        <div className="relative shrink-0 border-b border-zinc-100 dark:border-zinc-900/60 p-3.5 pt-[max(0.875rem,env(safe-area-inset-top,0.875rem))]">
           <div className="flex items-center justify-between">
             <div 
               onClick={isEffectiveCollapsed ? toggleCollapse : undefined}
@@ -314,17 +314,18 @@ export default function Sidebar({
             <button
               type="button"
               onClick={toggleCollapse}
-              className="hidden md:flex p-1.5 rounded-xl text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all cursor-pointer"
+              className="hidden md:flex p-2 rounded-xl text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all cursor-pointer"
               title={isEffectiveCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu"}
             >
               <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isEffectiveCollapsed ? 'rotate-180 text-emerald-500' : ''}`} />
             </button>
 
-            {/* Mobile Drawer Close */}
+            {/* Mobile Drawer Close (Complies with 44x44px Touch Target Rule) */}
             <button
               onClick={() => setIsOpen(false)}
               type="button"
-              className="md:hidden p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-zinc-650 cursor-pointer"
+              aria-label="Close Navigation Menu"
+              className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer touch-manipulation"
             >
               <X className="w-5 h-5" />
             </button>
@@ -352,7 +353,7 @@ export default function Sidebar({
                       onClick={() => handleNavClick(item.id, item.label)}
                       type="button"
                       title={isEffectiveCollapsed ? item.label : undefined}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 group relative isolate ${
+                      className={`w-full min-h-[44px] touch-manipulation flex items-center justify-between px-3 py-2 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 group relative isolate ${
                         isActive 
                           ? `${roleNav.bgClass} ${roleNav.activeClass}` 
                           : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-900/70 hover:text-zinc-900 dark:hover:text-zinc-100'
@@ -381,8 +382,8 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* Footer Area - Sleek User Card & Logout Button */}
-        <div className="p-3 border-t border-zinc-100 dark:border-zinc-900 shrink-0 bg-white dark:bg-zinc-950 space-y-2">
+        {/* Footer Area - Sleek User Card & Logout Button with Safe Area Inset Support */}
+        <div className="p-3 pb-[max(1rem,env(safe-area-inset-bottom,1rem))] border-t border-zinc-100 dark:border-zinc-900 shrink-0 bg-white dark:bg-zinc-950 space-y-2">
           {!isEffectiveCollapsed && (
             <div className="flex items-center gap-2.5 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60">
               <div className="relative shrink-0">
@@ -413,7 +414,7 @@ export default function Sidebar({
             }}
             type="button"
             title={isEffectiveCollapsed ? "Log Out" : undefined}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 active:scale-95 ${
+            className={`w-full min-h-[44px] touch-manipulation flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 active:scale-95 ${
               isEffectiveCollapsed ? 'justify-center px-1' : ''
             }`}
           >

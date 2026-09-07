@@ -76,7 +76,7 @@ import HelpCenter from './HelpCenter';
 import WeeklyScheduleGrid from './WeeklyScheduleGrid';
 import StudentWeeklyAttendanceChart from './StudentWeeklyAttendanceChart';
 import StudentAttendanceTrendChart from './StudentAttendanceTrendChart';
-import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton } from './SkeletonLoaders';
+import { ClassCardSkeleton, AttendanceTableSkeleton, ScheduleListSkeleton, StatCardSkeleton, ChartSkeleton } from './SkeletonLoaders';
 import { EXCUSE_PRESET_TYPES, isFridayPrayerWindow } from '../lib/msuUtils';
 
 const expandDaysToSpecificOnesVal = (days: string[]): string[] => {
@@ -314,6 +314,15 @@ export default function DashboardStudent({
   const [selectedScanClass, setSelectedScanClass] = React.useState<string>(classes[0]?.id || '');
   const [isScanning, setIsScanning] = React.useState(false);
   const [isCameraLoading, setIsCameraLoading] = React.useState(false);
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
+
   const [scanResult, setScanResult] = React.useState<{ success: boolean; message: string } | null>(null);
   const [attendanceSubTab, setAttendanceSubTab] = React.useState<'scanner' | 'history'>('scanner');
   const [isSuccessFlashing, setIsSuccessFlashing] = React.useState(false);
@@ -1799,6 +1808,10 @@ export default function DashboardStudent({
                       displayClasses = classes.filter(cls => studentEnrolledClassIds.has(cls.id));
                     }
 
+                    if (isInitialLoading) {
+                      return <ClassCardSkeleton count={4} />;
+                    }
+
                     if (displayClasses.length === 0) {
                       return (
                         <div className="col-span-full p-6 text-center rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800">
@@ -1919,6 +1932,10 @@ export default function DashboardStudent({
           {/* Schedule Lists Render */}
           {(() => {
             const isSearching = scheduleSearch.trim().length > 0;
+
+            if (isInitialLoading) {
+              return <ScheduleListSkeleton count={4} />;
+            }
 
             let targetClasses = classes;
             if (isSearching) {
