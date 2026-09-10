@@ -104,3 +104,38 @@ export function playWarningChime(): void {
     osc.stop(now + 0.3);
   } catch (e) {}
 }
+
+/**
+ * Prime & resume Web Audio API AudioContext on first user interaction.
+ * Complies with mobile browser (iOS Safari, Android Chrome) autoplay policies.
+ */
+export function unlockAudioContext(): void {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+// Automatically register one-time gesture listeners to prime audio subsystem early
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['pointerdown', 'touchstart', 'click', 'keydown'];
+  const handleFirstInteraction = () => {
+    unlockAudioContext();
+    unlockEvents.forEach(evt => {
+      try {
+        window.removeEventListener(evt, handleFirstInteraction, { capture: true } as any);
+      } catch {
+        // Fallback for older browsers
+        window.removeEventListener(evt, handleFirstInteraction);
+      }
+    });
+  };
+
+  unlockEvents.forEach(evt => {
+    try {
+      window.addEventListener(evt, handleFirstInteraction, { capture: true, passive: true });
+    } catch {
+      window.addEventListener(evt, handleFirstInteraction);
+    }
+  });
+}

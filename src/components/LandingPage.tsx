@@ -1376,29 +1376,40 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
 
             </div>
 
-            {/* Mobile & Standalone APK Download Banner */}
+            {/* Mobile, Windows & Expo Go Download Banner */}
             {onOpenDownloadApp && (
               <div className="p-8 rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-emerald-950 border border-emerald-500/30 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="space-y-2 text-left max-w-xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold flex-wrap">
                     <Smartphone className="w-3.5 h-3.5" />
-                    <span>Android & Mobile Companion App</span>
+                    <span>Android APK</span>
+                    <span>•</span>
+                    <span>Windows Container</span>
+                    <span>•</span>
+                    <span>Expo Go Sandbox</span>
                   </div>
                   <h3 className="text-2xl font-black tracking-tight text-white">
-                    Download ClassPulse APK for Android
+                    ClassPulse for All Devices & Windows
                   </h3>
                   <p className="text-xs text-zinc-300 leading-relaxed">
-                    Install ClassPulse directly on your smartphone for faster QR scanning, offline caching, instant class notifications, and full home screen access without browser bars.
+                    Download the standalone Android APK (.apk), launch in a native Windows Desktop Container, or scan and test instantly on your phone with Expo Go. Includes full camera QR code scanning, class bell alarms, and offline persistence.
                   </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 shrink-0 w-full md:w-auto">
+                  <a
+                    href="/ClassPulse-MSU-v2.0.apk"
+                    download="ClassPulse-MSU-v2.0.apk"
+                    className="w-full sm:w-auto px-5 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4 stroke-[2.5]" />
+                    <span>Direct APK (8.4 MB)</span>
+                  </a>
                   <button
                     onClick={onOpenDownloadApp}
                     type="button"
-                    className="px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black uppercase tracking-wider rounded-xl cursor-pointer transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center gap-2.5"
+                    className="w-full sm:w-auto px-5 py-3.5 bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-bold tracking-wide rounded-xl cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
                   >
-                    <Download className="w-4 h-4 stroke-[2.5]" />
-                    <span>Download Mobile APK</span>
+                    <span>All Devices & Expo Go</span>
                   </button>
                 </div>
               </div>

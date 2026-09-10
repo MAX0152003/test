@@ -10,12 +10,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isVerifiedEmail() {
+      return request.auth != null && (
+        request.auth.token.email_verified == true ||
+        request.auth.token.email == 'makil.fc515@s.msumain.edu.ph'
+      );
+    }
+
     function isAdmin() {
       return isAuthenticated() && (
         (request.auth.token.role != null && request.auth.token.role == 'admin') ||
         (request.auth.token.email != null && (
           request.auth.token.email == 'makil.fc515@s.msumain.edu.ph' ||
-          request.auth.token.email.matches('^cics\\.admin.*@msumain\\.edu\\.ph$')
+          (request.auth.token.email.matches('^cics\\.admin.*@msumain\\.edu\\.ph$') && isVerifiedEmail())
         ))
       );
     }
@@ -27,24 +34,43 @@ service cloud.firestore {
       );
     }
 
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
     // --------------------------------------------------------------------------
     // USERS, PROFILES, CREDENTIALS & PASSWORD RESETS
     // --------------------------------------------------------------------------
 
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(userId) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() <= 150 &&
+        (!('role' in request.resource.data) || request.resource.data.role in ['student', 'faculty', 'admin']) &&
+        (!('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin());
+      allow delete: if isAdmin();
     }
 
     match /registered_users/{userId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(userId) && (
+        request.resource.data.name is string || request.resource.data.email is string
+      ) &&
+      (!('role' in request.resource.data) || request.resource.data.role != 'admin' || isAdmin());
+      allow delete: if isAdmin();
     }
 
     match /credentials/{credId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(credId) && request.resource.data.key is string;
+      allow delete: if isAdmin();
     }
 
     match /password_resets/{resetId} {
-      allow read, write: if true;
+      allow read, create, update: if isValidId(resetId);
+      allow delete: if isAdmin();
     }
 
     // --------------------------------------------------------------------------
@@ -52,7 +78,18 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /classes/{classId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(classId) && (
+        isFaculty() || isAdmin() || (
+          request.resource.data.code is string &&
+          request.resource.data.code.size() > 0 &&
+          request.resource.data.code.size() <= 50 &&
+          request.resource.data.name is string &&
+          request.resource.data.name.size() > 0 &&
+          request.resource.data.name.size() <= 200
+        )
+      );
+      allow delete: if isFaculty() || isAdmin();
     }
 
     // --------------------------------------------------------------------------
@@ -60,11 +97,26 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /records/{recordId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(recordId) &&
+        request.resource.data.classId is string &&
+        request.resource.data.classId.size() > 0 &&
+        request.resource.data.classId.size() <= 128 &&
+        (request.resource.data.studentId is string || request.resource.data.studentName is string) &&
+        (!('status' in request.resource.data) || request.resource.data.status in ['present', 'late', 'absent', 'excused']);
+      allow update: if isFaculty() || isAdmin() || (
+        resource.data.studentId == request.resource.data.studentId &&
+        (!('status' in request.resource.data) || request.resource.data.status in ['present', 'late', 'absent', 'excused'])
+      );
+      allow delete: if isFaculty() || isAdmin();
     }
 
     match /attendance/{attendanceId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(attendanceId) &&
+        request.resource.data.classId is string &&
+        request.resource.data.classId.size() > 0;
+      allow update, delete: if isFaculty() || isAdmin();
     }
 
     // --------------------------------------------------------------------------
@@ -72,7 +124,13 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /enrollments/{enrollmentId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(enrollmentId) &&
+        request.resource.data.classId is string &&
+        request.resource.data.classId.size() > 0 &&
+        request.resource.data.studentId is string &&
+        request.resource.data.studentId.size() > 0;
+      allow delete: if isFaculty() || isAdmin();
     }
 
     // --------------------------------------------------------------------------
@@ -80,11 +138,25 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /excuse_letters/{letterId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(letterId) &&
+        request.resource.data.reason is string &&
+        request.resource.data.reason.size() > 0 &&
+        request.resource.data.studentId is string &&
+        request.resource.data.studentId.size() > 0 &&
+        (!('status' in request.resource.data) || request.resource.data.status == 'pending' || isFaculty() || isAdmin());
+      allow update, delete: if isFaculty() || isAdmin();
     }
 
     match /excuseLetters/{letterId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(letterId) &&
+        request.resource.data.reason is string &&
+        request.resource.data.reason.size() > 0 &&
+        request.resource.data.studentId is string &&
+        request.resource.data.studentId.size() > 0 &&
+        (!('status' in request.resource.data) || request.resource.data.status == 'pending' || isFaculty() || isAdmin());
+      allow update, delete: if isFaculty() || isAdmin();
     }
 
     // --------------------------------------------------------------------------
@@ -92,11 +164,27 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /consultation_bookings/{bookingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(bookingId) &&
+        request.resource.data.studentId is string &&
+        request.resource.data.studentId.size() > 0 &&
+        request.resource.data.facultyId is string &&
+        request.resource.data.facultyId.size() > 0;
+      allow update, delete: if isFaculty() || isAdmin() || (
+        resource.data.studentId == request.resource.data.studentId
+      );
     }
 
     match /consultations/{consultationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(consultationId) &&
+        request.resource.data.studentId is string &&
+        request.resource.data.studentId.size() > 0 &&
+        request.resource.data.facultyId is string &&
+        request.resource.data.facultyId.size() > 0;
+      allow update, delete: if isFaculty() || isAdmin() || (
+        resource.data.studentId == request.resource.data.studentId
+      );
     }
 
     // --------------------------------------------------------------------------
@@ -104,7 +192,12 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /messages/{messageId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(messageId) &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 2000;
+      allow update, delete: if isFaculty() || isAdmin();
     }
 
     // --------------------------------------------------------------------------
@@ -112,27 +205,40 @@ service cloud.firestore {
     // --------------------------------------------------------------------------
 
     match /faculty_statuses/{facultyId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(facultyId) && (
+        isFaculty() || isAdmin() || (request.resource.data.name is string && request.resource.data.name.size() > 0)
+      );
+      allow delete: if isFaculty() || isAdmin();
     }
 
     match /rooms/{roomId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isFaculty() || isAdmin();
     }
 
     match /announcements/{announcementId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isFaculty() || isAdmin();
     }
 
     match /session_links/{sessionId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidId(sessionId);
+      allow delete: if true;
     }
 
     match /archivedTerms/{termId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /audit_logs/{logId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if isValidId(logId) &&
+        request.resource.data.action is string &&
+        request.resource.data.action.size() <= 250;
+      allow update, delete: if isAdmin();
     }
 
     match /test/{testId} {
@@ -140,11 +246,11 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------------
-    // CATCH-ALL FALLBACK
+    // DEFAULT DENY ALL UNMATCHED PATHS
     // --------------------------------------------------------------------------
 
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

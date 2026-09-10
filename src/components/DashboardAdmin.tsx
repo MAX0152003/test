@@ -613,28 +613,59 @@ export default function DashboardAdmin({
     }
   });
 
-  // Ensure registered users and only the primary active admin profile are present in directory (removing generated co-admins)
+  // List of interactive directory users (excluding tombstoned/deleted users)
   const allDirectoryUsers = React.useMemo(() => {
-    const nonAdminUsers = usersList.filter(u => u.role !== 'admin');
-    const combined = [...nonAdminUsers];
+    let deletedSet = new Set<string>();
+    try {
+      const arr = JSON.parse(localStorage.getItem('classpulse_deleted_user_ids') || '[]');
+      deletedSet = new Set(arr.map((s: string) => String(s || '').toLowerCase().trim()));
+    } catch {}
+
+    const isDeleted = (u: MockUser) => {
+      if (u.id && deletedSet.has(String(u.id).toLowerCase().trim())) return true;
+      if (u.uid && deletedSet.has(String(u.uid).toLowerCase().trim())) return true;
+      if (u.email && deletedSet.has(String(u.email).toLowerCase().trim())) return true;
+      return false;
+    };
+
+    const validUsers = usersList.filter(u => !isDeleted(u));
+    const combined = [...validUsers];
+
+    // Ensure active admin profile is present if not deleted and not already in directory list
     if (userProfile && userProfile.role === 'admin') {
-      combined.unshift({
-        id: userProfile.id || 'admin-01',
-        name: userProfile.name || 'Master Admin',
-        email: userProfile.email || 'admin@msu.edu.ph',
-        role: 'admin',
-        uid: 'ADM-' + (userProfile.id ? userProfile.id.substring(0, 5).toUpperCase() : '01'),
-        department: userProfile.department || 'Academic Registrar Board'
-      });
+      const activeAdminId = userProfile.id || 'admin-01';
+      const activeAdminEmail = userProfile.email || 'admin@msu.edu.ph';
+      const alreadyInList = combined.some(u => 
+        (u.id && u.id === activeAdminId) ||
+        (u.email && u.email.toLowerCase().trim() === activeAdminEmail.toLowerCase().trim())
+      );
+      if (!alreadyInList && !deletedSet.has(activeAdminId.toLowerCase()) && !deletedSet.has(activeAdminEmail.toLowerCase())) {
+        combined.unshift({
+          id: activeAdminId,
+          name: userProfile.name || 'Master Admin',
+          email: activeAdminEmail,
+          role: 'admin',
+          uid: 'ADM-' + (userProfile.id ? userProfile.id.substring(0, 5).toUpperCase() : '01'),
+          department: userProfile.department || 'Academic Registrar Board'
+        });
+      }
     } else {
-      combined.unshift({
-        id: 'admin-01',
-        name: 'Master Admin',
-        email: 'admin@msu.edu.ph',
-        role: 'admin',
-        uid: 'ADM-01',
-        department: 'Academic Registrar Board'
-      });
+      const defaultAdminId = 'admin-01';
+      const defaultAdminEmail = 'admin@msu.edu.ph';
+      const alreadyInList = combined.some(u => 
+        u.id === defaultAdminId ||
+        (u.email && u.email.toLowerCase().trim() === defaultAdminEmail.toLowerCase().trim())
+      );
+      if (!alreadyInList && !deletedSet.has(defaultAdminId.toLowerCase()) && !deletedSet.has(defaultAdminEmail.toLowerCase())) {
+        combined.unshift({
+          id: defaultAdminId,
+          name: 'Master Admin',
+          email: defaultAdminEmail,
+          role: 'admin',
+          uid: 'ADM-01',
+          department: 'Academic Registrar Board'
+        });
+      }
     }
     return combined;
   }, [usersList, userProfile]);
@@ -726,7 +757,12 @@ export default function DashboardAdmin({
     message: string;
     confirmText?: string;
     cancelText?: string;
-    onConfirm: () => void;
+    itemName?: string;
+    itemBadge?: string;
+    itemDetails?: { label: string; value: string }[];
+    intent?: 'danger' | 'warning' | 'info';
+    icon?: 'trash' | 'alert' | 'refresh' | 'shield' | 'user-minus' | 'info';
+    onConfirm: () => void | Promise<void>;
   } | null>(null);
 
   // Bulletins Cabinet Locker and laboratory states
@@ -1661,33 +1697,144 @@ export default function DashboardAdmin({
     speakText(`New ${newUserRole} account for ${newUserName} successfully registered in system database.`, accessibility.readAloud);
   };
 
-  const handleDeleteUser = (id: string, name: string) => {
+  const handleDeleteUser = (userOrId: MockUser | string, nameFallback?: string) => {
+    // Resolve user object
+    let targetUser: MockUser | undefined;
+    if (typeof userOrId === 'string') {
+      targetUser = allDirectoryUsers.find(u => u.id === userOrId || u.uid === userOrId || (u.email && u.email.toLowerCase() === userOrId.toLowerCase()));
+      if (!targetUser) {
+        targetUser = {
+          id: userOrId,
+          name: nameFallback || 'User',
+          email: '',
+          role: 'student',
+          uid: userOrId,
+          department: 'Academic Registry'
+        };
+      }
+    } else {
+      targetUser = userOrId;
+    }
+
+    const targetId = targetUser.id || '';
+    const targetUid = targetUser.uid || targetUser.id || '';
+    const targetEmail = targetUser.email || '';
+    const targetName = targetUser.name || nameFallback || 'User';
+    const targetRole = targetUser.role || 'user';
+    const targetDept = targetUser.department || 'Academic Department';
+
+    // Prevent revoking your own active admin session
+    const isCurrentAdmin = Boolean(
+      userProfile && (
+        (userProfile.id && (targetId === userProfile.id || targetUid === userProfile.id)) ||
+        (userProfile.email && targetEmail && userProfile.email.toLowerCase().trim() === targetEmail.toLowerCase().trim())
+      )
+    );
+
+    if (isCurrentAdmin) {
+      const warningMsg = "You cannot revoke your own currently active administrator session.";
+      speakText(warningMsg, accessibility.readAloud);
+      if (typeof window !== 'undefined' && (window as any).showToast) {
+        (window as any).showToast(warningMsg, "warning");
+      }
+      return;
+    }
+
     setAdminDialogConfirm({
-      title: 'Revoke Credentials',
-      message: `Are you absolutely sure you want to revoke credentials and remove ${name} from integrated directories?`,
+      title: 'Revoke Credentials & Remove User',
+      message: `Are you absolutely sure you want to permanently revoke credentials and delete ${targetName} from the MSU directory system?\n\nThis will terminate their login credentials, detach active enrollments, and remove access rights immediately.`,
       confirmText: 'Revoke & Remove',
-      onConfirm: () => {
-        let registeredUsers = [];
+      cancelText: 'Cancel',
+      itemName: targetName,
+      itemBadge: targetRole.toUpperCase(),
+      itemDetails: [
+        { label: 'Identifier UID', value: targetUid || targetId },
+        { label: 'Institutional Email', value: targetEmail || 'Not Provided' },
+        { label: 'Department / Unit', value: targetDept }
+      ],
+      intent: 'danger',
+      icon: 'trash',
+      onConfirm: async () => {
+        // 1. Add to deleted tombstone list
+        let deletedArr: string[] = [];
+        try {
+          deletedArr = JSON.parse(localStorage.getItem('classpulse_deleted_user_ids') || '[]');
+        } catch {}
+        const toAdd = [targetId, targetUid, targetEmail].filter(Boolean) as string[];
+        for (const item of toAdd) {
+          if (!deletedArr.some(d => d.toLowerCase() === item.toLowerCase())) {
+            deletedArr.push(item);
+          }
+        }
+        localStorage.setItem('classpulse_deleted_user_ids', JSON.stringify(deletedArr));
+
+        // 2. Remove from classpulse_registered_users
+        let registeredUsers: any[] = [];
         try {
           registeredUsers = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
         } catch (err) {
           console.error(err);
         }
-        const updatedUsers = registeredUsers.filter((u: any) => u.id !== id);
+
+        const isMatch = (u: any) => {
+          if (!u) return false;
+          if (targetId && (u.id === targetId || u.uid === targetId)) return true;
+          if (targetUid && (u.uid === targetUid || u.id === targetUid)) return true;
+          if (targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail.toLowerCase().trim()) return true;
+          return false;
+        };
+
+        const updatedUsers = registeredUsers.filter((u: any) => !isMatch(u));
         localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedUsers));
         window.dispatchEvent(new Event('registered-users-changed'));
 
-        // Delete user from Firestore
-        const isOffline = localStorage.getItem('cp_offline') === 'true';
-        deleteRegisteredUserFromFirestore(isOffline, id).catch(err => console.error(err));
+        // 3. Remove from custom passwords
+        try {
+          const passRaw = localStorage.getItem('classpulse_custom_passwords');
+          if (passRaw) {
+            const passObj = JSON.parse(passRaw);
+            if (targetEmail) delete passObj[targetEmail.toLowerCase().trim()];
+            if (targetUid) delete passObj[targetUid.toLowerCase().trim()];
+            if (targetId) delete passObj[targetId.toLowerCase().trim()];
+            localStorage.setItem('classpulse_custom_passwords', JSON.stringify(passObj));
+          }
+        } catch {}
 
-        // Sync classpulse_registered_admins
+        // 4. Remove from classpulse_registered_admins
         const adminsList = updatedUsers.filter((u: any) => u.role === 'admin');
         localStorage.setItem('classpulse_registered_admins', JSON.stringify(adminsList));
         window.dispatchEvent(new Event('registered-admins-changed'));
 
-        setUsersList(updatedUsers);
-        speakText(`${name} removed successfully from student and faculty registries.`, accessibility.readAloud);
+        // 5. If student, purge student enrollments
+        if (targetRole === 'student') {
+          try {
+            const enrollmentsRaw = localStorage.getItem('cp_enrollments');
+            if (enrollmentsRaw) {
+              const allEnrollments = JSON.parse(enrollmentsRaw);
+              const filtered = allEnrollments.filter((e: any) => 
+                e.studentId !== targetUid && 
+                e.studentId !== targetId && 
+                (e.studentEmail || '').toLowerCase().trim() !== targetEmail.toLowerCase().trim() &&
+                (e.studentName || '').toLowerCase().trim() !== targetName.toLowerCase().trim()
+              );
+              localStorage.setItem('cp_enrollments', JSON.stringify(filtered));
+              window.dispatchEvent(new Event('storage'));
+            }
+          } catch {}
+        }
+
+        // 6. Delete user from Firestore
+        const isOffline = localStorage.getItem('cp_offline') === 'true';
+        deleteRegisteredUserFromFirestore(isOffline, targetId, targetEmail, targetUid).catch(err => console.error(err));
+
+        // 7. Update local UI state
+        setUsersList(prev => prev.filter(u => !isMatch(u)));
+
+        const successMsg = `${targetName} (${targetRole.toUpperCase()}) was removed successfully.`;
+        speakText(successMsg, accessibility.readAloud);
+        if (typeof window !== 'undefined' && (window as any).showToast) {
+          (window as any).showToast(successMsg, "success");
+        }
       }
     });
   };
@@ -4356,20 +4503,20 @@ export default function DashboardAdmin({
                               </div>
                             </div>
 
-                            <div className="flex gap-1 shrink-0 self-start">
+                            <div className="flex gap-1.5 shrink-0 self-start">
                               <button
                                 onClick={() => handleStartEditUser(u)}
-                                className="p-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-zinc-850 cursor-pointer transition-colors"
+                                className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-zinc-850 cursor-pointer transition-colors flex items-center justify-center"
                                 title="Edit User Details"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => handleDeleteUser(u.id, u.name)}
-                                className="p-2 border border-red-500/10 hover:bg-red-500/10 rounded-xl text-red-500 cursor-pointer transition-colors"
+                                onClick={() => handleDeleteUser(u)}
+                                className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-2 border border-red-500/10 hover:bg-red-500/10 rounded-xl text-red-500 cursor-pointer transition-colors flex items-center justify-center"
                                 title="Revoke Staff Credentials"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -4684,20 +4831,20 @@ export default function DashboardAdmin({
                               </div>
                             </div>
 
-                            <div className="flex gap-1 shrink-0 self-start">
+                            <div className="flex gap-1.5 shrink-0 self-start">
                               <button
                                 onClick={() => handleStartEditUser(u)}
-                                className="p-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-zinc-850 cursor-pointer transition-colors"
+                                className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-zinc-850 cursor-pointer transition-colors flex items-center justify-center"
                                 title="Edit User Details"
                               >
-                                <Edit className="w-3.5 h-3.5" />
+                                <Edit className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => handleDeleteUser(u.id, u.name)}
-                                className="p-2 border border-red-500/10 hover:bg-red-500/10 rounded-xl text-red-500 cursor-pointer transition-colors"
+                                onClick={() => handleDeleteUser(u)}
+                                className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-2 border border-red-500/10 hover:bg-red-500/10 rounded-xl text-red-500 cursor-pointer transition-colors flex items-center justify-center"
                                 title="Revoke Student Enrollment"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -4827,28 +4974,54 @@ export default function DashboardAdmin({
                                   <Building className="w-3.5 h-3.5 text-zinc-500" />
                                   <span>{u.department || 'Academic Registrar Board'}</span>
                                 </p>
-                                <span className="text-[9px] bg-zinc-100 dark:bg-zinc-900 text-zinc-500 font-mono tracking-wide px-1.5 py-0.5 rounded inline-block mt-1 font-extrabold">
-                                  ADM_ID: {u.uid || ('ADM-' + u.id.substring(0, 5).toUpperCase())}
-                                </span>
+                                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                  <span className="text-[9px] bg-zinc-100 dark:bg-zinc-900 text-zinc-500 font-mono tracking-wide px-1.5 py-0.5 rounded inline-block font-extrabold">
+                                    ADM_ID: {u.uid || ('ADM-' + u.id.substring(0, 5).toUpperCase())}
+                                  </span>
+                                  {Boolean(
+                                    userProfile && (
+                                      (userProfile.id && (u.id === userProfile.id || u.uid === userProfile.id)) ||
+                                      (userProfile.email && u.email && userProfile.email.toLowerCase().trim() === u.email.toLowerCase().trim())
+                                    )
+                                  ) && (
+                                    <span className="text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-sans tracking-wider uppercase px-1.5 py-0.5 rounded inline-block font-extrabold">
+                                      Active Session
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            <div className="flex gap-1 shrink-0 self-start">
-                              <button
-                                onClick={() => handleStartEditUser(u)}
-                                className="p-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-zinc-850 cursor-pointer transition-colors"
-                                title="Edit Admin Details"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteUser(u.id, u.name)}
-                                className="p-2 border border-red-500/10 hover:bg-red-500/10 rounded-xl text-red-500 cursor-pointer transition-colors"
-                                title="Revoke Admin Credentials"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            {(() => {
+                              const isCurrentAdmin = Boolean(
+                                userProfile && (
+                                  (userProfile.id && (u.id === userProfile.id || u.uid === userProfile.id)) ||
+                                  (userProfile.email && u.email && userProfile.email.toLowerCase().trim() === u.email.toLowerCase().trim())
+                                )
+                              );
+
+                              return (
+                                <div className="flex gap-1.5 shrink-0 self-start">
+                                  <button
+                                    onClick={() => handleStartEditUser(u)}
+                                    className="min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-2 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-zinc-850 cursor-pointer transition-colors flex items-center justify-center"
+                                    title="Edit Admin Details"
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(u)}
+                                    disabled={isCurrentAdmin}
+                                    className={`min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] p-2 border border-red-500/10 rounded-xl text-red-500 transition-colors flex items-center justify-center ${
+                                      isCurrentAdmin ? 'opacity-30 cursor-not-allowed bg-zinc-100 dark:bg-zinc-900' : 'hover:bg-red-500/10 cursor-pointer'
+                                    }`}
+                                    title={isCurrentAdmin ? "Cannot revoke active admin session" : "Revoke Admin Credentials"}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between">
@@ -4931,20 +5104,35 @@ export default function DashboardAdmin({
                       </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-900">
                       <button
                         type="button"
-                        onClick={() => setEditingUser(null)}
-                        className="px-4 py-2 border border-zinc-250 dark:border-zinc-800 rounded-xl text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-xs font-bold uppercase cursor-pointer"
+                        onClick={() => {
+                          const target = editingUser;
+                          setEditingUser(null);
+                          if (target) handleDeleteUser(target);
+                        }}
+                        className="px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                        title="Delete this user record"
                       >
-                        Cancel
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete User</span>
                       </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
-                      >
-                        Save Changes
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingUser(null)}
+                          className="px-4 py-2 border border-zinc-250 dark:border-zinc-800 rounded-xl text-zinc-450 hover:bg-zinc-50 dark:hover:bg-zinc-900 text-xs font-bold uppercase cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
                     </div>
                   </form>
                 </div>
@@ -7629,7 +7817,11 @@ export default function DashboardAdmin({
           }
         }}
         title={adminDialogConfirm?.title || 'Confirmation Required'}
-        intent="danger"
+        intent={adminDialogConfirm?.intent || 'danger'}
+        icon={adminDialogConfirm?.icon}
+        itemName={adminDialogConfirm?.itemName}
+        itemBadge={adminDialogConfirm?.itemBadge}
+        itemDetails={adminDialogConfirm?.itemDetails}
         confirmText={adminDialogConfirm?.confirmText || 'Confirm'}
         cancelText={adminDialogConfirm?.cancelText || 'Cancel'}
         description={

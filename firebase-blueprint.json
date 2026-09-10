@@ -105,6 +105,66 @@
         "status": { "type": "string" }
       },
       "required": ["id", "studentId", "facultyId", "date", "status"]
+    },
+    "FacultyStatus": {
+      "title": "Faculty Status",
+      "description": "Real-time presence and consultation status of faculty",
+      "type": "object",
+      "properties": {
+        "facultyId": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string" },
+        "location": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["facultyId", "name", "status"]
+    },
+    "LabRoom": {
+      "title": "Laboratory Room",
+      "description": "College lab facilities and occupancy status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "capacity": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "AuditLogEntry": {
+      "title": "Audit Log Entry",
+      "description": "System security and administrative audit event trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string" },
+        "performedBy": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "action"]
+    },
+    "SessionLink": {
+      "title": "Session Link",
+      "description": "Cross-device pairing token and session exchange data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "token": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "College or departmental broadcast announcement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "title"]
     }
   },
   "firestore": {
@@ -132,6 +192,14 @@
       "schema": "UserProfile",
       "description": "Collection of registered user accounts"
     },
+    "/credentials/{credId}": {
+      "schema": "UserProfile",
+      "description": "Secure credential lookup store"
+    },
+    "/password_resets/{resetId}": {
+      "schema": "UserProfile",
+      "description": "Self-service password recovery tokens"
+    },
     "/enrollments/{enrollmentId}": {
       "schema": "Enrollment",
       "description": "Collection of subject enrollments"
@@ -151,6 +219,34 @@
     "/consultations/{consultationId}": {
       "schema": "ConsultationBooking",
       "description": "Legacy alias for consultation appointments"
+    },
+    "/faculty_statuses/{facultyId}": {
+      "schema": "FacultyStatus",
+      "description": "Real-time faculty office presence"
+    },
+    "/rooms/{roomId}": {
+      "schema": "LabRoom",
+      "description": "College lab rooms and schedule bookings"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Broadcast announcements"
+    },
+    "/session_links/{sessionId}": {
+      "schema": "SessionLink",
+      "description": "Desktop-to-mobile session synchronization handshakes"
+    },
+    "/archivedTerms/{termId}": {
+      "schema": "ClassSession",
+      "description": "Archived academic semester records"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLogEntry",
+      "description": "Audit security event logs"
+    },
+    "/test/{testId}": {
+      "schema": "SessionLink",
+      "description": "Connection test heartbeat"
     }
   }
 }

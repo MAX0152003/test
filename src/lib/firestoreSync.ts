@@ -711,19 +711,73 @@ export async function fetchUserCredentialFromFirestore(key: string): Promise<str
 
 /**
  * Deletes a registered user account from Firestore via centralized queue.
+ * Thoroughly removes records across registered_users, users, and credentials collections.
  */
 export async function deleteRegisteredUserFromFirestore(
   isOffline: boolean,
-  userId: string
+  userId: string,
+  userEmail?: string,
+  userUid?: string
 ): Promise<void> {
   if (isOffline || !userId) return;
   const colPath = 'registered_users';
 
   return firestoreQueue.enqueue(`deleteRegisteredUser:${userId}`, async () => {
     try {
-      await deleteDoc(doc(db, colPath, userId));
-      await deleteDoc(doc(db, 'users', userId));
-      console.log(`User ${userId} deleted from Firestore.`);
+      // 1. Direct document delete by provided ID
+      await deleteDoc(doc(db, colPath, userId)).catch(() => {});
+      await deleteDoc(doc(db, 'users', userId)).catch(() => {});
+
+      // 2. Query and purge all matching docs in registered_users and users
+      const cleanEmail = (userEmail || '').toLowerCase().trim();
+      const cleanUid = (userUid || '').toLowerCase().trim();
+      const cleanId = (userId || '').toLowerCase().trim();
+
+      const purgeCollection = async (cName: string) => {
+        try {
+          const snap = await getDocs(collection(db, cName));
+          for (const d of snap.docs) {
+            const data = d.data();
+            const dEmail = (data.email || '').toLowerCase().trim();
+            const dUid = (data.uid || '').toLowerCase().trim();
+            const dId = (data.id || d.id || '').toLowerCase().trim();
+
+            const match = d.id === userId ||
+              (cleanId && dId === cleanId) ||
+              (cleanEmail && dEmail && dEmail === cleanEmail) ||
+              (cleanUid && dUid && dUid === cleanUid);
+
+            if (match) {
+              await deleteDoc(doc(db, cName, d.id)).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn(`[Firestore] purgeCollection error in ${cName}:`, e);
+        }
+      };
+
+      await purgeCollection('registered_users');
+      await purgeCollection('users');
+
+      // 3. Purge matching credentials
+      try {
+        const credSnap = await getDocs(collection(db, 'credentials'));
+        for (const d of credSnap.docs) {
+          const data = d.data();
+          const dKey = (data.key || d.id || '').toLowerCase().trim();
+          if (
+            (cleanEmail && dKey === cleanEmail) ||
+            (cleanUid && dKey === cleanUid) ||
+            (cleanId && dKey === cleanId)
+          ) {
+            await deleteDoc(doc(db, 'credentials', d.id)).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.warn("[Firestore] purge credentials error:", e);
+      }
+
+      console.log(`User ${userId} deleted completely from Firestore.`);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `${colPath}/${userId}`);
     }
@@ -802,14 +856,30 @@ export function listenToRegisteredUsers(
         snapshot.forEach((docSnap) => {
           users.push(docSnap.data());
         });
+
+        // Respect deleted users tombstone
+        let deletedSet = new Set<string>();
+        try {
+          const deletedArr = JSON.parse(localStorage.getItem('classpulse_deleted_user_ids') || '[]');
+          deletedSet = new Set(deletedArr.map((s: string) => (s || '').toLowerCase().trim()));
+        } catch {}
+
+        const isUserDeleted = (u: any) => {
+          if (!u) return true;
+          if (u.id && deletedSet.has(String(u.id).toLowerCase().trim())) return true;
+          if (u.uid && deletedSet.has(String(u.uid).toLowerCase().trim())) return true;
+          if (u.email && deletedSet.has(String(u.email).toLowerCase().trim())) return true;
+          return false;
+        };
+
         if (users.length > 0) {
           let localUsers: any[] = [];
           try {
             localUsers = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
           } catch {}
           const userMap = new Map<string, any>();
-          localUsers.forEach(u => u.id && userMap.set(u.id, u));
-          users.forEach(u => u.id && userMap.set(u.id, u));
+          localUsers.filter(u => !isUserDeleted(u)).forEach(u => u.id && userMap.set(u.id, u));
+          users.filter(u => !isUserDeleted(u)).forEach(u => u.id && userMap.set(u.id, u));
           const merged = Array.from(userMap.values());
 
           localStorage.setItem('classpulse_registered_users', JSON.stringify(merged));
@@ -924,9 +994,24 @@ export async function syncAllAccountsFromFirestore(isOffline: boolean): Promise<
         localUsers = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
       } catch {}
 
+      // Respect deleted users tombstone
+      let deletedSet = new Set<string>();
+      try {
+        const deletedArr = JSON.parse(localStorage.getItem('classpulse_deleted_user_ids') || '[]');
+        deletedSet = new Set(deletedArr.map((s: string) => (s || '').toLowerCase().trim()));
+      } catch {}
+
+      const isUserDeleted = (u: any) => {
+        if (!u) return true;
+        if (u.id && deletedSet.has(String(u.id).toLowerCase().trim())) return true;
+        if (u.uid && deletedSet.has(String(u.uid).toLowerCase().trim())) return true;
+        if (u.email && deletedSet.has(String(u.email).toLowerCase().trim())) return true;
+        return false;
+      };
+
       const userMap = new Map<string, any>();
-      localUsers.forEach(u => u && u.id && userMap.set(u.id, u));
-      firestoreUsers.forEach(u => u && u.id && userMap.set(u.id, u));
+      localUsers.filter(u => !isUserDeleted(u)).forEach(u => u && u.id && userMap.set(u.id, u));
+      firestoreUsers.filter(u => !isUserDeleted(u)).forEach(u => u && u.id && userMap.set(u.id, u));
 
       const combinedUsers = Array.from(userMap.values());
       localStorage.setItem('classpulse_registered_users', JSON.stringify(combinedUsers));
