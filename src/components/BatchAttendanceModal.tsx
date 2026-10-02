@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import { 
   Users, 
   Calendar, 
@@ -112,26 +113,22 @@ export const BatchAttendanceModal: React.FC<BatchAttendanceModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
-      >
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-        />
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 15 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 15 }}
-          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="relative w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-2xl overflow-hidden z-10 text-left space-y-5 my-auto"
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
         >
+          <motion.div
+            {...modalBackdropMotion}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+          />
+
+          <motion.div
+            {...modalCardMotion}
+            className="relative w-full max-w-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-5 sm:p-6 shadow-2xl overflow-hidden z-10 text-left space-y-5 my-auto"
+          >
           {/* Header */}
           <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-850">
             <div className="flex items-center gap-3">
@@ -331,6 +328,7 @@ export const BatchAttendanceModal: React.FC<BatchAttendanceModalProps> = ({
           </form>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 };

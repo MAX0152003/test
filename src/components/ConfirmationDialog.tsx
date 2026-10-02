@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import { 
   AlertTriangle, 
   Trash2, 
@@ -129,19 +130,14 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
         >
           {/* Backdrop */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            {...modalBackdropMotion}
             onClick={onClose}
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
           />
 
           {/* Modal Card */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 0 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 0 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            {...modalCardMotion}
             className="relative w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-3xl p-6 sm:p-7 shadow-2xl z-10 text-left space-y-5 max-h-[90vh] overflow-y-auto"
           >
             {/* Close Button */}

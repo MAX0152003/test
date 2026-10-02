@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { screenMotion } from '../lib/animationTransitions';
 import { 
   HelpCircle, 
   LifeBuoy, 
@@ -267,9 +268,7 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
           // DETAILED TICKET CHAT WINDOW with Administrator (separated out of Messages)
           <motion.div
             key="ticket-chat"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            {...screenMotion}
             className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left"
           >
             <div className="lg:col-span-4 space-y-4">
@@ -399,9 +398,7 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
           // USER'S INBOX OF SUPPORT TICKETS & TICKET FILING INTERFACE (separated out of Messages)
           <motion.div
             key="tickets"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            {...screenMotion}
             className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left"
           >
             {/* Create Help Ticket card */}
@@ -535,9 +532,7 @@ export default function HelpCenter({ userProfile, accessibility, onBack }: HelpC
           // HELPDESK FAQS & CAMPUS USER MANUAL
           <motion.div
             key="faq"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            {...screenMotion}
             className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-left"
           >
             <div className="lg:col-span-8 space-y-4">

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion } from '../lib/animationTransitions';
 
 interface SidebarProps {
   role: Role;
@@ -224,23 +225,23 @@ export default function Sidebar({
     switch (role) {
       case 'student':
         return {
-          activeClass: 'text-emerald-600 dark:text-emerald-400 font-extrabold shadow-2xs',
+          activeClass: 'text-emerald-600 dark:text-emerald-400 font-semibold shadow-2xs',
           bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/15 ring-1 ring-emerald-500/25',
-          badgeClass: 'bg-emerald-500 text-black font-bold',
+          badgeClass: 'bg-emerald-500 text-black font-semibold',
           roleLabel: 'text-emerald-600 dark:text-emerald-400'
         };
       case 'faculty':
         return {
-          activeClass: 'text-emerald-700 dark:text-emerald-400 font-extrabold shadow-2xs',
+          activeClass: 'text-emerald-700 dark:text-emerald-400 font-semibold shadow-2xs',
           bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/15 ring-1 ring-emerald-500/25',
-          badgeClass: 'bg-emerald-500 text-black font-bold',
+          badgeClass: 'bg-emerald-500 text-black font-semibold',
           roleLabel: 'text-emerald-600 dark:text-emerald-400'
         };
       case 'admin':
         return {
-          activeClass: 'text-amber-700 dark:text-amber-400 font-extrabold shadow-2xs',
+          activeClass: 'text-amber-700 dark:text-amber-400 font-semibold shadow-2xs',
           bgClass: 'bg-amber-500/10 dark:bg-amber-500/15 ring-1 ring-amber-500/25',
-          badgeClass: 'bg-amber-500 text-black font-bold',
+          badgeClass: 'bg-amber-500 text-black font-semibold',
           roleLabel: 'text-amber-600 dark:text-amber-400'
         };
     }
@@ -261,10 +262,7 @@ export default function Sidebar({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            {...modalBackdropMotion}
             onClick={() => setIsOpen(false)}
             className="md:hidden fixed inset-0 z-40 bg-zinc-950/60 backdrop-blur-xs cursor-pointer"
           />
@@ -302,10 +300,10 @@ export default function Sidebar({
 
               {!isEffectiveCollapsed && (
                 <div className="text-left flex flex-col justify-center min-w-0">
-                  <h1 className="text-sm font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase truncate">
+                  <h1 className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 uppercase truncate">
                     Class<span className="text-emerald-500">Pulse</span>
                   </h1>
-                  <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 tracking-widest uppercase truncate">{role} Portal</span>
+                  <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 tracking-wide capitalize truncate">{role} Portal</span>
                 </div>
               )}
             </div>
@@ -338,7 +336,7 @@ export default function Sidebar({
             {navSections.map((section, idx) => (
               <div key={section.title} className="space-y-1">
                 {!isEffectiveCollapsed ? (
-                  <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wider text-zinc-400 dark:text-zinc-500">
+                  <div className="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                     {section.title}
                   </div>
                 ) : (
@@ -353,7 +351,7 @@ export default function Sidebar({
                       onClick={() => handleNavClick(item.id, item.label)}
                       type="button"
                       title={isEffectiveCollapsed ? item.label : undefined}
-                      className={`w-full min-h-[44px] touch-manipulation flex items-center justify-between px-3 py-2 rounded-xl transition-all text-xs font-bold cursor-pointer active:scale-95 group relative isolate ${
+                      className={`w-full min-h-[44px] touch-manipulation flex items-center justify-between px-3 py-2 rounded-xl transition-all text-xs sm:text-sm font-semibold cursor-pointer active:scale-95 group relative isolate ${
                         isActive 
                           ? `${roleNav.bgClass} ${roleNav.activeClass}` 
                           : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-900/70 hover:text-zinc-900 dark:hover:text-zinc-100'
@@ -367,7 +365,7 @@ export default function Sidebar({
                       </div>
 
                       {!isEffectiveCollapsed && item.badge !== undefined && item.badge > 0 && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 font-mono shadow-2xs ${roleNav.badgeClass}`}>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 font-mono shadow-2xs ${roleNav.badgeClass}`}>
                           {item.badge}
                         </span>
                       )}
@@ -390,7 +388,7 @@ export default function Sidebar({
                 <img 
                   src={userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} 
                   alt={userName}
-                  className="w-7 h-7 rounded-full object-cover shrink-0 border border-emerald-500/30"
+                  className="w-8 h-8 rounded-full object-cover shrink-0 border border-emerald-500/30"
                   referrerPolicy="no-referrer"
                 />
                 <span 
@@ -401,8 +399,8 @@ export default function Sidebar({
                 />
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-[11px] font-extrabold text-zinc-900 dark:text-zinc-100 truncate">{userName}</p>
-                <p className="text-[9px] font-semibold text-zinc-400 truncate capitalize">{role}</p>
+                <p className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">{userName}</p>
+                <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 truncate capitalize">{role}</p>
               </div>
             </div>
           )}

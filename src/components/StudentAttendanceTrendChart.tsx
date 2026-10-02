@@ -297,18 +297,18 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
               <span className="font-bold text-zinc-900 dark:text-zinc-100">{data.sessionCount} class{data.sessionCount > 1 ? 'es' : ''}</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-1 pt-1 border-t border-zinc-100 dark:border-zinc-850 text-[10px]">
-              <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 p-1 rounded-lg text-center font-bold">
-                <p className="text-[7.5px] uppercase text-emerald-600/70 dark:text-emerald-400/70">Pres</p>
-                <p>{data.present}</p>
+            <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-zinc-100 dark:border-zinc-850 text-xs">
+              <div className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 p-1.5 rounded-lg text-center font-bold">
+                <p className="text-[10px] uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80">Pres</p>
+                <p className="font-mono text-xs">{data.present}</p>
               </div>
-              <div className="bg-amber-500/10 text-amber-700 dark:text-amber-300 p-1 rounded-lg text-center font-bold">
-                <p className="text-[7.5px] uppercase text-amber-600/70 dark:text-amber-400/70">Late</p>
-                <p>{data.late}</p>
+              <div className="bg-amber-500/10 text-amber-700 dark:text-amber-300 p-1.5 rounded-lg text-center font-bold">
+                <p className="text-[10px] uppercase tracking-wider text-amber-600/80 dark:text-amber-400/80">Late</p>
+                <p className="font-mono text-xs">{data.late}</p>
               </div>
-              <div className="bg-red-500/10 text-red-700 dark:text-red-300 p-1 rounded-lg text-center font-bold">
-                <p className="text-[7.5px] uppercase text-red-600/70 dark:text-red-400/70">Abs</p>
-                <p>{data.absent}</p>
+              <div className="bg-red-500/10 text-red-700 dark:text-red-300 p-1.5 rounded-lg text-center font-bold">
+                <p className="text-[10px] uppercase tracking-wider text-red-600/80 dark:text-red-400/80">Abs</p>
+                <p className="font-mono text-xs">{data.absent}</p>
               </div>
             </div>
           </div>
@@ -318,7 +318,7 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
               {data.classNames.map((cName, idx) => (
                 <span 
                   key={idx}
-                  className="px-1.5 py-0.5 rounded text-[8.5px] font-mono font-bold bg-zinc-100 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300"
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 dark:bg-zinc-850 text-zinc-700 dark:text-zinc-300"
                 >
                   {cName}
                 </span>
@@ -343,8 +343,8 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
             <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
               Attendance Trend & Punctuality Line Chart
             </h3>
-            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${metrics.standingClass} flex items-center gap-1`}>
-              <ShieldCheck className="w-3 h-3" />
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${metrics.standingClass} flex items-center gap-1`}>
+              <ShieldCheck className="w-3.5 h-3.5" />
               {metrics.standingLabel}
             </span>
           </div>
@@ -356,7 +356,7 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
         {/* View Controls & Selectors */}
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Time Range Selector */}
-          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-[10.5px] font-bold">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold">
             <button
               type="button"
               onClick={() => setTimeRange('7d')}
@@ -427,17 +427,17 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
         {/* Overall Attendance Rate */}
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider">Attendance Rate</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Attendance Rate</span>
             {metrics.trajectory === 'up' ? (
-              <span className="flex items-center gap-0.5 text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+              <span className="flex items-center gap-0.5 text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
                 <TrendingUp className="w-3 h-3" /> +{metrics.delta}%
               </span>
             ) : metrics.trajectory === 'down' ? (
-              <span className="flex items-center gap-0.5 text-[9px] font-black text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-full">
+              <span className="flex items-center gap-0.5 text-[10px] font-black text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-full">
                 <TrendingDown className="w-3 h-3" /> {metrics.delta}%
               </span>
             ) : (
-              <span className="text-[9px] font-black text-zinc-400 bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
+              <span className="text-[10px] font-black text-zinc-400 bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full">
                 Steady
               </span>
             )}
@@ -448,11 +448,11 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
             }`}>
               {metrics.rate}%
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               ({metrics.total} logs)
             </span>
           </div>
-          <div className="mt-1 text-[9.5px] text-zinc-500 flex items-center gap-1 font-medium">
+          <div className="mt-1 text-xs text-zinc-500 flex items-center gap-1 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>80% Minimum Required</span>
           </div>
@@ -461,18 +461,18 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
         {/* Punctuality / On-Time Index */}
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">On-Time Check-ins</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">On-Time Check-ins</span>
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
               {metrics.presents}
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               ({metrics.punctuality}% on-time)
             </span>
           </div>
-          <div className="mt-1 text-[9.5px] text-zinc-500 flex items-center gap-1 font-medium">
+          <div className="mt-1 text-xs text-zinc-500 flex items-center gap-1 font-medium">
             <span>{metrics.excused > 0 ? `+${metrics.excused} excused approved` : 'Verified QR scans'}</span>
           </div>
         </div>
@@ -480,18 +480,18 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
         {/* Lateness Threshold */}
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Late Arrivals</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Late Arrivals</span>
             <Clock className="w-3.5 h-3.5 text-amber-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className={`text-2xl font-black font-mono ${metrics.lates > 0 ? 'text-amber-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
               {metrics.lates}
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               (0.7 weight)
             </span>
           </div>
-          <div className="mt-1 text-[9.5px] text-amber-600/80 dark:text-amber-400/80 font-medium">
+          <div className="mt-1 text-xs text-amber-600/80 dark:text-amber-400/80 font-medium">
             <span>{metrics.lates >= 5 ? 'Approaching 10-late drop' : '10 lates = automatic drop'}</span>
           </div>
         </div>
@@ -499,18 +499,18 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
         {/* Absence Warning Monitor */}
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850 flex flex-col justify-between">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">Unexcused Absences</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">Unexcused Absences</span>
             <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className={`text-2xl font-black font-mono ${metrics.absents > 0 ? 'text-red-500' : 'text-zinc-700 dark:text-zinc-300'}`}>
               {metrics.absents}
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               / 5 allowed
             </span>
           </div>
-          <div className="mt-1 text-[9.5px] text-red-600/80 dark:text-red-400/80 font-medium">
+          <div className="mt-1 text-xs text-red-600/80 dark:text-red-400/80 font-medium">
             <span>{metrics.absents > 0 ? `${5 - metrics.absents} left before auto drop` : 'Zero unexcused absences'}</span>
           </div>
         </div>
@@ -518,7 +518,7 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
 
       {/* Chart Mode Toggle Buttons */}
       <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-[10px] font-black uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold uppercase tracking-wider">
           <button
             type="button"
             onClick={() => setViewMode('rate_trend')}

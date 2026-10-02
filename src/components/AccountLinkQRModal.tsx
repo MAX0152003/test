@@ -1,6 +1,7 @@
 import React from 'react';
 import { QrCode, Smartphone, CheckCircle2, Copy, RefreshCw, X, ShieldCheck, Camera, Clock, Timer, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import { createSessionLinkInFirestore, listenToSessionLink, claimSessionLinkFromFirestore } from '../lib/firestoreSync';
 import { parseSessionToken } from '../lib/authUtils';
 import { playSuccessChime, triggerHapticFeedback } from '../lib/soundUtils';
@@ -152,13 +153,17 @@ export default function AccountLinkQRModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="w-full max-w-md bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-left"
-        >
+      {isOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4">
+          <motion.div
+            {...modalBackdropMotion}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div
+            {...modalCardMotion}
+            className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden text-left"
+          >
           {/* Modal Header */}
           <div className="p-4 sm:p-5 border-b border-zinc-100 dark:border-zinc-850 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/60">
             <div className="flex items-center gap-3">
@@ -407,6 +412,7 @@ export default function AccountLinkQRModal({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 }

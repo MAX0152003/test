@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { TRANSITION_EASE, TRANSITION_DURATION } from '../lib/animationTransitions';
 import {
   QrCode,
   Calendar,
@@ -94,7 +95,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
     ],
     fri: [
       { code: 'CS 101', name: 'Intro to Computer Science', time: '08:00 AM - 09:30 AM', room: 'CCS Lab 1', cluster: 'CCS Complex', status: 'Enrolled' },
-      { code: '🕌 JUM\'AH', name: 'MSU Friday Prayer & Cultural Window', time: '11:30 AM - 01:30 PM', room: 'Campus Mosque / Dimaporo', cluster: 'Campus Wide', status: 'Protected Window', isJumah: true },
+      { code: '🕌 JUM\'AH', name: 'MSU Friday Prayer & Cultural Window', time: '11:30 AM - 01:00 PM', room: 'Campus Mosque / Dimaporo', cluster: 'Campus Wide', status: 'Protected Window', isJumah: true },
       { code: 'PE 102', name: 'Physical Fitness & Wellness', time: '02:00 PM - 03:30 PM', room: 'Gymnasium', cluster: 'Sports Complex', status: 'Enrolled' },
     ]
   };
@@ -110,7 +111,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
     },
     {
       q: "How does Friday Jum’ah prayer window protection work?",
-      a: "In compliance with Mindanao State University cultural and religious observances, the system flags and protects Friday 11:30 AM to 1:30 PM across all timetable matrixes, ensuring students and faculty attend prayers without academic conflict."
+      a: "In compliance with Mindanao State University cultural and religious observances, the system flags and protects Friday 11:30 AM to 1:00 PM across all timetable matrixes, ensuring students and faculty attend prayers without academic conflict."
     },
     {
       q: "How do I register or reset my password?",
@@ -281,7 +282,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
                     className="space-y-3"
                   >
                     <div className="flex items-center justify-between">
@@ -315,7 +316,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
                     className="space-y-3"
                   >
                     <div className="flex items-center justify-between">
@@ -329,7 +330,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                         </div>
                       </div>
                       <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                        11:30 - 1:30 PM
+                        11:30 - 1:00 PM
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] space-y-1 text-amber-900 dark:text-amber-300">
@@ -343,7 +344,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
                     className="space-y-3"
                   >
                     <div className="flex items-center justify-between">
@@ -821,7 +822,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                   MSU Friday Jum’ah Awareness
                 </h3>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  Automatic cultural & religious window protection across all timetables (Friday 11:30 AM - 1:30 PM), ensuring zero lecture conflicts during university congregational prayers.
+                  Automatic cultural & religious window protection across all timetables (Friday 11:30 AM - 1:00 PM), ensuring zero lecture conflicts during university congregational prayers.
                 </p>
               </div>
 
@@ -1039,10 +1040,10 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 {activeRoleTab === 'student' ? (
                   <motion.div
                     key="tab-student"
-                    initial={{ opacity: 0, y: 15 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
                     className="grid grid-cols-2 gap-8 items-center"
                   >
                     <div className="space-y-4">
@@ -1101,10 +1102,10 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 ) : activeRoleTab === 'faculty' ? (
                   <motion.div
                     key="tab-faculty"
-                    initial={{ opacity: 0, y: 15 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
                     className="grid grid-cols-2 gap-8 items-center"
                   >
                     <div className="space-y-4">
@@ -1163,10 +1164,10 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                 ) : (
                   <motion.div
                     key="tab-admin"
-                    initial={{ opacity: 0, y: 15 }}
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -15 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
                     className="grid grid-cols-2 gap-8 items-center"
                   >
                     <div className="space-y-4">
@@ -1281,7 +1282,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                   </div>
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  Automated institutional scheduling blackout from 11:30 AM to 1:30 PM every Friday across all colleges, guaranteeing zero conflicts with university congregational prayers.
+                  Automated institutional scheduling blackout from 11:30 AM to 1:00 PM every Friday across all colleges, guaranteeing zero conflicts with university congregational prayers.
                 </p>
                 <div className="pt-2 border-t border-zinc-100 dark:border-zinc-900 flex flex-wrap gap-1.5 text-[10px] font-mono">
                   <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 font-bold">Protected Slots</span>
@@ -1480,7 +1481,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
                   id="desktop-cta-signin-btn"
                   onClick={() => onEnterPortal('login')}
                   type="button"
-                  className="px-6 py-3.5 rounded-xl bg-white/20 hover:bg-white/30 text-black text-xs font-black uppercase tracking-wider cursor-pointer transition-all border border-black/10"
+                  className="px-6 py-3.5 rounded-xl bg-white/20 hover:bg-white/30 text-black text-xs font-black uppercase tracking-wider cursor-pointer transition-all border border-zinc-300/40 hover:border-zinc-400/50"
                 >
                   Sign In to Existing Account
                 </button>

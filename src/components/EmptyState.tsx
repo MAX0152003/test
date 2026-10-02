@@ -110,10 +110,10 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(({
       </div>
 
       <div className="space-y-1 max-w-sm">
-        <h4 className="text-sm font-extrabold text-zinc-800 dark:text-zinc-200 tracking-tight">
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
           {title}
         </h4>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-medium">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-normal">
           {description}
         </p>
       </div>
@@ -122,7 +122,7 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(({
         <button
           type="button"
           onClick={onAction}
-          className="mt-1 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/20 text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+          className="mt-1 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer shadow-xs"
         >
           {actionText}
         </button>

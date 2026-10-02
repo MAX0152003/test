@@ -44,20 +44,43 @@ export function isValidMsuId(value: string): boolean {
 }
 
 /**
- * Checks if a given class schedule overlaps with Friday Jum'ah Prayer window (11:30 AM - 1:30 PM)
+ * Checks if a given class schedule overlaps with Friday Jum'ah Prayer window (11:30 AM - 1:00 PM)
  */
-export function isFridayPrayerWindow(days: string[] = [], startTime?: string, _endTime?: string): boolean {
-  const hasFriday = days.some(d => d.includes('F') || d.toLowerCase().includes('fri') || d.toLowerCase() === 'friday');
+export function isFridayPrayerWindow(days: string[] = [], startTime?: string, endTime?: string): boolean {
+  const hasFriday = days.some(d => {
+    const lower = d.trim().toLowerCase();
+    return lower === 'f' || lower.includes('fri') || lower === 'fs' || lower === 'f-s' || lower === 'friday';
+  });
   if (!hasFriday) return false;
 
   if (!startTime) return true; // Any Friday class gets Friday awareness
-  
-  // Check if class starts or runs within 11:00 AM - 01:30 PM
-  const lowerTime = startTime.toLowerCase();
-  if (lowerTime.includes('11:') || lowerTime.includes('12:') || lowerTime.includes('1:00') || lowerTime.includes('1:30')) {
-    return true;
-  }
-  return true;
+
+  const parseTime = (timeStr: string): number => {
+    if (!timeStr) return 0;
+    try {
+      const clean = timeStr.trim().toUpperCase();
+      const isPM = clean.includes('PM');
+      const isAM = clean.includes('AM');
+      const parts = clean.replace(/(AM|PM)/g, '').trim().split(':');
+      let hours = parseInt(parts[0] || '0', 10);
+      const minutes = parseInt(parts[1] || '0', 10);
+      if (isPM && hours < 12) hours += 12;
+      if (isAM && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    } catch {
+      return 0;
+    }
+  };
+
+  const startMin = parseTime(startTime);
+  const endMin = endTime ? parseTime(endTime) : startMin + 60;
+
+  // Friday Jum'ah Prayer Window: 11:30 AM (690 min) to 1:00 PM (780 min)
+  const jumahStart = 11 * 60 + 30; // 11:30 AM = 690 mins
+  const jumahEnd = 13 * 60;        // 01:00 PM = 780 mins
+
+  // Overlap condition: session starts before Jum'ah ends and ends after Jum'ah starts
+  return startMin < jumahEnd && endMin > jumahStart;
 }
 
 export const DEFAULT_GRACE_PERIOD_MINUTES = 15;

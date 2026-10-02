@@ -27,6 +27,7 @@ import { ConfirmationDialog } from './ConfirmationDialog';
 import { StudentFacultyCard, StudentCourseCard, StudentExcuseCard, StudentLectureCard } from './StudentDashboardCards';
 import { AttendanceRiskCalculatorModal } from './AttendanceRiskCalculatorModal';
 import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
+import { screenMotion } from '../lib/animationTransitions';
 import { 
   Scan, 
   Calendar, 
@@ -1159,10 +1160,7 @@ export default function DashboardStudent({
               return (
                 <motion.div
                   key="dashboard"
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  {...screenMotion}
                   className="space-y-3 sm:space-y-4 text-left"
                 >
             {/* Compact Welcome Banner */}
@@ -1868,10 +1866,7 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="schedule"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="space-y-6 text-left"
           >
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
@@ -1971,12 +1966,9 @@ export default function DashboardStudent({
           <motion.div
             key="attendance"
             id="attendance-scanner-card"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full space-y-5 text-left animate-fade-in"
-        >
+            {...screenMotion}
+            className="w-full space-y-5 text-left"
+          >
           {(() => {
             return (
               <div className="space-y-5 text-left">
@@ -2457,11 +2449,8 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="excuse-letters"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-6 text-left"
           >
           <StudentExcuseInbox
             excuseLetters={excuseLetters || []}
@@ -2480,11 +2469,8 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="consultations"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-6 text-left"
           >
           <ConsultationsView
             role="student"
@@ -2511,10 +2497,7 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="messages"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
           >
           <Messages 
@@ -2536,10 +2519,7 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="help-center"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
           >
           <HelpCenter 
             userProfile={userProfile} 
@@ -2553,11 +2533,8 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="notifications"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-4 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-4 text-left"
           >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-855/60 pb-3">
             <div className="flex items-start gap-3">
@@ -2834,11 +2811,8 @@ export default function DashboardStudent({
         return (
           <motion.div
             key="profile"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-6 text-left"
           >
           <div className="space-y-6 text-left">
             <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4">

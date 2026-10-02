@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { listItemMotion } from '../lib/animationTransitions';
 import {
   Inbox,
   Plus,
@@ -371,18 +372,18 @@ export default function StudentExcuseInbox({
       {/* List of Excuse Letters */}
       <div className="space-y-4">
         {filteredLetters.length === 0 ? (
-          <div className="p-12 text-center rounded-3xl bg-white dark:bg-zinc-950 border border-dashed border-zinc-200 dark:border-zinc-800 space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 text-zinc-400 flex items-center justify-center mx-auto text-xl">
+          <div className="p-12 text-center rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/30 border border-dashed border-zinc-200 dark:border-zinc-800 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto text-xl shadow-xs">
               📭
             </div>
-            <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">No excuse letters found</h4>
-            <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+            <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">No excuse letters found</h4>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto font-normal">
               {searchQuery ? 'No results matched your search keyword.' : 'You have not submitted any excuse letters for this category.'}
             </p>
             <button
               type="button"
               onClick={handleOpenCreateModal}
-              className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 hover:bg-emerald-400 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-emerald-500 text-black text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-emerald-400 cursor-pointer transition-all active:scale-[0.98]"
             >
               <Plus className="w-3.5 h-3.5" />
               File an Excuse Letter
@@ -400,10 +401,7 @@ export default function StudentExcuseInbox({
                   <motion.div
                     key={letter.id}
                     layout
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
+                    {...listItemMotion}
                     className={`p-5 sm:p-6 rounded-3xl bg-white dark:bg-zinc-950 border shadow-xs space-y-4 text-left relative overflow-hidden transition-all ${
                       isPending
                         ? 'border-amber-500/30 ring-1 ring-amber-500/10'
@@ -422,25 +420,25 @@ export default function StudentExcuseInbox({
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pl-1">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">
+                          <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">
                             {letter.className || letter.classCode || 'Course Leave'}
                           </span>
                           {letter.excuseType && (
-                            <span className="text-[9px] font-extrabold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 rounded-md">
                               🏷️ {letter.excuseType}
                             </span>
                           )}
-                          <span className="text-[9px] font-mono text-zinc-400 py-0.5 px-2 bg-zinc-100 dark:bg-zinc-900 rounded-full">
+                          <span className="text-[10px] font-mono text-zinc-400 py-0.5 px-2 bg-zinc-100 dark:bg-zinc-900 rounded-md border border-zinc-200/50 dark:border-zinc-800/50">
                             Ref: {letter.id.slice(0, 12)}
                           </span>
                         </div>
-                        <p className="text-[11px] text-zinc-500">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
                           Leave Window:{' '}
-                          <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
                             {letter.startDate}
                           </span>{' '}
                           to{' '}
-                          <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
                             {letter.endDate}
                           </span>
                         </p>
@@ -449,12 +447,12 @@ export default function StudentExcuseInbox({
                       {/* Status Badge */}
                       <div className="flex items-center gap-2 self-start">
                         <span
-                          className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
+                          className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 ${
                             isValid
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
                               : isInvalid
-                              ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20'
-                              : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                              ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25'
+                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25'
                           }`}
                         >
                           <span
@@ -468,8 +466,8 @@ export default function StudentExcuseInbox({
                     </div>
 
                     {/* Excuse Reason Card */}
-                    <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 pl-4 space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/80 dark:border-zinc-800/80 pl-4 space-y-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                         Reason & Justification
                       </p>
                       <p className="text-xs text-zinc-700 dark:text-zinc-300 italic font-sans leading-relaxed">
@@ -715,7 +713,7 @@ export default function StudentExcuseInbox({
                         <img
                           src={formAttachment}
                           alt="preview"
-                          className="w-10 h-10 object-cover rounded-lg border"
+                          className="w-10 h-10 object-cover rounded-lg border border-zinc-200 dark:border-zinc-800"
                           referrerPolicy="no-referrer"
                         />
                         <div className="min-w-0 text-left">

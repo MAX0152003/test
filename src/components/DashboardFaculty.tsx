@@ -19,6 +19,7 @@ import { ConfirmationDialog } from './ConfirmationDialog';
 import { VirtualList } from './VirtualList';
 import { BatchAttendanceModal } from './BatchAttendanceModal';
 import { AccreditationReportModal } from './AccreditationReportModal';
+import { screenMotion, modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import { 
   Plus, 
   QrCode, 
@@ -1285,18 +1286,15 @@ export default function DashboardFaculty({
               return (
                 <motion.div
                   key="dashboard"
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  {...screenMotion}
                   className="space-y-3.5 sm:space-y-4 text-left"
                 >
             {/* Compact Welcome Header */}
           <div className="p-3.5 sm:p-4 md:p-5 rounded-2xl relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-indigo-900 via-zinc-900 to-emerald-950 text-white shadow-md">
             <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
               <div className="space-y-1">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/10 text-emerald-400">
-                  <Sparkles className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-white/10 text-emerald-400">
+                  <Sparkles className="w-3.5 h-3.5" />
                   Faculty Hub
                 </span>
                 <h2 className="text-lg sm:text-xl font-black tracking-tight">
@@ -1320,7 +1318,7 @@ export default function DashboardFaculty({
                     setIsBulletinsHidden(false);
                     speakText("University Bulletins expanded.", accessibility.readAloud);
                   }}
-                  className="inline-flex items-center gap-1.5 py-1 px-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer select-none active:scale-95"
+                  className="inline-flex items-center gap-1.5 py-1 px-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer select-none active:scale-95"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   unhide
@@ -1330,7 +1328,7 @@ export default function DashboardFaculty({
               <div className="p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/[0.02] border border-amber-500/15 text-amber-950 dark:text-amber-300 space-y-3 text-left animate-fade-in relative">
                 <div className="flex items-center justify-between gap-4">
                   <h4 className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-550 bg-amber-500 animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                     University Bulletins ({announcements.filter(ann => ann.target === 'all' || ann.target === 'faculty').length})
                   </h4>
                   <button
@@ -1339,10 +1337,10 @@ export default function DashboardFaculty({
                       setIsBulletinsHidden(true);
                       speakText("Administrative Bulletins hidden/minimized.", accessibility.readAloud);
                     }}
-                    className="inline-flex items-center gap-1.5 py-1 px-2 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer select-none active:scale-95"
+                    className="inline-flex items-center gap-1.5 py-1 px-2 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer select-none active:scale-95"
                     title="Hide and minimize bulletins card"
                   >
-                    <EyeOff className="w-3 h-3" />
+                    <EyeOff className="w-3.5 h-3.5" />
                     hide
                   </button>
                 </div>
@@ -1352,8 +1350,8 @@ export default function DashboardFaculty({
                     .map((ann) => (
                       <div key={ann.id} className="pt-3 first:pt-0">
                         <h5 className="text-xs font-extrabold text-amber-600 dark:text-amber-400">{ann.title}</h5>
-                        <p className="text-[11px] text-zinc-600 dark:text-zinc-300 mt-1 leading-relaxed font-sans">{ann.content}</p>
-                        <span className="text-[8px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wider block mt-1 uppercase">Issued {new Date(ann.createdAt).toLocaleDateString()}</span>
+                        <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-1 leading-relaxed font-sans">{ann.content}</p>
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wider block mt-1 uppercase">Issued {new Date(ann.createdAt).toLocaleDateString()}</span>
                       </div>
                     ))}
                 </div>
@@ -1375,15 +1373,15 @@ export default function DashboardFaculty({
                 />
                 <div>
                   <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100">{userProfile.name}</h4>
-                  <span className="text-[9px] font-mono font-bold tracking-widest uppercase text-zinc-400">LECTURER COORDINATOR</span>
+                  <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-zinc-400">LECTURER COORDINATOR</span>
                 </div>
               </div>
 
               {/* Status Indicator Panel */}
               <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 space-y-2 text-left">
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">Active Campus Status</span>
-                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                  <span className="text-[11px] font-bold uppercase text-zinc-400 tracking-wider">Active Campus Status</span>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                     facultyStatus === 'available' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
                     facultyStatus === 'in-class' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
                     'bg-red-500/10 text-red-500 border border-red-500/20'
@@ -1405,12 +1403,12 @@ export default function DashboardFaculty({
                         onChangeFacultyStatus(st.id as any);
                         speakText(`Status updated to ${st.label}`, accessibility.readAloud);
                       }}
-                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-extrabold uppercase transition-all border cursor-pointer text-center ${
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border cursor-pointer text-center ${
                         facultyStatus === st.id
                           ? st.color === 'emerald' ? 'bg-emerald-500 text-black border-emerald-500 font-extrabold' :
                             st.color === 'amber' ? 'bg-amber-500 text-black border-amber-500 font-extrabold' :
                             'bg-red-500 text-white border-red-500 font-extrabold'
-                          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-650 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                       }`}
                     >
                       {st.label}
@@ -1419,13 +1417,13 @@ export default function DashboardFaculty({
                 </div>
               </div>
 
-              <p className="text-[10px] text-zinc-400 leading-normal">
+              <p className="text-xs text-zinc-400 leading-normal">
                 Updating your status alerts students in your active rosters through schedule broadcasts.
               </p>
 
               {/* Message Admin Inline Help Panel */}
-              <div className="pt-3.5 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-[11px] mt-1 shrink-0">
-                <span className="text-zinc-500 font-bold">Administrative Help?</span>
+              <div className="pt-3.5 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs mt-1 shrink-0">
+                <span className="text-zinc-500 font-medium">Administrative Help?</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -1445,11 +1443,11 @@ export default function DashboardFaculty({
               <div className="p-5 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 flex flex-col justify-between shadow-[0_2px_12px_rgba(0,0,0,0.01)] relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/[0.02] rounded-full blur-2xl group-hover:scale-110 transition-transform" />
                 <div className="space-y-1 text-left relative z-10">
-                  <span className="text-[9px] font-mono font-black uppercase tracking-widest text-zinc-400">Class Statistics</span>
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400">Class Statistics</span>
                   <h4 className="text-3xl font-black font-mono text-zinc-900 dark:text-zinc-100 mt-2">{totalClasses} Sections</h4>
                   <p className="text-xs text-zinc-500">Allocated across {classes.reduce((acc, c) => acc + c.days.length, 0)} schedule intervals week-round.</p>
                 </div>
-                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between text-[10px] text-zinc-400 mt-4 relative z-10">
+                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between text-xs text-zinc-400 mt-4 relative z-10">
                   <span>Room Allocation List</span>
                   <span className="font-bold underline text-emerald-550 dark:text-emerald-450 cursor-pointer" onClick={() => setScreen('schedules')}>Inspect Rooms</span>
                 </div>
@@ -1458,11 +1456,11 @@ export default function DashboardFaculty({
               <div className="p-5 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 flex flex-col justify-between shadow-[0_2px_12px_rgba(0,0,0,0.01)] relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 w-32 h-32 bg-indigo-500/5 dark:bg-indigo-500/[0.02] rounded-full blur-2xl group-hover:scale-110 transition-transform" />
                 <div className="space-y-1 text-left relative z-10">
-                  <span className="text-[9px] font-mono font-black uppercase tracking-widest text-zinc-400">Total Rosters Count</span>
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400">Total Rosters Count</span>
                   <h4 className="text-3xl font-black font-mono text-zinc-900 dark:text-zinc-100 mt-2">{currentStudentsCount} Students</h4>
                   <p className="text-xs text-zinc-500">Regularly attending classes. Average active scan tracking speed is <b>1.8s / student</b>.</p>
                 </div>
-                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between text-[10px] text-zinc-400 mt-4 relative z-10">
+                <div className="pt-4 border-t border-zinc-100 dark:border-zinc-900 flex items-center justify-between text-xs text-zinc-400 mt-4 relative z-10">
                   <span className="text-emerald-500 font-extrabold flex items-center gap-0.5">• Term average: 88.5%</span>
                   <span className="text-emerald-555 font-bold cursor-pointer" onClick={() => setScreen('students-monitoring')}>View Risk Analysis</span>
                 </div>
@@ -1475,7 +1473,7 @@ export default function DashboardFaculty({
           {/* Student Performance Analytics */}
           <div className="p-6 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 shadow-[0_2px_12px_rgba(0,0,0,0.01)] space-y-4">
               <div>
-                <span className="text-[10px] font-mono font-black uppercase text-zinc-400 tracking-widest">Performance Analysis</span>
+                <span className="text-[11px] font-mono font-bold uppercase text-zinc-400 tracking-wider">Performance Analysis</span>
                 <h3 className="font-extrabold text-base tracking-tight text-zinc-900 dark:text-zinc-100 mt-1">Student Performance rosters</h3>
                 <p className="text-xs text-zinc-400 leading-normal mt-0.5">Visual representation of general roster standings in term evaluations.</p>
               </div>
@@ -1517,7 +1515,7 @@ export default function DashboardFaculty({
                   <div className="space-y-3.5 pt-1">
                     {stats.map((stat) => (
                       <div key={stat.name} className="space-y-1">
-                        <div className="flex justify-between items-center text-[10px]">
+                        <div className="flex justify-between items-center text-xs">
                           <span className="font-bold text-zinc-700 dark:text-zinc-200">{stat.name}</span>
                           <span className="font-mono text-zinc-400">{stat.count} students ({stat.percent}%)</span>
                         </div>
@@ -1948,10 +1946,7 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="schedule-editor"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="space-y-6 text-left"
           >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
@@ -2002,13 +1997,18 @@ export default function DashboardFaculty({
           {/* Schedule Input Editor Form Modal Overlay */}
           <AnimatePresence>
             {isFormOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="w-full max-w-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
+                  {...modalBackdropMotion}
+                  onClick={() => {
+                    setIsFormOpen(false);
+                    setEditingClass(null);
+                  }}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+                />
+                <motion.div
+                  {...modalCardMotion}
+                  className="relative z-10 w-full max-w-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-2xl shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
                 >
                   <div className="flex justify-between items-center pb-3 border-b border-zinc-100 dark:border-zinc-900 mb-4 shrink-0">
                     <h3 className="font-black text-sm uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
@@ -2216,8 +2216,8 @@ export default function DashboardFaculty({
                         })}
                       </div>
                       {formDays.includes('F') && (
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-1">
-                          <span>🕌 Friday Schedule: Aware of 11:30 AM - 1:30 PM Jum’ah Prayer break window</span>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 mt-1">
+                          <span>🕌 Friday Schedule: Aware of 11:30 AM - 1:00 PM Jum’ah Prayer break window</span>
                         </p>
                       )}
                     </div>
@@ -2267,11 +2267,8 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="qr-generator"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-6 text-left"
           >
           <div className="space-y-6 text-left">
             <div className="flex items-start gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
@@ -2583,12 +2580,12 @@ export default function DashboardFaculty({
                           </div>
                         ) : (
                           /* Standby placeholder */
-                          <div className="w-48 h-48 bg-zinc-150 dark:bg-zinc-900 flex flex-wrap p-2 rounded-lg relative border border-zinc-200 dark:border-zinc-850 items-center justify-center">
-                            <div className="absolute inset-0 border border-blue-500/20 rounded-lg animate-pulse" />
-                            <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute top-2 left-2" />
-                            <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute top-2 right-2" />
-                            <div className="w-10 h-10 border-4 border-zinc-800 dark:border-zinc-200 bg-transparent absolute bottom-2 left-2" />
-                            <div className="absolute inset-8 border border-zinc-400 dark:border-zinc-650 flex items-center justify-center text-zinc-500 font-mono text-[9px] font-black uppercase text-center">
+                          <div className="w-48 h-48 bg-zinc-50 dark:bg-zinc-900 flex flex-wrap p-2 rounded-lg relative border border-zinc-200 dark:border-zinc-800 items-center justify-center">
+                            <div className="absolute inset-0 border border-emerald-500/20 rounded-lg animate-pulse" />
+                            <div className="w-10 h-10 border-2 border-zinc-300 dark:border-zinc-700 bg-transparent absolute top-2 left-2" />
+                            <div className="w-10 h-10 border-2 border-zinc-300 dark:border-zinc-700 bg-transparent absolute top-2 right-2" />
+                            <div className="w-10 h-10 border-2 border-zinc-300 dark:border-zinc-700 bg-transparent absolute bottom-2 left-2" />
+                            <div className="absolute inset-8 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-400 font-mono text-[9px] font-bold uppercase text-center">
                               STANDBY<br />READY TO GENERATE
                             </div>
                           </div>
@@ -2872,11 +2869,8 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="notifications"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-4 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-4 text-left"
           >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-3">
@@ -3039,11 +3033,8 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="profile"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-6 text-left"
           >
           <div className="space-y-6 text-left">
             <div className="flex items-start gap-3 border-b border-zinc-100 dark:border-zinc-900 pb-4">
@@ -3160,10 +3151,7 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="messages"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
           >
           <Messages 
@@ -3183,11 +3171,8 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="consultations"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-6 text-left"
           >
           <ConsultationsView
             role="faculty"
@@ -3230,10 +3215,7 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="excuse-inbox"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="space-y-6 text-left"
           >
             <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
@@ -3677,10 +3659,7 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="students-monitoring"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="space-y-6 text-left"
           >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
@@ -4344,7 +4323,7 @@ export default function DashboardFaculty({
 
             </div>
           ) : (
-            <div className="p-8 border border-dashed rounded-3xl bg-white dark:bg-zinc-950 text-center text-zinc-400 text-xs">
+            <div className="p-8 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-white dark:bg-zinc-950 text-center text-zinc-400 text-xs">
               No subjects listed. Create class registers in My Classes first.
             </div>
           )}
@@ -4356,10 +4335,7 @@ export default function DashboardFaculty({
         return (
           <motion.div
             key="help-center"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
           >
           <HelpCenter 
             userProfile={userProfile} 

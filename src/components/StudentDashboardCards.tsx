@@ -73,15 +73,15 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h4 className="font-extrabold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 truncate">{fac.name}</h4>
+                <h4 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 truncate">{fac.name}</h4>
                 {isEnrolledInstructor && (
-                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shrink-0">
                     Enrolled
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1 mt-0.5">
-                <MapPin className="w-3 h-3 shrink-0 text-emerald-500" />
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate flex items-center gap-1 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
                 <span>{fac.room || 'Consultation Office'}</span>
               </p>
             </div>
@@ -90,16 +90,16 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
           {/* Status Chip */}
           <div className="shrink-0">
             {fac.status === 'available' ? (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> Available
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" /> Available
               </span>
             ) : fac.status === 'in-class' ? (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black text-amber-700 dark:text-amber-400 bg-amber-500/15 border border-amber-500/30 uppercase tracking-wider flex items-center gap-1 animate-pulse">
-                <Clock className="w-3 h-3" /> In Class
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 animate-pulse" /> In Class
               </span>
             ) : (
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-black text-red-600 dark:text-red-400 bg-red-500/15 border border-red-500/30 uppercase tracking-wider flex items-center gap-1">
-                <X className="w-3 h-3" /> Unavailable
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5">
+                <X className="w-3.5 h-3.5" /> Unavailable
               </span>
             )}
           </div>
@@ -109,23 +109,23 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
         {fac.status === 'in-class' && timeInfo && (
           <div className="mt-2.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-left gap-2">
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px] font-black text-amber-800 dark:text-amber-300">
-                <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0 animate-spin" />
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span className="truncate">Free in ~{timeInfo.remainingMinutes} mins</span>
               </div>
-              <div className="text-[10px] text-amber-700 dark:text-amber-400 font-medium truncate mt-0.5">
+              <div className="text-xs text-amber-700/80 dark:text-amber-400/80 font-medium truncate mt-0.5">
                 {timeInfo.endTimeStr ? `Class finishes at ${timeInfo.endTimeStr}` : 'Teaching ongoing'}
                 {timeInfo.currentClassCode ? ` • ${timeInfo.currentClassCode}` : ''}
               </div>
             </div>
-            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-800 dark:text-amber-300 shrink-0">
               In Session
             </span>
           </div>
         )}
 
         {fac.status === 'available' && (
-          <div className="mt-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+          <div className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
             <span className="text-emerald-500">✨</span>
             <span>Free for walk-in consultation or scheduled appointment</span>
           </div>
@@ -138,7 +138,7 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
           <button
             type="button"
             onClick={() => onToggleWatch(fac.id, fac.name, fac.room)}
-            className={`flex-1 min-w-[110px] min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl text-[10px] font-black tracking-wide uppercase transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:scale-95 ${
+            className={`flex-1 min-w-[110px] min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation active:scale-[0.98] ${
               isWatched
                 ? 'bg-emerald-500 text-black border border-emerald-400 shadow-xs'
                 : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-400 border border-amber-500/30'
@@ -162,7 +162,7 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
         <button
           type="button"
           onClick={() => onBookSlot(fac.id, fac.name)}
-          className="flex-1 min-w-[100px] min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-700 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/30 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer touch-manipulation active:scale-95"
+          className="flex-1 min-w-[100px] min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-700 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer touch-manipulation active:scale-[0.98]"
           title={`Book a formal consultation slot with ${fac.name}`}
         >
           <CalendarClock className="w-3.5 h-3.5" />
@@ -172,7 +172,7 @@ export const StudentFacultyCard: React.FC<FacultyCardProps> = React.memo(({
         <button
           type="button"
           onClick={() => onChat(fac.id, fac.name)}
-          className="min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl bg-zinc-200/80 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-black uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all cursor-pointer touch-manipulation active:scale-95 shrink-0"
+          className="min-h-[44px] sm:min-h-[38px] py-2 px-3 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer touch-manipulation active:scale-[0.98] shrink-0"
           title={`Message ${fac.name}`}
         >
           <MessageSquare className="w-3.5 h-3.5" />
@@ -231,22 +231,22 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase inline-block font-mono">
+          <span className="text-xs font-bold tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200/70 dark:border-zinc-700/70 uppercase inline-block font-mono">
             {cls.code}
           </span>
-          <h4 className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100 mt-1.5 sm:mt-2 tracking-tight truncate">{cls.name}</h4>
+          <h4 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 mt-1.5 sm:mt-2 tracking-tight truncate">{cls.name}</h4>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full whitespace-nowrap ${
+          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap border ${
             isEnrolled 
-              ? 'bg-blue-600 text-white font-extrabold shadow-sm' 
-              : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-500'
+              ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700' 
+              : 'bg-zinc-100/60 dark:bg-zinc-850/60 text-zinc-500 border-zinc-200/50 dark:border-zinc-800/50'
           }`}>
-            {isEnrolled ? 'Joined' : 'Available'}
+            {isEnrolled ? 'Enrolled' : 'Available'}
           </span>
 
           {isEnrolled && (
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md whitespace-nowrap ${standingColor}`}>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-md whitespace-nowrap ${standingColor}`}>
               {standingLabel}
             </span>
           )}
@@ -275,7 +275,7 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
                 e.stopPropagation();
                 onEnroll(cls.id);
               }}
-              className="mt-1.5 px-3 py-1.5 min-h-[36px] touch-manipulation text-[9.5px] font-black uppercase tracking-wider rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-sm active:scale-95 transition-all whitespace-nowrap flex items-center justify-center"
+              className="mt-1.5 px-3 py-1.5 min-h-[36px] touch-manipulation text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black cursor-pointer shadow-xs active:scale-[0.98] transition-all whitespace-nowrap flex items-center justify-center"
               title="Enroll in this subject"
             >
               Enroll Now
@@ -284,14 +284,14 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-400 mt-3 sm:mt-4 flex-wrap pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
+      <div className="flex items-center justify-between gap-2 text-xs text-zinc-500 mt-3 sm:mt-4 flex-wrap pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60">
         <div className="flex items-center gap-2.5 sm:gap-3.5 flex-wrap">
-          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300 font-mono">
-            <Clock className="w-3.5 h-3.5 text-zinc-500" />
+          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300 font-mono text-xs">
+            <Clock className="w-3.5 h-3.5 text-zinc-400" />
             {cls.startTime}
           </span>
-          <span className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-            <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+          <span className="flex items-center gap-1 font-medium text-zinc-600 dark:text-zinc-400 text-xs">
+            <MapPin className="w-3.5 h-3.5 text-zinc-400" />
             {cls.room}
           </span>
         </div>
@@ -303,7 +303,7 @@ export const StudentCourseCard: React.FC<CourseCardProps> = React.memo(({
               e.stopPropagation();
               onOpenRiskCalculator(cls);
             }}
-            className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
               allowableLeft <= 1 
                 ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30 animate-pulse'
                 : allowableLeft <= 2
@@ -336,35 +336,35 @@ export const StudentExcuseCard: React.FC<ExcuseCardProps> = React.memo(({
   onPreviewImage
 }) => {
   const statusBadge = req.status === 'approved' || req.status === 'valid'
-    ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+    ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
     : req.status === 'rejected' || req.status === 'invalid'
-    ? 'bg-red-100 dark:bg-red-500/15 text-red-500'
-    : 'bg-zinc-200 dark:bg-zinc-850 text-zinc-550';
+    ? 'bg-red-100 dark:bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25'
+    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700';
 
   const statusText = req.status === 'approved' || req.status === 'valid' 
-    ? 'valid' 
+    ? 'Valid (Approved)' 
     : req.status === 'rejected' || req.status === 'invalid' 
-    ? 'invalid' 
+    ? 'Invalid (Rejected)' 
     : req.status;
 
   return (
-    <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs transition-all">
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5 font-bold flex-wrap">
-          <span className="font-extrabold text-xs text-zinc-800 dark:text-zinc-200">{req.className}</span>
-          <span className="text-[9px] font-mono font-black text-zinc-400">({req.id})</span>
+    <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between text-xs transition-all">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 font-medium flex-wrap">
+          <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">{req.className}</span>
+          <span className="text-xs font-mono text-zinc-400">({req.id})</span>
           {isLatest && (
-            <span className="text-[8px] font-black uppercase px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               Latest
             </span>
           )}
           {req.excuseType && (
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200/50 dark:border-zinc-700/50">
+            <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
               {req.excuseType}
             </span>
           )}
         </div>
-        <p className="text-[10px] text-zinc-450 leading-normal mt-0.5">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-normal">
           Duration: {req.startDate} to {req.endDate} • {req.reason}
         </p>
         {(req.attachmentImg || req.attachmentData || req.attachmentName) && (
@@ -383,13 +383,13 @@ export const StudentExcuseCard: React.FC<ExcuseCardProps> = React.memo(({
                 (window as any).showToast(`Document: ${req.attachmentName}`, "info");
               }
             }}
-            className="text-[9px] font-mono bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded mt-1 inline-flex items-center gap-1 cursor-pointer transition-colors"
+            className="text-xs font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-md mt-1 inline-flex items-center gap-1.5 cursor-pointer transition-colors"
           >
             📎 {req.attachmentName || 'Supporting Attachment'} (Click to View/Save)
           </button>
         )}
       </div>
-      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0 ml-2 ${statusBadge}`}>
+      <span className={`text-xs font-semibold capitalize px-2.5 py-1 rounded-full shrink-0 ml-2 ${statusBadge}`}>
         {statusText}
       </span>
     </div>
@@ -407,12 +407,12 @@ interface LectureCardProps {
 export const StudentLectureCard: React.FC<LectureCardProps> = React.memo(({ cls }) => {
   return (
     <div className="flex gap-2.5 items-start">
-      <div className="p-1 px-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 font-mono text-[9px] font-black uppercase shrink-0 mt-0.5">
+      <div className="p-1 px-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60 font-mono text-xs font-semibold shrink-0 mt-0.5">
         {cls.startTime.split(' ')[0]}
       </div>
       <div className="min-w-0 flex-1 text-left">
-        <h5 className="text-[10.5px] font-black text-zinc-800 dark:text-zinc-200 truncate leading-tight">{cls.name}</h5>
-        <span className="text-[9px] text-zinc-400 block mt-0.5 truncate">{cls.room} • {cls.code}</span>
+        <h5 className="text-xs sm:text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate leading-tight">{cls.name}</h5>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400 block mt-0.5 truncate">{cls.room} • {cls.code}</span>
       </div>
     </div>
   );

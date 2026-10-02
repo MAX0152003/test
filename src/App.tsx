@@ -51,6 +51,7 @@ import { normalizeUserIdentity } from './lib/authUtils';
 import AccountLinkQRModal from './components/AccountLinkQRModal';
 import DownloadAppModal from './components/DownloadAppModal';
 import CommandPalette from './components/CommandPalette';
+import { screenMotion, toastMotion } from './lib/animationTransitions';
 import { getSynchronizedDate, getSynchronizedTimestamp } from './lib/timeSyncUtils';
 import { 
   INITIAL_CLASSES, 
@@ -97,7 +98,6 @@ import {
   UserCircle,
   Scan,
   MessageSquare,
-  QrCode,
   CheckCircle,
   Clock,
   Sparkles,
@@ -899,7 +899,9 @@ export default function App() {
           setEnrollments(fetchedEnrollments);
           safeStorage.setItem('cp_enrollments', JSON.stringify(fetchedEnrollments));
         }),
-        saveUserProfileToFirestore(false, user)
+        saveUserProfileToFirestore(false, user).catch((profileErr) => {
+          console.warn("User profile initial sync note:", profileErr);
+        })
       ])
         .then(() => {
           console.log("Initial Firestore synchronization completed successfully.");
@@ -2390,7 +2392,7 @@ export default function App() {
                   <Activity className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 hidden sm:inline">ClassPulse</span>
-                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 sm:px-3 sm:py-1 rounded-full border shadow-2xs ${
+                <span className={`text-xs font-bold tracking-wide px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border shadow-2xs ${
                   user.role === 'student' ? 'bg-[#03213D] text-white border-[#03213D]/20' :
                   user.role === 'faculty' ? 'bg-emerald-600 text-white border-emerald-500/20' :
                   'bg-[#CC762A] text-white border-[#CC762A]/20'
@@ -2418,16 +2420,6 @@ export default function App() {
               <div className={`items-center gap-2 sm:gap-2.5 shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
-                {/* Account Link QR Button */}
-                <button
-                  onClick={() => setIsAccountLinkModalOpen(true)}
-                  type="button"
-                  className="p-2 rounded-xl border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 transition-all cursor-pointer relative shrink-0"
-                  title="Account Link QR Code (Desktop <-> Mobile Sync)"
-                >
-                  <QrCode className="w-4.5 h-4.5 text-emerald-500" />
-                </button>
-
                 <button
                   onClick={() => {
                     setActiveScreen('notifications');
@@ -2436,14 +2428,14 @@ export default function App() {
                   type="button"
                   className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 ${
                     activeScreen === 'notifications'
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-extrabold shadow-2xs'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-bold shadow-2xs'
                       : 'text-zinc-600 dark:text-zinc-400'
                   }`}
                   title="Notifications"
                 >
                   <Bell className="w-4.5 h-4.5" />
                   {filteredNotificationsForMe.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] font-black leading-none font-mono">
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold leading-none font-mono">
                       {filteredNotificationsForMe.filter(n => !n.read).length}
                     </span>
                   )}
@@ -2530,10 +2522,7 @@ export default function App() {
                 {activeScreen === 'settings' ? (
                   <motion.div
                     key="settings-screen"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    {...screenMotion}
                     className="w-full flex-1 flex flex-col"
                   >
                     <SettingsPage
@@ -2554,10 +2543,7 @@ export default function App() {
                 ) : (
                   <motion.div
                     key="dashboard-screen"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                    {...screenMotion}
                     className={`w-full flex-1 flex flex-col text-left ${
                       activeScreen === 'messages' || activeScreen === 'tickets' ? 'h-full min-h-0 overflow-hidden' : ''
                     }`}
@@ -2722,7 +2708,7 @@ export default function App() {
                     }`}
                   >
                     <Icon className={`w-4.5 h-4.5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-500 dark:text-zinc-400'}`} />
-                    <span className="text-[9px] font-black tracking-wider uppercase">{item.label}</span>
+                    <span className="text-[10px] sm:text-[11px] font-bold tracking-wide">{item.label}</span>
                   </button>
                 );
               })}
@@ -2737,9 +2723,7 @@ export default function App() {
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15, transition: { duration: 0.15 } }}
+            {...toastMotion}
             className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] left-3 right-3 sm:left-auto sm:right-6 sm:bottom-6 z-50 max-w-sm p-3.5 rounded-2xl shadow-2xl bg-zinc-900 dark:bg-zinc-950 border border-zinc-750 text-white flex items-center justify-between gap-3 text-left"
           >
             <div className="flex items-center gap-2.5 min-w-0">

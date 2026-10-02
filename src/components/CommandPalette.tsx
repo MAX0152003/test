@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import { 
   Search, 
   X, 
@@ -344,7 +345,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       <AnimatePresence>
         {isSearchOpen && (
           <>
-            <div 
+            <motion.div 
+              {...modalBackdropMotion}
               className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xs" 
               onClick={() => {
                 setIsSearchOpen(false);
@@ -353,10 +355,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             />
 
             <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.97 }}
-              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              {...modalCardMotion}
               className="absolute top-full left-0 right-0 mt-2 z-[100] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col text-left max-h-[75vh]"
             >
               {/* Filter Scope Toggle Bar */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import {
   Smartphone,
   X,
@@ -275,21 +276,23 @@ const styles = StyleSheet.create({
 
   return (
     <AnimatePresence>
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
-      >
-        {/* Backdrop dismiss */}
-        <div className="fixed inset-0" onClick={onClose} />
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-xl rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-5 sm:p-7 text-left space-y-5 overflow-hidden z-10 my-auto"
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
         >
+          {/* Backdrop dismiss */}
+          <motion.div
+            {...modalBackdropMotion}
+            className="fixed inset-0 bg-black/85 backdrop-blur-md"
+            onClick={onClose}
+          />
+
+          <motion.div
+            {...modalCardMotion}
+            className="relative w-full max-w-xl rounded-2xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl p-5 sm:p-7 text-left space-y-5 overflow-hidden z-10 my-auto"
+          >
           {/* Accent Top Line */}
           <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600" />
 
@@ -698,6 +701,7 @@ const styles = StyleSheet.create({
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 }

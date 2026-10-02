@@ -558,7 +558,11 @@ export async function saveUserProfileToFirestore(
     `saveUserProfile:${profile.id}`,
     async () => {
       try {
-        const cleanProfile = sanitizeForFirestore(profile);
+        const cleanProfile = sanitizeForFirestore({
+          ...profile,
+          name: profile.name || 'ClassPulse User',
+          role: profile.role || 'admin'
+        });
         await setDoc(doc(db, colPath, profile.id), cleanProfile, { merge: true });
         
         // Also sync to registered_users collection so admin directory and other clients receive it

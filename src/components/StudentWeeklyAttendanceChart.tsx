@@ -203,23 +203,23 @@ export default function StudentWeeklyAttendanceChart({
           <div className="border-b border-zinc-150 dark:border-zinc-850 pb-1.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[9px] font-mono font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+              <span className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                 ClassPulse • Weekly Breakdown
               </span>
             </div>
-            <span className="text-[9px] font-mono text-zinc-400">{data.weekLabel}</span>
+            <span className="text-xs font-mono text-zinc-400">{data.weekLabel}</span>
           </div>
 
           <div>
-            <span className="text-[10px] font-mono font-bold text-zinc-400 block uppercase">Calendar Range</span>
-            <p className="text-[11px] font-black text-zinc-900 dark:text-zinc-100 mt-0.5">{data.dateRange}</p>
+            <span className="text-[11px] font-mono font-bold text-zinc-400 block uppercase">Calendar Range</span>
+            <p className="text-xs font-black text-zinc-900 dark:text-zinc-100 mt-0.5">{data.dateRange}</p>
           </div>
 
-          <div className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 text-[11px] font-mono">
+          <div className="flex items-center justify-between py-1.5 px-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 text-xs font-mono">
             <span className="text-zinc-500 font-medium">Weekly Rate:</span>
             <div className="flex items-center gap-1.5">
               <span className="text-emerald-500 font-black text-xs">{data.rate}%</span>
-              <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded font-mono ${
+              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded font-mono ${
                 isTargetMet ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/15 text-red-600 dark:text-red-400'
               }`}>
                 {isTargetMet ? 'Target Met' : 'Needs Focus'}
@@ -227,7 +227,7 @@ export default function StudentWeeklyAttendanceChart({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[10px] font-mono">
+          <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-xs font-mono">
             <div className="flex items-center justify-between px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -258,7 +258,7 @@ export default function StudentWeeklyAttendanceChart({
             </div>
           </div>
 
-          <div className="pt-1.5 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+          <div className="pt-1.5 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs font-mono text-zinc-500 dark:text-zinc-400">
             <span>Total Logged Sessions:</span>
             <span className="font-black text-zinc-900 dark:text-zinc-100">{data.total}</span>
           </div>
@@ -268,7 +268,7 @@ export default function StudentWeeklyAttendanceChart({
               {data.issues.map((iss, idx) => (
                 <span 
                   key={`${iss}-${idx}`}
-                  className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold ${
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                     iss.includes('Absent') ? 'bg-red-500/10 text-red-500' :
                     iss.includes('Late') ? 'bg-amber-500/10 text-amber-500' :
                     iss.includes('Excused') ? 'bg-sky-500/10 text-sky-500' :
@@ -298,7 +298,7 @@ export default function StudentWeeklyAttendanceChart({
             <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 tracking-tight">
               4-Week Attendance & Punctuality Trends
             </h3>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${aggregateMetrics.statusColor}`}>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider border ${aggregateMetrics.statusColor}`}>
               {aggregateMetrics.consistencyStatus}
             </span>
           </div>
@@ -309,8 +309,8 @@ export default function StudentWeeklyAttendanceChart({
 
         {/* Subject Filter Dropdown */}
         <div className="flex items-center gap-2 shrink-0">
-          <label htmlFor="student-trend-subject-select" className="text-[10px] font-extrabold text-zinc-400 uppercase tracking-widest flex items-center gap-1">
-            <Filter className="w-3 h-3 text-emerald-500" />
+          <label htmlFor="student-trend-subject-select" className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+            <Filter className="w-3.5 h-3.5 text-emerald-500" />
             Course:
           </label>
           <select
@@ -333,14 +333,14 @@ export default function StudentWeeklyAttendanceChart({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider">4-Week Average</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">4-Week Average</span>
             <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-black font-mono text-zinc-900 dark:text-zinc-100">
               {aggregateMetrics.overallRate}%
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               ({aggregateMetrics.totalSessions} sessions)
             </span>
           </div>
@@ -348,14 +348,14 @@ export default function StudentWeeklyAttendanceChart({
 
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">On-Time / Present</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">On-Time / Present</span>
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400">
               {aggregateMetrics.totalPresents}
             </span>
-            <span className="text-[10px] text-zinc-400 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               {aggregateMetrics.totalSessions > 0 ? Math.round((aggregateMetrics.totalPresents / aggregateMetrics.totalSessions) * 100) : 100}%
             </span>
           </div>
@@ -363,7 +363,7 @@ export default function StudentWeeklyAttendanceChart({
 
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Late Check-Ins</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Late Check-Ins</span>
             <Clock className="w-3.5 h-3.5 text-amber-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -371,7 +371,7 @@ export default function StudentWeeklyAttendanceChart({
               {aggregateMetrics.totalLates}
             </span>
             {aggregateMetrics.totalLates > 0 && (
-              <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded-sm">
+              <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
                 Watch threshold
               </span>
             )}
@@ -380,7 +380,7 @@ export default function StudentWeeklyAttendanceChart({
 
         <div className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-150 dark:border-zinc-850">
           <div className="flex items-center justify-between text-zinc-400 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">Unexcused Absences</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">Unexcused Absences</span>
             <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -388,11 +388,11 @@ export default function StudentWeeklyAttendanceChart({
               {aggregateMetrics.totalAbsents}
             </span>
             {aggregateMetrics.totalAbsents > 0 ? (
-              <span className="text-[9px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.2 rounded-sm">
+              <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded-md">
                 Max 3 consec / 5 total
               </span>
             ) : (
-              <span className="text-[10px] text-emerald-500 font-bold">Zero absents</span>
+              <span className="text-xs text-emerald-500 font-bold">Zero absents</span>
             )}
           </div>
         </div>

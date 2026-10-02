@@ -33,6 +33,7 @@ import { ACADEMIC_TERMS } from '../lib/msuUtils';
 import { ImagePreviewModal } from './ImagePreviewModal';
 import { BulkImportEngineModal } from './BulkImportEngineModal';
 import { AccreditationReportModal } from './AccreditationReportModal';
+import { screenMotion, modalBackdropMotion, modalCardMotion, popoverMotion } from '../lib/animationTransitions';
 import { 
   Users, 
   UserCheck, 
@@ -2320,10 +2321,7 @@ export default function DashboardAdmin({
               return (
                 <motion.div
                   key="dashboard"
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -50 }}
-                  transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                  {...screenMotion}
                   className="space-y-6 text-left"
                 >
           
@@ -2346,11 +2344,11 @@ export default function DashboardAdmin({
             className="p-5 rounded-[1.5rem] border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-[0_2px_12px_rgba(0,0,0,0.02)] space-y-3"
           >
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-900">
-              <span className="text-[10px] font-black uppercase text-zinc-400 dark:text-zinc-500 tracking-widest flex items-center gap-1.5">
+              <span className="text-xs font-bold uppercase text-zinc-400 dark:text-zinc-500 tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
                 Administrative Quick Command center
               </span>
-              <span className="text-[8px] font-mono text-zinc-400 uppercase tracking-wider">MSU-INTEGRATED CORE</span>
+              <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">MSU-INTEGRATED CORE</span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
@@ -2365,7 +2363,7 @@ export default function DashboardAdmin({
                   <Megaphone className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-black">Bulletins Locker</h4>
-                <p className="text-[10px] text-zinc-400 mt-1">Campus archive & composer</p>
+                <p className="text-xs text-zinc-400 mt-1">Campus archive & composer</p>
               </button>
 
               <button 
@@ -2389,7 +2387,7 @@ export default function DashboardAdmin({
                   <Plus className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-black">Register Subject</h4>
-                <p className="text-[10px] text-zinc-400 mt-1">Insert schedules ledger</p>
+                <p className="text-xs text-zinc-400 mt-1">Insert schedules ledger</p>
               </button>
 
               <button 
@@ -2400,7 +2398,7 @@ export default function DashboardAdmin({
                   <Download className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-black">Export Analytics</h4>
-                <p className="text-[10px] text-zinc-400 mt-1">Download attendance sheet</p>
+                <p className="text-xs text-zinc-400 mt-1">Download attendance sheet</p>
               </button>
 
               <button 
@@ -2418,7 +2416,7 @@ export default function DashboardAdmin({
                   <Clock className="w-4 h-4" />
                 </div>
                 <h4 className="text-xs font-black">Force Sync</h4>
-                <p className="text-[10px] text-zinc-400 mt-1">Audit active directory listings</p>
+                <p className="text-xs text-zinc-400 mt-1">Audit active directory listings</p>
               </button>
             </div>
           </motion.div>
@@ -2437,7 +2435,7 @@ export default function DashboardAdmin({
                 </div>
                 {/* Visual selector pills & Fast CSV dispatcher */}
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl text-[10px] font-bold">
+                  <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl text-xs font-bold">
                     <button
                       type="button"
                       onClick={() => {
@@ -3989,11 +3987,8 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="resets"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="space-y-6 text-left"
           >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div>
@@ -4246,11 +4241,8 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="users"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="space-y-6 text-left"
           >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div className="space-y-4">
@@ -4646,10 +4638,7 @@ export default function DashboardAdmin({
                             />
                             
                             <motion.div
-                              initial={{ opacity: 0, y: -6, scale: 0.96 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                              transition={{ duration: 0.18, ease: 'easeOut' }}
+                              {...popoverMotion}
                               className="absolute right-0 sm:left-0 top-full mt-2.5 w-72 sm:w-80 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-zinc-200/90 dark:border-zinc-800/90 shadow-2xl rounded-2xl p-3 z-50 text-left space-y-2.5"
                             >
                               <div className="flex items-center justify-between px-1 pt-1 pb-2 border-b border-zinc-150 dark:border-zinc-850">
@@ -5146,11 +5135,8 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="schedule-editor"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-6 text-left animate-fade-in"
+            {...screenMotion}
+            className="space-y-6 text-left"
           >
           <div className="pb-4 border-b border-zinc-150 dark:border-zinc-850/60">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -5364,11 +5350,8 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="profile"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-6 text-left animate-fade-in text-zinc-900 dark:text-zinc-100"
+            {...screenMotion}
+            className="w-full space-y-6 text-left text-zinc-900 dark:text-zinc-100"
           >
           <div className="space-y-6">
             <div className="flex justify-between items-center pb-3 border-b border-zinc-200 dark:border-zinc-855">
@@ -5737,10 +5720,7 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="reports"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="space-y-6 text-left text-zinc-900 dark:text-zinc-100"
           >
           <div className="p-6 rounded-3xl border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-850 shadow-sm space-y-6">
@@ -6263,10 +6243,7 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="messages"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
           >
           <Messages 
@@ -6285,10 +6262,7 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="tickets"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="flex-1 h-full min-h-0 flex flex-col text-left overflow-hidden pb-0"
           >
           <div className="pb-3 border-b border-zinc-150 dark:border-zinc-850/60 flex items-start gap-4 shrink-0">
@@ -6322,11 +6296,8 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="notifications"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full space-y-4 text-left animate-fade-in"
+            {...screenMotion}
+            className="w-full space-y-4 text-left"
           >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-150 dark:border-zinc-850/60 pb-4">
             <div className="flex items-start gap-4">
@@ -6498,10 +6469,7 @@ export default function DashboardAdmin({
         return (
           <motion.div
             key="rooms"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            {...screenMotion}
             className="space-y-6 text-left"
           >
           {/* Header section with back action */}
@@ -7203,13 +7171,15 @@ export default function DashboardAdmin({
       {/* REGISTER NEW SUBJECT SCHEDULE MODAL OVERLAY */}
       <AnimatePresence>
         {isAdminClassFormOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
+              {...modalBackdropMotion}
+              onClick={() => setIsAdminClassFormOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              {...modalCardMotion}
+              className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
             >
               {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900/60">
@@ -7427,13 +7397,15 @@ export default function DashboardAdmin({
       {/* 6. UNIVERSITY BULLETIN CABINET STORAGE MODAL BOX */}
       <AnimatePresence>
       {isBulletinsLockerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div
+            {...modalBackdropMotion}
+            onClick={() => setIsBulletinsLockerOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+          />
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-4xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
+            {...modalCardMotion}
+            className="relative z-10 w-full max-w-4xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left"
           >
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-900">
@@ -7834,13 +7806,15 @@ export default function DashboardAdmin({
       {/* ESTABLISH/ADD NEW ROOM INSTANT MODAL OVERLAY */}
       <AnimatePresence>
         {isAddingRoom && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left relative"
+              {...modalBackdropMotion}
+              onClick={() => setIsAddingRoom(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              {...modalCardMotion}
+              className="relative z-10 w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 rounded-[2rem] shadow-2xl p-6 overflow-hidden flex flex-col max-h-[90vh] text-left relative"
             >
               {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-zinc-150 dark:border-zinc-900/60">
@@ -7990,12 +7964,15 @@ export default function DashboardAdmin({
       {/* Manage Colleges & Academic Buildings Modal */}
       <AnimatePresence>
         {isClusterManagerOpen && (
-          <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-55 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl max-w-xl w-full text-left space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+              {...modalBackdropMotion}
+              onClick={() => setIsClusterManagerOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            <motion.div
+              {...modalCardMotion}
+              className="relative z-10 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl max-w-xl w-full text-left space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto"
             >
               <button
                 type="button"

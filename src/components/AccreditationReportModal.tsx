@@ -1,5 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { modalBackdropMotion, modalCardMotion } from '../lib/animationTransitions';
 import { 
   Award, 
   Printer, 
@@ -186,30 +187,24 @@ export const AccreditationReportModal: React.FC<AccreditationReportModalProps> =
     URL.revokeObjectURL(url);
   };
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
-        role="dialog"
-        aria-modal="true"
-      >
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity print:hidden"
-        />
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.97, y: 10 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-4xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden z-10 text-left space-y-4 my-auto max-h-[94vh] flex flex-col print:p-0 print:border-none print:shadow-none print:max-h-none print:w-full print:bg-white print:text-black"
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
         >
+          <motion.div
+            {...modalBackdropMotion}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity print:hidden"
+          />
+
+          <motion.div
+            {...modalCardMotion}
+            className="relative w-full max-w-4xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl overflow-hidden z-10 text-left space-y-4 my-auto max-h-[94vh] flex flex-col print:p-0 print:border-none print:shadow-none print:max-h-none print:w-full print:bg-white print:text-black"
+          >
           {/* Header Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-150 dark:border-zinc-850 shrink-0 print:hidden">
             <div className="flex items-center gap-2.5">
@@ -273,7 +268,7 @@ export const AccreditationReportModal: React.FC<AccreditationReportModalProps> =
           <div ref={printRef} className="overflow-y-auto space-y-5 pr-1 flex-1 print:overflow-visible print:space-y-4">
             
             {/* Institution Header */}
-            <div className="text-center pb-3 border-b-2 border-zinc-800 dark:border-zinc-200 print:border-black print:text-black">
+            <div className="text-center pb-3 border-b-2 border-zinc-200 dark:border-zinc-800 print:border-black print:text-black">
               <div className="flex items-center justify-center gap-2 mb-1">
                 <Building2 className="w-6 h-6 text-emerald-600 print:text-black" />
                 <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 print:text-gray-600">
@@ -382,19 +377,19 @@ export const AccreditationReportModal: React.FC<AccreditationReportModalProps> =
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-center text-xs print:grid-cols-3">
                 <div className="space-y-1">
-                  <div className="border-b border-zinc-800 dark:border-zinc-200 print:border-black w-3/4 mx-auto pb-4" />
+                  <div className="border-b border-zinc-200 dark:border-zinc-800 print:border-black w-3/4 mx-auto pb-4" />
                   <div className="font-bold text-zinc-900 dark:text-zinc-100 print:text-black">Dean</div>
                   <div className="text-[10px] text-zinc-400 print:text-gray-600">College Office</div>
                 </div>
 
                 <div className="space-y-1">
-                  <div className="border-b border-zinc-800 dark:border-zinc-200 print:border-black w-3/4 mx-auto pb-4" />
+                  <div className="border-b border-zinc-200 dark:border-zinc-800 print:border-black w-3/4 mx-auto pb-4" />
                   <div className="font-bold text-zinc-900 dark:text-zinc-100 print:text-black">Quality Assurance</div>
                   <div className="text-[10px] text-zinc-400 print:text-gray-600">Accreditation Committee</div>
                 </div>
 
                 <div className="space-y-1">
-                  <div className="border-b border-zinc-800 dark:border-zinc-200 print:border-black w-3/4 mx-auto pb-4" />
+                  <div className="border-b border-zinc-200 dark:border-zinc-800 print:border-black w-3/4 mx-auto pb-4" />
                   <div className="font-bold text-zinc-900 dark:text-zinc-100 print:text-black">Registrar</div>
                   <div className="text-[10px] text-zinc-400 print:text-gray-600">Academic Records</div>
                 </div>
@@ -418,6 +413,7 @@ export const AccreditationReportModal: React.FC<AccreditationReportModalProps> =
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 };

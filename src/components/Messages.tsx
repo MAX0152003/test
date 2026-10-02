@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion, AnimatePresence } from 'motion/react';
+import { TRANSITION_EASE, TRANSITION_DURATION } from '../lib/animationTransitions';
 import { listenToMessages, saveMessageToFirestore } from '../lib/firestoreSync';
 import { ImagePreviewModal } from './ImagePreviewModal';
 
@@ -975,19 +976,19 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                     }}
                     className={`w-full flex items-center justify-between gap-3 p-2.5 rounded-xl text-left border cursor-pointer transition-all mb-1 ${
                       activeContactId === ch.id
-                        ? 'bg-zinc-900 dark:bg-zinc-900 text-white border-zinc-900 dark:border-zinc-800 font-extrabold shadow-sm'
+                        ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white border-zinc-250 dark:border-zinc-750 font-extrabold shadow-xs'
                         : 'bg-transparent border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900/50 text-zinc-900 dark:text-zinc-100'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${
-                        activeContactId === ch.id ? 'bg-zinc-950/20 text-white' : 'bg-emerald-500/10 text-emerald-500'
+                        activeContactId === ch.id ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-500'
                       }`}>
                         #
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className={`text-xs font-extrabold truncate ${activeContactId === ch.id ? 'text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>{ch.name}</h4>
-                        <p className={`text-[9px] truncate uppercase mt-0.5 font-bold ${activeContactId === ch.id ? 'text-zinc-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{ch.code} Room</p>
+                        <h4 className={`text-xs font-extrabold truncate ${activeContactId === ch.id ? 'text-zinc-900 dark:text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>{ch.name}</h4>
+                        <p className={`text-[9px] truncate uppercase mt-0.5 font-bold ${activeContactId === ch.id ? 'text-zinc-500 dark:text-zinc-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{ch.code} Room</p>
                       </div>
                     </div>
                     {unreadCount > 0 && (
@@ -1023,7 +1024,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                   }}
                   className={`w-full flex items-center justify-between gap-3 p-2.5 rounded-xl text-left border cursor-pointer transition-all mb-1 ${
                     activeContactId === c.id
-                      ? 'bg-zinc-900 dark:bg-zinc-900 text-white border-zinc-900 dark:border-zinc-800 font-extrabold shadow-sm'
+                      ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white border-zinc-250 dark:border-zinc-750 font-extrabold shadow-xs'
                       : 'bg-transparent border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900/50 text-zinc-900 dark:text-zinc-100'
                   }`}
                 >
@@ -1049,19 +1050,19 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className={`text-xs font-extrabold truncate flex items-center gap-1.5 ${activeContactId === c.id ? 'text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                      <h4 className={`text-xs font-extrabold truncate flex items-center gap-1.5 ${activeContactId === c.id ? 'text-zinc-900 dark:text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>
                         <span className="truncate">{c.name}</span>
                         {isMe && (
                           <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 ${
                             activeContactId === c.id 
-                              ? 'bg-emerald-400 text-black font-extrabold' 
+                              ? 'bg-emerald-500 text-white font-extrabold' 
                               : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                           }`}>
                             (You)
                           </span>
                         )}
                       </h4>
-                      <p className={`text-[9px] truncate uppercase font-extrabold mt-0.5 ${activeContactId === c.id ? 'text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'}`}>{c.role} • {c.courseCode}</p>
+                      <p className={`text-[9px] truncate uppercase font-extrabold mt-0.5 ${activeContactId === c.id ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'}`}>{c.role} • {c.courseCode}</p>
                     </div>
                   </div>
                   {unreadCount > 0 && (
@@ -1308,9 +1309,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                     return (
                       <motion.div 
                         key={m.id} 
-                        initial={{ opacity: 0, y: 15 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                        transition={{ duration: 0.2, ease: TRANSITION_EASE }}
                         className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`}
                       >
                         {/* Name and timestamp header */}
@@ -1571,7 +1572,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         <ImageIcon className="w-4 h-4 text-pink-500" />
                         <span>Upload Photo File</span>
                       </div>
-                      <span className="text-[8px] bg-zinc-100 dark:bg-zinc-900 border text-zinc-400 px-1.5 py-0.5 rounded font-mono uppercase">Local</span>
+                      <span className="text-[8px] bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono uppercase">Local</span>
                     </button>
                     
                     <button 
@@ -1598,7 +1599,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         <LinkIcon className="w-4 h-4 text-indigo-500" />
                         <span>Link url Link</span>
                       </div>
-                      <span className="text-[8px] bg-zinc-100 dark:bg-zinc-900 border text-zinc-400 px-1.5 py-0.5 rounded font-mono uppercase">URL</span>
+                      <span className="text-[8px] bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono uppercase">URL</span>
                     </button>
 
                     <button 
@@ -1612,7 +1613,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         <FileText className="w-4 h-4 text-amber-500" />
                         <span>Upload Any File</span>
                       </div>
-                      <span className="text-[8px] bg-zinc-100 dark:bg-zinc-900 border text-zinc-400 px-1.5 py-0.5 rounded font-mono uppercase">FILE</span>
+                      <span className="text-[8px] bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono uppercase">FILE</span>
                     </button>
                   </div>
                 </div>
@@ -1728,7 +1729,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                   }}
                   className={`w-full flex flex-col gap-2 p-3.5 rounded-2xl text-left border cursor-pointer transition-all mb-2.5 relative ${
                     isActive
-                      ? 'bg-zinc-900 dark:bg-zinc-900 text-white border-zinc-900 dark:border-zinc-800 font-bold shadow-md'
+                      ? 'bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-white border-zinc-250 dark:border-zinc-750 font-bold shadow-xs'
                       : 'bg-white dark:bg-zinc-950/40 border-zinc-200 dark:border-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 text-zinc-900 dark:text-zinc-100'
                   }`}
                 >
@@ -1747,10 +1748,10 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         </div>
                       )}
                       <div className="min-w-0">
-                        <h4 className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                        <h4 className={`text-xs font-extrabold truncate ${isActive ? 'text-zinc-900 dark:text-white' : 'text-zinc-900 dark:text-zinc-100'}`}>
                           {t.userName}
                         </h4>
-                        <p className={`text-[9px] font-semibold uppercase ${isActive ? 'text-zinc-400' : 'text-zinc-450'}`}>
+                        <p className={`text-[9px] font-semibold uppercase ${isActive ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-450'}`}>
                           {t.userRole} • {t.category}
                         </p>
                       </div>
@@ -1968,10 +1969,10 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
           {!mobileShowChat ? (
             <motion.div
               key="sidebar-pane"
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.15 }}
+              exit={{ opacity: 0, x: -16 }}
+              transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
               className="w-full h-full flex flex-col"
             >
               {userProfile.role === 'admin' && mode === 'tickets' ? renderAdminSidebar() : renderSidebar()}
@@ -1979,10 +1980,10 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
           ) : (
             <motion.div
               key="chat-pane"
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.15 }}
+              exit={{ opacity: 0, x: 16 }}
+              transition={{ duration: TRANSITION_DURATION, ease: TRANSITION_EASE }}
               className="w-full h-full flex flex-col"
             >
               {userProfile.role === 'admin' && mode === 'tickets' ? renderAdminChatArea() : renderChatArea()}
