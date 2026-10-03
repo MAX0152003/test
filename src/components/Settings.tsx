@@ -79,6 +79,19 @@ export default function Settings({
   const [cropModalOpen, setCropModalOpen] = React.useState(false);
   const [cropImageSrc, setCropImageSrc] = React.useState<string | null>(null);
 
+  // Keep form fields synced if userProfile changes or is enriched from storage
+  React.useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name || '');
+      setEmail(userProfile.email || '');
+      setStudentId(userProfile.studentId || '');
+      setDepartment(userProfile.department || '');
+      setPhone(userProfile.phone || '');
+      setBio(userProfile.bio || '');
+      setAvatar(userProfile.avatar || '');
+    }
+  }, [userProfile]);
+
   // States to track save state
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
@@ -173,6 +186,13 @@ export default function Settings({
     // Simulate database network write latency
     await new Promise(resolve => setTimeout(resolve, 1000));
 
+    const oldName = userProfile.name?.trim().toLowerCase();
+    const existingPrevNames: string[] = (userProfile as any).previousNames || [];
+    const prevNames = Array.from(new Set([
+      ...existingPrevNames,
+      oldName
+    ].filter(Boolean) as string[]));
+
     const updatedProfile: UserProfile = {
       ...userProfile,
       name: name.trim(),
@@ -181,10 +201,19 @@ export default function Settings({
       department: department.trim(),
       phone: phone.trim(),
       bio: bio.trim(),
-      avatar: avatar
+      avatar: avatar,
+      previousNames: prevNames
     };
 
     onUpdateProfile(updatedProfile);
+
+    // Synchronously write to local storage caches so refresh immediately has latest
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('classpulse_active_user', JSON.stringify(updatedProfile));
+        localStorage.setItem('cp_user', JSON.stringify(updatedProfile));
+      } catch {}
+    }
 
     const isOffline = localStorage.getItem('cp_offline') === 'true';
     saveUserProfileToFirestore(isOffline, updatedProfile).catch(err => console.error(err));

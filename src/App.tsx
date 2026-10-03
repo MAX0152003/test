@@ -45,7 +45,9 @@ import {
   listenToPasswordResets,
   claimSessionLinkFromFirestore,
   forceResyncAllFromFirestore,
-  wipeAllFirestoreAndLocalData
+  wipeAllFirestoreAndLocalData,
+  saveMessageToFirestore,
+  listenToMessages
 } from './lib/firestoreSync';
 import { normalizeUserIdentity } from './lib/authUtils';
 import AccountLinkQRModal from './components/AccountLinkQRModal';
@@ -180,10 +182,32 @@ export default function App() {
 
   // 1. Core State Managers (Local Storage integrated)
   const [user, setUser] = React.useState<UserProfile | null>(() => {
-    const cached = safeStorage.getItem('cp_user');
+    const cached = safeStorage.getItem('cp_user') || safeStorage.getItem('classpulse_active_user');
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        // Enrich from registered_users cache if present so phone, department, bio, etc. never vanish
+        try {
+          const registeredUsers: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
+          const reg = registeredUsers.find((u: any) => 
+            (u.email && parsed.email && u.email.toLowerCase().trim() === parsed.email.toLowerCase().trim()) ||
+            (u.id && parsed.id && u.id === parsed.id) ||
+            (u.studentId && parsed.studentId && u.studentId === parsed.studentId) ||
+            (u.facultyId && parsed.facultyId && u.facultyId === parsed.facultyId)
+          );
+          if (reg) {
+            return {
+              ...reg,
+              ...parsed,
+              phone: parsed.phone || reg.phone || '',
+              bio: parsed.bio || reg.bio || '',
+              department: parsed.department || reg.department || '',
+              studentId: parsed.studentId || reg.studentId || reg.uid,
+              facultyId: parsed.facultyId || reg.facultyId || reg.uid
+            };
+          }
+        } catch {}
+        return parsed;
       } catch (e) {
         console.error("Error parsing cp_user:", e);
       }
@@ -230,7 +254,14 @@ export default function App() {
     return safeStorage.getItem('cp_screen') || 'dashboard';
   });
 
-  const [selectedChatContact, setSelectedChatContact] = React.useState<{ id: string; name?: string; ts?: number } | undefined>(undefined);
+  const [selectedChatContact, setSelectedChatContact] = React.useState<{ id: string; name?: string; ts?: number } | undefined>(() => {
+    try {
+      const cached = safeStorage.getItem('cp_selected_chat_contact');
+      return cached ? JSON.parse(cached) : undefined;
+    } catch {
+      return undefined;
+    }
+  });
 
   const [isMobileBarVisible, setIsMobileBarVisible] = React.useState(true);
   const [isKeyboardOpen, setIsKeyboardOpen] = React.useState(false);
@@ -246,68 +277,19 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
-    // Intelligent viewport centering and focus management specifically for message and profile inputs
-    const centerElementInViewport = (targetEl?: HTMLElement | null) => {
-      const el = targetEl || (document.activeElement as HTMLElement | null);
-      if (!el || !(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
-
-      // Add active focus class
-      el.classList.add('app-active-focused-input');
-      
-      const elName = (el as HTMLInputElement).name?.toLowerCase() || el.getAttribute('name')?.toLowerCase() || '';
-      const isMessageOrProfileField = 
-        el.getAttribute('data-message-input') === 'true' ||
-        el.getAttribute('data-profile-input') === 'true' ||
-        el.id?.toLowerCase().includes('message') ||
-        el.id?.toLowerCase().includes('profile') ||
-        el.id?.toLowerCase().includes('chat') ||
-        el.id?.toLowerCase().includes('bio') ||
-        elName.includes('message') ||
-        elName.includes('profile') ||
-        elName.includes('bio') ||
-        elName.includes('phone') ||
-        elName.includes('contact') ||
-        el.closest('[data-chat-thread="true"]') !== null ||
-        el.closest('#profile-tab-content') !== null ||
-        el.closest('.message-composer-wrapper') !== null ||
-        el.closest('form') !== null;
-
-      if (isMessageOrProfileField) {
-        el.classList.add('app-message-profile-focused');
-      }
-
-      // First fast scroll into center
-      setTimeout(() => {
-        try {
-          el.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'nearest'
-          });
-        } catch (e) {
-          el.scrollIntoView(false);
-        }
-      }, 80);
-
-      // Second scroll after mobile OS virtual keyboard has finished sliding in (300ms)
-      setTimeout(() => {
-        if (document.activeElement === el) {
-          try {
-            el.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'nearest'
-            });
-          } catch (e) {}
-        }
-      }, 300);
-    };
-
+    // Intelligent focus management for message and profile inputs without jittery auto-scroll fighting mobile OS
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         setIsKeyboardOpen(true);
-        centerElementInViewport(target);
+        target.classList.add('app-active-focused-input');
+        
+        // Only scroll smoothly if inside chat message composer, avoid fighting mobile OS on login/register
+        if (user && target.getAttribute('data-message-input') === 'true') {
+          try {
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } catch {}
+        }
       }
     };
 
@@ -327,34 +309,14 @@ export default function App() {
 
     window.addEventListener('focusin', handleFocusIn);
     window.addEventListener('focusout', handleFocusOut);
-
-    const handleViewportResize = () => {
-      if (window.visualViewport) {
-        const isShrunk = window.innerHeight - window.visualViewport.height > 100;
-        if (isShrunk) {
-          setIsKeyboardOpen(true);
-          const active = document.activeElement as HTMLElement | null;
-          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
-            centerElementInViewport(active);
-          }
-        }
-      }
-    };
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportResize);
-      window.visualViewport.addEventListener('scroll', handleViewportResize);
-    }
-
     return () => {
       window.removeEventListener('focusin', handleFocusIn);
       window.removeEventListener('focusout', handleFocusOut);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportResize);
-        window.visualViewport.removeEventListener('scroll', handleViewportResize);
-      }
     };
-  }, []);
+  }, [user]);
+
+  // Real-time unread messages count tracker
+  const [unreadMessagesCount, setUnreadMessagesCount] = React.useState<number>(0);
 
   const mainScrollRef = React.useRef<HTMLDivElement>(null);
   const prevLabRoomsRef = React.useRef<Record<string, 'occupied' | 'available' | 'maintenance'>>({});
@@ -435,13 +397,17 @@ export default function App() {
     if (screenId === 'messages') {
       if (contactObj) {
         setSelectedChatContact(contactObj);
+        safeStorage.setItem('cp_selected_chat_contact', JSON.stringify(contactObj));
       } else {
         setSelectedChatContact(undefined);
+        safeStorage.removeItem('cp_selected_chat_contact');
       }
     } else {
       setSelectedChatContact(undefined);
+      safeStorage.removeItem('cp_selected_chat_contact');
     }
     setActiveScreen(screenId);
+    safeStorage.setItem('cp_screen', screenId);
     setTimeout(() => {
       if (mainScrollRef.current) {
         mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -580,6 +546,88 @@ export default function App() {
   // Debounced persistence for leaves and consultations
   useDebouncedStorageSync('classpulse_student_leaves', excuseLetters, 400);
   useDebouncedStorageSync('classpulse_consultation_bookings', consultationBookings, 400);
+
+  const computeUnreadMessages = React.useCallback((messagesList?: any[]) => {
+    if (!user) return 0;
+    try {
+      const msgs = messagesList || JSON.parse(localStorage.getItem('cp_chat_messages_v2') || '[]');
+      const myIds = new Set([
+        user.id,
+        user.studentId,
+        user.facultyId,
+        user.email ? user.email.toLowerCase().trim() : '',
+        ...((user as any).aliases || [])
+      ].filter(Boolean));
+      const myName = user.name ? user.name.trim().toLowerCase() : '';
+      const myPrevNames: string[] = ((user as any).previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+
+      const myClassCodes = new Set(classes.map(c => c.code || c.id));
+
+      return msgs.filter((m: any) => {
+        if (!m || m.read) return false;
+        // If sent by me, it's not unread for me
+        if (myIds.has(m.senderId)) return false;
+        if (myName && m.senderName && m.senderName.trim().toLowerCase() === myName && (!m.senderRole || m.senderRole === user.role)) return false;
+        if (m.senderName && myPrevNames.includes(m.senderName.trim().toLowerCase())) return false;
+
+        // Directly addressed to me
+        if (myIds.has(m.receiverId)) return true;
+        if (myName && m.receiverName && m.receiverName.trim().toLowerCase() === myName) return true;
+        if (m.receiverName && myPrevNames.includes(m.receiverName.trim().toLowerCase())) return true;
+
+        // Broadcast or admin address
+        if (m.receiverId === 'all') return true;
+        if (user.role === 'admin' && (m.receiverRole === 'admin' || m.receiverId === 'admin' || String(m.receiverId).toLowerCase().includes('admin'))) return true;
+
+        // Sent to a class/subject channel I am part of
+        if (m.receiverId && myClassCodes.has(m.receiverId)) return true;
+
+        return false;
+      }).length;
+    } catch {
+      return 0;
+    }
+  }, [user, classes]);
+
+  React.useEffect(() => {
+    setUnreadMessagesCount(computeUnreadMessages());
+  }, [computeUnreadMessages]);
+
+  React.useEffect(() => {
+    const handleMsgsUpdated = (e: any) => {
+      const msgs = e.detail?.messages;
+      setUnreadMessagesCount(computeUnreadMessages(msgs));
+    };
+
+    window.addEventListener('classpulse-messages-updated', handleMsgsUpdated);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'cp_chat_messages_v2') {
+        setUnreadMessagesCount(computeUnreadMessages());
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    const unsubGlobalMsgs = listenToMessages(false, (incoming) => {
+      try {
+        const localRaw = localStorage.getItem('cp_chat_messages_v2');
+        const localMsgs = localRaw ? JSON.parse(localRaw) : [];
+        const mergedMap = new Map();
+        localMsgs.forEach((m: any) => m && m.id && mergedMap.set(m.id, m));
+        incoming.forEach((m: any) => m && m.id && mergedMap.set(m.id, m));
+        const merged = Array.from(mergedMap.values());
+        localStorage.setItem('cp_chat_messages_v2', JSON.stringify(merged));
+        setUnreadMessagesCount(computeUnreadMessages(merged));
+      } catch {
+        setUnreadMessagesCount(computeUnreadMessages(incoming));
+      }
+    });
+
+    return () => {
+      window.removeEventListener('classpulse-messages-updated', handleMsgsUpdated);
+      window.removeEventListener('storage', handleStorage);
+      if (unsubGlobalMsgs) unsubGlobalMsgs();
+    };
+  }, [computeUnreadMessages]);
 
   const [accessibility, setAccessibility] = React.useState<AccessibilityConfig>(() => {
     const cached = safeStorage.getItem('cp_accessibility');
@@ -775,6 +823,21 @@ export default function App() {
     const unsubscribeAuth = auth.onAuthStateChanged((currentUser) => {
       if (currentUser) {
         setIsAuthenticated(true);
+        // Ensure user state is restored on refresh even if memory state was reset
+        setUser(prev => {
+          if (prev) return prev;
+          try {
+            const cached = safeStorage.getItem('cp_user') || safeStorage.getItem('classpulse_active_user');
+            if (cached) return JSON.parse(cached);
+            const regUsers: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
+            const found = regUsers.find((u: any) => 
+              (u.email && currentUser.email && u.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+              u.id === currentUser.uid
+            );
+            if (found) return normalizeUserIdentity(found);
+          } catch {}
+          return null;
+        });
       } else {
         setIsAuthenticated(false);
       }
@@ -782,6 +845,48 @@ export default function App() {
 
     return () => unsubscribeAuth();
   }, [isOffline]);
+
+  // Synchronize active user state with latest registered users changes so profile fields never vanish
+  React.useEffect(() => {
+    const handleRegUsersChanged = () => {
+      setUser(prev => {
+        if (!prev) return prev;
+        try {
+          const regUsers: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
+          const myEmail = prev.email ? prev.email.toLowerCase().trim() : '';
+          const myId = prev.id;
+          const myStudentId = prev.studentId;
+          const myFacultyId = prev.facultyId;
+          
+          const reg = regUsers.find((u: any) =>
+            (myId && u.id === myId) ||
+            (myEmail && u.email && u.email.toLowerCase().trim() === myEmail) ||
+            (myStudentId && (u.studentId === myStudentId || u.uid === myStudentId || u.id === myStudentId)) ||
+            (myFacultyId && (u.facultyId === myFacultyId || u.uid === myFacultyId || u.id === myFacultyId))
+          );
+          if (reg) {
+            const merged = {
+              ...reg,
+              ...prev,
+              phone: prev.phone || reg.phone || '',
+              bio: prev.bio || reg.bio || '',
+              department: prev.department || reg.department || '',
+              avatar: prev.avatar || reg.avatar || ''
+            };
+            if (JSON.stringify(prev) !== JSON.stringify(merged)) {
+              safeStorage.setItem('cp_user', JSON.stringify(merged));
+              safeStorage.setItem('classpulse_active_user', JSON.stringify(merged));
+              return merged;
+            }
+          }
+        } catch {}
+        return prev;
+      });
+    };
+
+    window.addEventListener('registered-users-changed', handleRegUsersChanged);
+    return () => window.removeEventListener('registered-users-changed', handleRegUsersChanged);
+  }, []);
 
   // Firestore Sync Data on mount: pulls down classes, attendance records, users and credentials to sync across devices
   React.useEffect(() => {
@@ -1318,10 +1423,13 @@ export default function App() {
         name: name || registered?.name || 'New Student',
         email: email || registered?.email || '',
         role: 'student',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
-        studentId: registered?.uid || '2023-' + Math.floor(10000 + Math.random() * 90000),
+        avatar: registered?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+        studentId: registered?.studentId || registered?.uid || '2023-' + Math.floor(10000 + Math.random() * 90000),
         department: registered?.department || 'CCS Department',
-        bio: 'Registered securely via ClassPulse.'
+        phone: registered?.phone || '',
+        bio: registered?.bio || 'Registered securely via ClassPulse.',
+        previousNames: registered?.previousNames || [],
+        aliases: registered?.aliases || [resolvedId]
       };
     } else if (role === 'faculty') {
       profile = {
@@ -1329,10 +1437,13 @@ export default function App() {
         name: name || registered?.name || 'New Faculty',
         email: email || registered?.email || '',
         role: 'faculty',
-        avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
-        facultyId: registered?.uid || 'FAC-' + Math.floor(10000 + Math.random() * 90000),
+        avatar: registered?.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+        facultyId: registered?.facultyId || registered?.uid || 'FAC-' + Math.floor(10000 + Math.random() * 90000),
         department: registered?.department || 'College of Computer Studies',
-        bio: 'Registered securely via ClassPulse.'
+        phone: registered?.phone || '',
+        bio: registered?.bio || 'Registered securely via ClassPulse.',
+        previousNames: registered?.previousNames || [],
+        aliases: registered?.aliases || [resolvedId]
       };
     } else {
       profile = {
@@ -1340,14 +1451,19 @@ export default function App() {
         name: name || registered?.name || 'New Admin',
         email: email || registered?.email || '',
         role: 'admin',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+        avatar: registered?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
         department: registered?.department || 'Academic Registrar Board',
-        bio: 'Registered securely via ClassPulse.'
+        phone: registered?.phone || '',
+        bio: registered?.bio || 'Registered securely via ClassPulse.',
+        previousNames: registered?.previousNames || [],
+        aliases: registered?.aliases || [resolvedId]
       };
     }
  
     const normalizedProfile = normalizeUserIdentity(profile);
     setUser(normalizedProfile);
+    safeStorage.setItem('cp_user', JSON.stringify(normalizedProfile));
+    safeStorage.setItem('classpulse_active_user', JSON.stringify(normalizedProfile));
     saveUserProfileToFirestore(false, normalizedProfile).catch(err => console.error("Firestore user profile error:", err));
     setActiveScreen('dashboard');
     speakText(`Welcome to ClassPulse. Successfully loaded your ${role} dashboard.`, accessibility.readAloud);
@@ -1386,7 +1502,7 @@ export default function App() {
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'schedule-editor', label: 'Classes', icon: CalendarDays },
           { id: 'qr-generator', label: 'QR Code', icon: Scan },
-          { id: 'excuse-inbox', label: 'Excuses', icon: Inbox },
+          { id: 'messages', label: 'Messages', icon: MessageSquare },
           { id: 'menu_toggle', label: 'Menu', icon: Menu }
         ];
       case 'admin':
@@ -1394,7 +1510,7 @@ export default function App() {
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'users', label: 'Users', icon: Users },
           { id: 'schedule-editor', label: 'Schedules', icon: CalendarDays },
-          { id: 'profile', label: 'Profile', icon: UserCircle },
+          { id: 'messages', label: 'Messages', icon: MessageSquare },
           { id: 'menu_toggle', label: 'Menu', icon: Menu }
         ];
     }
@@ -1749,58 +1865,182 @@ export default function App() {
 
   // Profile Update callback - ensures propagation to enrollments globally
   const handleUpdateProfile = (updatedProfile: UserProfile) => {
+    const previousProfile = user;
+    const oldId = previousProfile?.id;
+    const oldStudentId = previousProfile?.studentId;
+    const oldFacultyId = previousProfile?.facultyId;
+    const oldEmail = previousProfile?.email ? previousProfile.email.toLowerCase().trim() : '';
+    const oldName = previousProfile?.name ? previousProfile.name.trim().toLowerCase() : '';
+
     setUser(updatedProfile);
 
     // 1. Persist active user session locally
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem('classpulse_active_user', JSON.stringify(updatedProfile));
-        localStorage.setItem('classpulse_active_role', updatedProfile.role);
-
-        // 2. Synchronize to registered_users local cache
+        // 2. Synchronize to registered_users local cache with strict deduplication
         const regUsers: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
-        let found = false;
-        const mappedUsers = regUsers.map(u => {
-          if (
-            u.id === updatedProfile.id || 
-            (u.email && updatedProfile.email && u.email.toLowerCase() === updatedProfile.email.toLowerCase()) ||
-            (u.uid && (u.uid === updatedProfile.studentId || u.uid === updatedProfile.facultyId))
-          ) {
-            found = true;
-            return {
-              ...u,
-              ...updatedProfile,
-              uid: updatedProfile.studentId || updatedProfile.facultyId || u.uid || updatedProfile.id
-            };
-          }
-          return u;
-        });
+        const isMatch = (u: any) => {
+          if (!u) return false;
+          if (u.id === updatedProfile.id || (oldId && u.id === oldId)) return true;
+          if (updatedProfile.email && u.email && u.email.toLowerCase().trim() === updatedProfile.email.toLowerCase().trim()) return true;
+          if (oldEmail && u.email && u.email.toLowerCase().trim() === oldEmail) return true;
+          if (updatedProfile.studentId && (u.studentId === updatedProfile.studentId || u.uid === updatedProfile.studentId || u.id === updatedProfile.studentId)) return true;
+          if (oldStudentId && (u.studentId === oldStudentId || u.uid === oldStudentId || u.id === oldStudentId)) return true;
+          if (updatedProfile.facultyId && (u.facultyId === updatedProfile.facultyId || u.uid === updatedProfile.facultyId || u.id === updatedProfile.facultyId)) return true;
+          if (oldFacultyId && (u.facultyId === oldFacultyId || u.uid === oldFacultyId || u.id === oldFacultyId)) return true;
+          if (u.role === updatedProfile.role && oldName && u.name && u.name.trim().toLowerCase() === oldName) return true;
+          return false;
+        };
 
-        if (!found) {
-          mappedUsers.push({
-            ...updatedProfile,
-            uid: updatedProfile.studentId || updatedProfile.facultyId || updatedProfile.id
-          });
-        }
+        const existingMatched = regUsers.find(u => isMatch(u));
+        const prevNames = Array.from(new Set([
+          ...(existingMatched?.previousNames || []),
+          ...((updatedProfile as any).previousNames || []),
+          oldName,
+          existingMatched?.name ? existingMatched.name.trim().toLowerCase() : ''
+        ].filter(Boolean) as string[]));
+
+        const aliases = Array.from(new Set([
+          ...(existingMatched?.aliases || []),
+          ...((updatedProfile as any).aliases || []),
+          oldId,
+          oldStudentId,
+          oldFacultyId,
+          updatedProfile.id,
+          updatedProfile.studentId,
+          updatedProfile.facultyId,
+          updatedProfile.email
+        ].filter(Boolean) as string[]));
+
+        const consolidatedUser = {
+          ...existingMatched,
+          ...updatedProfile,
+          uid: updatedProfile.studentId || updatedProfile.facultyId || updatedProfile.id,
+          aliases,
+          previousNames: prevNames
+        };
+
+        setUser(consolidatedUser);
+        safeStorage.setItem('cp_user', JSON.stringify(consolidatedUser));
+        safeStorage.setItem('classpulse_active_user', JSON.stringify(consolidatedUser));
+        localStorage.setItem('classpulse_active_role', consolidatedUser.role);
+
+        const nonMatchingUsers = regUsers.filter(u => !isMatch(u));
+        const mappedUsers = [consolidatedUser, ...nonMatchingUsers];
 
         localStorage.setItem('classpulse_registered_users', JSON.stringify(mappedUsers));
         localStorage.setItem('classpulse_registered_admins', JSON.stringify(mappedUsers.filter(u => u.role === 'admin')));
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new Event('registered-users-changed'));
         }
+
+        // 3. Synchronize existing chat messages so old messages adapt to the updated student name and profile
+        const cachedMsgsRaw = localStorage.getItem('cp_chat_messages_v2');
+        if (cachedMsgsRaw) {
+          try {
+            const cachedMsgs = JSON.parse(cachedMsgsRaw);
+            let msgsModified = false;
+            const updatedMsgs = cachedMsgs.map((m: any) => {
+              let changed = false;
+              const newM = { ...m };
+
+              // Check if sender was this student/user
+              const isSender = 
+                m.senderId === updatedProfile.id ||
+                (oldId && m.senderId === oldId) ||
+                (updatedProfile.studentId && m.senderId === updatedProfile.studentId) ||
+                (oldStudentId && m.senderId === oldStudentId) ||
+                (updatedProfile.facultyId && m.senderId === updatedProfile.facultyId) ||
+                (oldFacultyId && m.senderId === oldFacultyId) ||
+                (oldEmail && m.senderId?.toLowerCase() === oldEmail) ||
+                (oldName && m.senderName && m.senderName.trim().toLowerCase() === oldName && m.senderRole === updatedProfile.role);
+
+              if (isSender) {
+                newM.senderName = updatedProfile.name;
+                newM.senderAvatar = updatedProfile.avatar;
+                if (updatedProfile.role === 'student' && updatedProfile.studentId) {
+                  newM.senderId = updatedProfile.studentId;
+                } else if (updatedProfile.id) {
+                  newM.senderId = updatedProfile.id;
+                }
+                changed = true;
+              }
+
+              // Check if receiver was this student/user
+              const isReceiver = 
+                m.receiverId === updatedProfile.id ||
+                (oldId && m.receiverId === oldId) ||
+                (updatedProfile.studentId && m.receiverId === updatedProfile.studentId) ||
+                (oldStudentId && m.receiverId === oldStudentId) ||
+                (updatedProfile.facultyId && m.receiverId === updatedProfile.facultyId) ||
+                (oldFacultyId && m.receiverId === oldFacultyId) ||
+                (oldEmail && m.receiverId?.toLowerCase() === oldEmail) ||
+                (oldName && m.receiverName && m.receiverName.trim().toLowerCase() === oldName);
+
+              if (isReceiver) {
+                newM.receiverName = updatedProfile.name;
+                if (updatedProfile.role === 'student' && updatedProfile.studentId) {
+                  newM.receiverId = updatedProfile.studentId;
+                } else if (updatedProfile.id) {
+                  newM.receiverId = updatedProfile.id;
+                }
+                changed = true;
+              }
+
+              if (changed) {
+                msgsModified = true;
+                saveMessageToFirestore(false, newM).catch(err => console.error("Firestore message sync error on profile update:", err));
+                return newM;
+              }
+              return m;
+            });
+
+            if (msgsModified) {
+              localStorage.setItem('cp_chat_messages_v2', JSON.stringify(updatedMsgs));
+              window.dispatchEvent(new CustomEvent('classpulse-messages-updated', { detail: { messages: updatedMsgs } }));
+            }
+          } catch (msgErr) {
+            console.error("Local messages update error on profile update:", msgErr);
+          }
+        }
+
+        // 4. Clean extra conversation IDs to prevent phantom contacts
+        try {
+          const extraIdsRaw = localStorage.getItem('cp_extra_conv_ids');
+          if (extraIdsRaw) {
+            const extraIds: string[] = JSON.parse(extraIdsRaw);
+            const cleanedExtraIds = extraIds.map(id => {
+              if (id === oldId || id === oldStudentId) {
+                return updatedProfile.studentId || updatedProfile.id;
+              }
+              return id;
+            }).filter((id, idx, arr) => id && arr.indexOf(id) === idx && id !== updatedProfile.id && id !== updatedProfile.studentId);
+            localStorage.setItem('cp_extra_conv_ids', JSON.stringify(cleanedExtraIds));
+          }
+        } catch {}
       } catch (err) {
         console.error("Local storage sync error on profile update:", err);
       }
     }
 
-    // 3. Save to Firestore (persists to both 'users' and 'registered_users')
+    // 5. Save to Firestore (persists to both 'users' and 'registered_users')
     saveUserProfileToFirestore(false, updatedProfile).catch(err => console.error("Firestore update profile error:", err));
 
-    // 4. Update the local enrollments list matching this student IDs
+    // 6. Update the local enrollments list matching this student IDs
     setEnrollments(prev => prev.map(e => {
-      if (e.studentId === updatedProfile.studentId || e.studentEmail === updatedProfile.email || (updatedProfile.id && e.studentId === updatedProfile.id)) {
+      const isTarget = 
+        e.studentId === updatedProfile.studentId || 
+        (oldStudentId && e.studentId === oldStudentId) ||
+        (updatedProfile.id && e.studentId === updatedProfile.id) ||
+        (oldId && e.studentId === oldId) ||
+        (updatedProfile.email && e.studentEmail && e.studentEmail.toLowerCase().trim() === updatedProfile.email.toLowerCase().trim()) ||
+        (oldEmail && e.studentEmail && e.studentEmail.toLowerCase().trim() === oldEmail) ||
+        (oldName && e.studentName && e.studentName.trim().toLowerCase() === oldName);
+
+      if (isTarget) {
         return {
           ...e,
+          studentId: updatedProfile.studentId || e.studentId,
           studentName: updatedProfile.name,
           studentEmail: updatedProfile.email,
           studentAvatar: updatedProfile.avatar
@@ -1809,11 +2049,19 @@ export default function App() {
       return e;
     }));
 
-    // 5. Update attendance records reflecting student identity
+    // 7. Update attendance records reflecting student identity
     setAttendanceRecords(prev => prev.map(r => {
-      if (r.studentId === updatedProfile.studentId || r.studentName === user?.name || r.studentId === updatedProfile.id) {
+      const isTarget = 
+        r.studentId === updatedProfile.studentId ||
+        (oldStudentId && r.studentId === oldStudentId) ||
+        (updatedProfile.id && r.studentId === updatedProfile.id) ||
+        (oldId && r.studentId === oldId) ||
+        (oldName && r.studentName && r.studentName.trim().toLowerCase() === oldName);
+
+      if (isTarget) {
         return {
           ...r,
+          studentId: updatedProfile.studentId || r.studentId,
           studentName: updatedProfile.name,
           studentAvatar: updatedProfile.avatar
         };
@@ -1821,10 +2069,10 @@ export default function App() {
       return r;
     }));
 
-    // 6. If faculty, update faculty statuses array and courses taught
+    // 8. If faculty, update faculty statuses array and courses taught
     if (updatedProfile.role === 'faculty') {
       setFacultyStatuses(prev => prev.map(f => {
-        if (f.id === updatedProfile.facultyId || f.name === user?.name || f.id === updatedProfile.id) {
+        if (f.id === updatedProfile.facultyId || (oldFacultyId && f.id === oldFacultyId) || (oldName && f.name.trim().toLowerCase() === oldName) || f.id === updatedProfile.id) {
           return {
             ...f,
             name: updatedProfile.name,
@@ -1835,7 +2083,7 @@ export default function App() {
       }));
 
       setClasses(prev => prev.map(c => {
-        if (c.facultyId === updatedProfile.facultyId || c.facultyId === updatedProfile.id || c.facultyName === user?.name) {
+        if (c.facultyId === updatedProfile.facultyId || (oldFacultyId && c.facultyId === oldFacultyId) || c.facultyId === updatedProfile.id || (oldName && c.facultyName.trim().toLowerCase() === oldName)) {
           return {
             ...c,
             facultyName: updatedProfile.name
@@ -2315,31 +2563,7 @@ export default function App() {
             userName={user.name}
             userAvatar={user.avatar}
             unreadNotifications={filteredNotificationsForMe.filter(n => !n.read).length}
-            unreadMessages={(() => {
-              try {
-                const cached = localStorage.getItem('cp_chat_messages_v2');
-                const myId = user.role === 'student' 
-                  ? (user.studentId || '2023-10492') 
-                  : user.role === 'faculty' 
-                    ? (user.facultyId || 'fac-1') 
-                    : (user.id || 'admin-01');
-                
-                let msgs = [];
-                if (cached) {
-                  msgs = JSON.parse(cached);
-                }
-                
-                return msgs.filter((m: any) => {
-                  if (m.senderId === myId) return false;
-                  if (m.read) return false;
-                  if (m.receiverId === myId) return true;
-                  if (m.receiverId === 'CS-101' && user.role === 'student') return true;
-                  return false;
-                }).length;
-              } catch (e) {
-                return 0;
-              }
-            })()}
+            unreadMessages={unreadMessagesCount}
             pendingExcuseCount={
               user.role === 'student'
                 ? excuseLetters.filter(e => 
@@ -2416,10 +2640,32 @@ export default function App() {
                 setIsSearchOpen={setIsSearchOpen}
               />
 
-              {/* Right controllers: Notification Bell & Profile Circle Avatar */}
+              {/* Right controllers: Messages Shortcut, Notification Bell & Profile Circle Avatar */}
               <div className={`items-center gap-2 sm:gap-2.5 shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
+                {/* Messages Shortcut Button with Live Unread Badge */}
+                <button
+                  onClick={() => {
+                    handleSetScreen('messages');
+                    speakText("Navigating to messages", accessibility.readAloud);
+                  }}
+                  type="button"
+                  className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 ${
+                    activeScreen === 'messages'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-bold shadow-2xs'
+                      : 'text-zinc-600 dark:text-zinc-400'
+                  }`}
+                  title="Messages"
+                >
+                  <MessageSquare className="w-4.5 h-4.5" />
+                  {unreadMessagesCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-emerald-500 text-black rounded-full flex items-center justify-center text-[10px] font-black leading-none font-mono ring-1 ring-white dark:ring-zinc-950 shadow-xs animate-pulse">
+                      {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   onClick={() => {
                     setActiveScreen('notifications');
@@ -2707,7 +2953,14 @@ export default function App() {
                         : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
                     }`}
                   >
-                    <Icon className={`w-4.5 h-4.5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-500 dark:text-zinc-400'}`} />
+                    <div className="relative">
+                      <Icon className={`w-4.5 h-4.5 transition-transform ${isActive ? 'scale-110 stroke-[2.5] text-emerald-500' : 'stroke-2 text-zinc-500 dark:text-zinc-400'}`} />
+                      {item.id === 'messages' && unreadMessagesCount > 0 && (
+                        <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-black text-[9px] font-black flex items-center justify-center shadow-xs animate-pulse ring-1 ring-white dark:ring-zinc-950">
+                          {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] sm:text-[11px] font-bold tracking-wide">{item.label}</span>
                   </button>
                 );

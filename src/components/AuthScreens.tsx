@@ -865,11 +865,11 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
   const isDark = accessibility.theme === 'dark';
 
   return (
-    <div className="min-h-screen py-10 px-4 flex flex-col justify-center items-center relative transition-colors duration-305 bg-[#f9f9f9] dark:bg-[#121212] text-zinc-900 dark:text-zinc-100 font-sans overflow-hidden">
+    <div className="min-h-[100dvh] w-full py-4 sm:py-8 px-4 flex flex-col items-center justify-start sm:justify-center relative bg-[#f9f9f9] dark:bg-[#121212] text-zinc-900 dark:text-zinc-100 font-sans overflow-y-auto overscroll-contain">
       
-      {/* Decorative Interactive Blurred Blobs */}
-      <div className="absolute top-[15%] left-[20%] w-72 h-72 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none animate-pulse" />
-      <div className="absolute bottom-[15%] right-[20%] w-72 h-72 bg-indigo-500/[0.04] dark:bg-indigo-500/[0.02] rounded-full blur-3xl pointer-events-none animate-pulse" />
+      {/* Decorative Interactive Blurred Blobs - hidden on mobile to eliminate GPU rasterization lag */}
+      <div className="hidden sm:block absolute top-[15%] left-[20%] w-72 h-72 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none" />
+      <div className="hidden sm:block absolute bottom-[15%] right-[20%] w-72 h-72 bg-indigo-500/[0.04] dark:bg-indigo-500/[0.02] rounded-full blur-3xl pointer-events-none" />
       
       {/* Decorative Grid Overlay */}
       <div 
@@ -892,28 +892,24 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
       )}
       
       {/* Brand Launcher Logo Header */}
-      <div className="mb-6 text-center z-10 space-y-2">
+      <div className="mb-4 sm:mb-6 text-center z-10 space-y-1 sm:space-y-2">
         <div className="relative inline-block group">
           <motion.div
-            initial={{ opacity: 0, scale: 0.88, y: -8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 220, damping: 20 }}
-            whileHover={{ 
-              scale: 1.08, 
-              rotate: 2,
-              boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)'
-            }}
-            whileTap={{ scale: 0.95 }}
-            className="relative w-14 h-14 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-bold text-2xl mx-auto cursor-pointer shadow-lg shadow-emerald-500/25"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-bold text-xl sm:text-2xl mx-auto cursor-pointer shadow-lg shadow-emerald-500/25"
           >
-            <Activity className="w-7 h-7 stroke-[2.5]" />
+            <Activity className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.5]" />
           </motion.div>
         </div>
-        <div className="pt-2 mx-auto max-w-sm">
-          <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
+        <div className="pt-1 mx-auto max-w-sm">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
             Class<span className="text-emerald-500 font-extrabold">Pulse</span>
           </h1>
-          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 font-bold flex items-center justify-center gap-1.5 uppercase tracking-wider font-mono">
+          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 sm:mt-1 font-bold flex items-center justify-center gap-1.5 uppercase tracking-wider font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
             Mindanao State University • Academic Suite
           </p>
@@ -922,11 +918,11 @@ export default function AuthScreens({ onLoginSuccess, accessibility, onBackToLan
 
       {/* Main Form Box Container */}
       <motion.div 
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -24, scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 120, damping: 18 }}
-        className="w-full max-w-md p-7 sm:p-8 rounded-3xl border bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-zinc-200/80 dark:border-zinc-800 shadow-2xl transition-all duration-300 z-10 text-left relative overflow-hidden group"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.16, ease: "easeOut" }}
+        className="w-full max-w-md p-5 sm:p-8 rounded-3xl border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-xl z-10 text-left relative overflow-hidden group"
       >
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 opacity-90" />
 

@@ -1883,6 +1883,36 @@ export default function DashboardAdmin({
     localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedUsers));
     window.dispatchEvent(new Event('registered-users-changed'));
 
+    // Also synchronize chat messages to prevent duplicate/stale user records in messaging
+    try {
+      const cachedMsgsRaw = localStorage.getItem('cp_chat_messages_v2');
+      if (cachedMsgsRaw) {
+        const cachedMsgs = JSON.parse(cachedMsgsRaw);
+        let msgsChanged = false;
+        const mappedMsgs = cachedMsgs.map((m: any) => {
+          let updated = false;
+          const copy = { ...m };
+          if (m.senderId === editingUser.id || m.senderId === editingUser.uid || m.senderId === editUserUid) {
+            copy.senderName = editUserName;
+            updated = true;
+          }
+          if (m.receiverId === editingUser.id || m.receiverId === editingUser.uid || m.receiverId === editUserUid) {
+            copy.receiverName = editUserName;
+            updated = true;
+          }
+          if (updated) {
+            msgsChanged = true;
+            return copy;
+          }
+          return m;
+        });
+        if (msgsChanged) {
+          localStorage.setItem('cp_chat_messages_v2', JSON.stringify(mappedMsgs));
+          window.dispatchEvent(new CustomEvent('classpulse-messages-updated', { detail: { messages: mappedMsgs } }));
+        }
+      }
+    } catch {}
+
     // Sync classpulse_registered_admins
     const adminsList = updatedUsers.filter((u: any) => u.role === 'admin');
     localStorage.setItem('classpulse_registered_admins', JSON.stringify(adminsList));

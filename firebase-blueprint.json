@@ -41,10 +41,11 @@
         "id": { "type": "string" },
         "senderId": { "type": "string" },
         "senderName": { "type": "string" },
+        "message": { "type": "string" },
         "text": { "type": "string" },
         "timestamp": { "type": "string" }
       },
-      "required": ["id", "senderId", "text"]
+      "required": ["id", "senderId"]
     },
     "UserProfile": {
       "title": "User Profile",

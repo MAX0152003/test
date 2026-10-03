@@ -40,7 +40,88 @@ interface EnrichedChatMessage extends ChatMessage {
   attachmentFile?: { name: string; size: string };
 }
 
-const ALL_CAMPUS_PEOPLE: any[] = [];
+const ALL_CAMPUS_PEOPLE: any[] = [
+  {
+    id: 'fac-1',
+    facultyId: 'fac-1',
+    name: 'Dr. Maria Santos',
+    role: 'faculty',
+    email: 'maria.santos@msu.edu.ph',
+    dept: 'Computer Science Department',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
+    aliases: ['fac-1', 'FAC-90234', 'maria.santos@msu.edu.ph']
+  },
+  {
+    id: 'fac-2',
+    facultyId: 'fac-2',
+    name: 'Engr. Allan Turing',
+    role: 'faculty',
+    email: 'allan.turing@msu.edu.ph',
+    dept: 'Software Engineering Department',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    aliases: ['fac-2', 'allan.turing@msu.edu.ph']
+  },
+  {
+    id: 'fac-3',
+    facultyId: 'fac-3',
+    name: 'Prof. Elena Gomez',
+    role: 'faculty',
+    email: 'elena.gomez@msu.edu.ph',
+    dept: 'Information Technology Department',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150',
+    aliases: ['fac-3', 'elena.gomez@msu.edu.ph']
+  },
+  {
+    id: 'fac-4',
+    facultyId: 'fac-4',
+    name: 'Dr. Ahmad Khan',
+    role: 'faculty',
+    email: 'ahmad.khan@msu.edu.ph',
+    dept: 'College of Computer Studies',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
+    aliases: ['fac-4', 'FAC-90234', 'ahmad.khan@msu.edu.ph']
+  },
+  {
+    id: 'stud-101',
+    studentId: '2023-10492',
+    name: 'Bea Alonzo',
+    role: 'student',
+    email: 'bea.alonzo@s.msumain.edu.ph',
+    dept: 'BS Computer Science',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    aliases: ['stud-101', '2023-10492', 'bea.alonzo@s.msumain.edu.ph']
+  },
+  {
+    id: 'stud-102',
+    studentId: '2023-10493',
+    name: 'Carlos Perez',
+    role: 'student',
+    email: 'carlos.perez@s.msumain.edu.ph',
+    dept: 'BS Information Technology',
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
+    aliases: ['stud-102', '2023-10493', 'carlos.perez@s.msumain.edu.ph']
+  },
+  {
+    id: 'stud-103',
+    studentId: '2023-10494',
+    name: 'Diane Cruz',
+    role: 'student',
+    email: 'diane.cruz@s.msumain.edu.ph',
+    dept: 'BS Computer Engineering',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
+    aliases: ['stud-103', '2023-10494', 'diane.cruz@s.msumain.edu.ph']
+  },
+  {
+    id: 'stud-104',
+    studentId: '2023-10495',
+    name: 'Eric Tan',
+    role: 'student',
+    email: 'eric.tan@s.msumain.edu.ph',
+    dept: 'BS Computer Science',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
+    aliases: ['stud-104', '2023-10495', 'eric.tan@s.msumain.edu.ph']
+  }
+];
 
 export const getDynamicCampusPeople = (userRole?: string, userId?: string, userName?: string, userAvatar?: string, userEmail?: string) => {
   let registeredList: any[] = [];
@@ -50,10 +131,17 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
     // ignore
   }
 
+  // Combine dynamic registered users with foundational campus directory
+  const combinedRaw = [...registeredList, ...ALL_CAMPUS_PEOPLE];
+
   const result: any[] = [];
   const addedIds = new Set<string>();
 
-  // If active user exists, include them
+  const myNormalizedEmail = userEmail ? userEmail.trim().toLowerCase() : '';
+  const myNormalizedId = userId ? userId.trim() : '';
+  const myNormalizedName = userName ? userName.trim().toLowerCase() : '';
+
+  // 1. If active user exists, include them first with their canonical profile
   if (userId) {
     result.push({
       id: userId,
@@ -61,29 +149,120 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
       role: userRole || 'student',
       avatar: userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
       email: userEmail || '',
-      dept: 'Academic Portal'
+      dept: 'Academic Portal',
+      aliases: [userId, myNormalizedEmail].filter(Boolean),
+      previousNames: myNormalizedName ? [myNormalizedName] : []
     });
     addedIds.add(userId);
+    if (myNormalizedEmail) addedIds.add(myNormalizedEmail);
   }
 
-  registeredList.forEach((r: any) => {
+  // 2. Iterate through combined registered & campus directory and deduplicate thoroughly
+  combinedRaw.forEach((r: any) => {
+    if (!r) return;
     if (userRole !== 'admin' && r.role === 'admin') {
       return;
     }
-    const rId = r.id || r.uid;
-    if (rId && !addedIds.has(rId)) {
-      const isCurrentUser = (userId && (r.id === userId || r.uid === userId)) ||
-                           (userEmail && r.email && r.email.toLowerCase() === userEmail.toLowerCase());
-      result.push({
-        id: rId,
-        name: isCurrentUser && userName ? userName : (r.name || 'Academic User'),
-        role: r.role || 'student',
-        avatar: isCurrentUser && userAvatar !== undefined ? userAvatar : (r.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'),
-        email: r.email || '',
-        dept: r.department || (r.role === 'faculty' ? 'College Staff' : r.role === 'admin' ? 'Registrar' : 'CCS Student')
-      });
-      addedIds.add(rId);
+
+    const rId = String(r.id || r.uid || '').trim();
+    const rUid = String(r.uid || '').trim();
+    const rStudentId = String(r.studentId || '').trim();
+    const rFacultyId = String(r.facultyId || '').trim();
+    const rEmail = r.email ? String(r.email).trim().toLowerCase() : '';
+    const rName = r.name ? String(r.name).trim().toLowerCase() : '';
+    const rAliases: string[] = (r.aliases || []).map((a: string) => String(a).trim());
+    const rPrevNames: string[] = (r.previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+
+    // Check if this registered entry corresponds to current user
+    const isCurrentUser = 
+      (myNormalizedId && (rId === myNormalizedId || rUid === myNormalizedId || rStudentId === myNormalizedId || rFacultyId === myNormalizedId || rAliases.includes(myNormalizedId))) ||
+      (myNormalizedEmail && rEmail && (rEmail === myNormalizedEmail || rAliases.includes(myNormalizedEmail)));
+
+    if (isCurrentUser) {
+      // Enrich current user record if dept or avatar was missing
+      if (result.length > 0 && result[0]) {
+        if (!result[0].dept && r.department) result[0].dept = r.department;
+        if (r.avatar && (!userAvatar || userAvatar.includes('photo-1534528741775'))) result[0].avatar = r.avatar;
+        if (!result[0].aliases) result[0].aliases = [];
+        [rId, rUid, rStudentId, rFacultyId, rEmail, ...rAliases].filter(Boolean).forEach(a => {
+          if (!result[0].aliases.includes(a)) result[0].aliases.push(a);
+        });
+        if (!result[0].previousNames) result[0].previousNames = [];
+        [rName, ...rPrevNames].filter(Boolean).forEach(n => {
+          if (!result[0].previousNames.includes(n)) result[0].previousNames.push(n);
+        });
+      }
+      if (rId) addedIds.add(rId);
+      if (rUid) addedIds.add(rUid);
+      if (rStudentId) addedIds.add(rStudentId);
+      if (rFacultyId) addedIds.add(rFacultyId);
+      if (rEmail) addedIds.add(rEmail);
+      rAliases.forEach(a => addedIds.add(a));
+      return;
     }
+
+    // Check if this other person has already been added
+    const alreadyAdded = 
+      (rId && addedIds.has(rId)) ||
+      (rUid && addedIds.has(rUid)) ||
+      (rStudentId && addedIds.has(rStudentId)) ||
+      (rFacultyId && addedIds.has(rFacultyId)) ||
+      (rEmail && addedIds.has(rEmail)) ||
+      rAliases.some(a => addedIds.has(a)) ||
+      result.some(p => 
+        (rEmail && p.email && p.email.toLowerCase() === rEmail) ||
+        (rStudentId && (p.studentId === rStudentId || p.id === rStudentId || p.uid === rStudentId || p.aliases?.includes(rStudentId))) ||
+        (rFacultyId && (p.facultyId === rFacultyId || p.id === rFacultyId || p.uid === rFacultyId || p.aliases?.includes(rFacultyId))) ||
+        (rId && (p.id === rId || p.aliases?.includes(rId))) ||
+        (p.role === r.role && rName && (p.name.trim().toLowerCase() === rName || p.previousNames?.includes(rName))) ||
+        (p.role === r.role && rPrevNames.some((n: string) => p.name.trim().toLowerCase() === n || p.previousNames?.includes(n)))
+      );
+
+    if (alreadyAdded) {
+      // Find and update attributes if newer
+      const existing = result.find(p => 
+        (rId && (p.id === rId || p.aliases?.includes(rId))) ||
+        (rEmail && p.email && p.email.toLowerCase() === rEmail) ||
+        (rStudentId && (p.studentId === rStudentId || p.id === rStudentId || p.uid === rStudentId || p.aliases?.includes(rStudentId))) ||
+        (p.role === r.role && rName && (p.name.trim().toLowerCase() === rName || p.previousNames?.includes(rName))) ||
+        (p.role === r.role && rPrevNames.some((n: string) => p.name.trim().toLowerCase() === n))
+      );
+      if (existing) {
+        if (r.avatar && (!existing.avatar || existing.avatar.includes('photo-1534528741775'))) existing.avatar = r.avatar;
+        if (r.name && (!existing.name || existing.name === 'Academic User')) existing.name = r.name;
+        if (r.department && !existing.dept) existing.dept = r.department;
+        if (!existing.aliases) existing.aliases = [existing.id];
+        [rId, rUid, rStudentId, rFacultyId, rEmail, ...rAliases].filter(Boolean).forEach(a => {
+          if (!existing.aliases.includes(a)) existing.aliases.push(a);
+        });
+        if (!existing.previousNames) existing.previousNames = [];
+        [rName, ...rPrevNames].filter(Boolean).forEach(n => {
+          if (!existing.previousNames.includes(n)) existing.previousNames.push(n);
+        });
+      }
+      return;
+    }
+
+    const primaryId = rStudentId || rFacultyId || rId || rUid;
+    const combinedAliases = Array.from(new Set([rId, rUid, rStudentId, rFacultyId, primaryId, ...rAliases].filter(Boolean)));
+    const combinedPrevNames = Array.from(new Set([rName, ...rPrevNames].filter(Boolean)));
+
+    result.push({
+      id: primaryId,
+      name: r.name || 'Academic User',
+      role: r.role || 'student',
+      avatar: r.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+      email: r.email || '',
+      dept: r.department || (r.role === 'faculty' ? 'College Staff' : r.role === 'admin' ? 'Registrar' : 'CCS Student'),
+      studentId: rStudentId || undefined,
+      facultyId: rFacultyId || undefined,
+      uid: rUid || undefined,
+      aliases: combinedAliases,
+      previousNames: combinedPrevNames
+    });
+
+    combinedAliases.forEach(a => addedIds.add(a));
+    if (rEmail) addedIds.add(rEmail);
   });
 
   // If user is admin, ensure current admin is included in people list
@@ -112,11 +291,11 @@ export const getDynamicCampusPeople = (userRole?: string, userId?: string, userN
 export default function Messages({ userProfile, classes, enrollments, accessibility, onBack, mode, setScreen, initialContactId, isOffline: propIsOffline, onOpenConsultations }: MessagesProps) {
   const isOfflineMode = propIsOffline ?? (typeof window !== 'undefined' && localStorage.getItem('cp_offline') === 'true');
 
-  const myId = userProfile.id || (userProfile as any).uid || (userProfile.role === 'student' 
-    ? (userProfile.studentId || '2023-10492') 
+  const myId = userProfile.role === 'student' 
+    ? (userProfile.studentId || userProfile.id || (userProfile as any).uid || '2023-10492') 
     : userProfile.role === 'faculty' 
-      ? (userProfile.facultyId || 'fac-1') 
-      : 'admin-cur');
+      ? (userProfile.facultyId || userProfile.id || 'fac-1') 
+      : (userProfile.id || (userProfile as any).uid || 'admin-cur');
 
   const isUserOffline = (contactObj: any) => {
     if (!contactObj) return true;
@@ -129,6 +308,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
     // Check self
     const isSelf = contactObj.id === myId || 
+                   (userProfile.id && contactObj.id === userProfile.id) ||
+                   (userProfile.studentId && contactObj.id === userProfile.studentId) ||
+                   (userProfile.facultyId && contactObj.id === userProfile.facultyId) ||
                    (userProfile.email && contactObj.email && contactObj.email.toLowerCase() === userProfile.email.toLowerCase()) ||
                    (userProfile.name && contactObj.name && contactObj.name.toLowerCase() === userProfile.name.toLowerCase());
 
@@ -156,7 +338,44 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     return [];
   });
 
-  const [activeContactId, setActiveContactId] = useState<string>('');
+  const [_registeredUsersVersion, setRegisteredUsersVersion] = useState(0);
+
+  useEffect(() => {
+    const handleUsersChanged = () => {
+      setRegisteredUsersVersion(v => v + 1);
+    };
+    const handleMessagesUpdated = (e: any) => {
+      if (e.detail?.messages) {
+        setMessages(e.detail.messages);
+      }
+    };
+    window.addEventListener('registered-users-changed', handleUsersChanged);
+    window.addEventListener('classpulse-messages-updated', handleMessagesUpdated);
+    return () => {
+      window.removeEventListener('registered-users-changed', handleUsersChanged);
+      window.removeEventListener('classpulse-messages-updated', handleMessagesUpdated);
+    };
+  }, []);
+
+  const [activeContactId, setActiveContactId] = useState<string>(() => {
+    if (initialContactId) {
+      if (typeof initialContactId === 'object' && initialContactId.id) return initialContactId.id;
+      if (typeof initialContactId === 'string') return initialContactId;
+    }
+    try {
+      return localStorage.getItem('cp_active_contact_id') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  useEffect(() => {
+    if (activeContactId) {
+      try {
+        localStorage.setItem('cp_active_contact_id', activeContactId);
+      } catch {}
+    }
+  }, [activeContactId]);
   const [inputText, setInputText] = useState('');
   const [userSearchText, setUserSearchText] = useState('');
   const [imagePreviewData, setImagePreviewData] = useState<{ url: string; title?: string; subtitle?: string; fileName?: string } | null>(null);
@@ -400,21 +619,68 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     }
   };
 
+  // Universal identity matching functions for bulletproof chat routing
+  function isMsgFromMe(m: EnrichedChatMessage): boolean {
+    if (!m) return false;
+    const myIds = new Set([
+      myId,
+      userProfile.id,
+      userProfile.studentId,
+      userProfile.facultyId,
+      userProfile.email ? userProfile.email.toLowerCase().trim() : '',
+      ...((userProfile as any).aliases || [])
+    ].filter(Boolean));
+
+    if (m.senderId && myIds.has(m.senderId)) return true;
+
+    const myName = userProfile.name ? userProfile.name.trim().toLowerCase() : '';
+    const myPrevNames: string[] = ((userProfile as any).previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+    if (m.senderName) {
+      const senderLow = m.senderName.trim().toLowerCase();
+      if (myName && senderLow === myName && (!m.senderRole || m.senderRole === userProfile.role)) return true;
+      if (myPrevNames.includes(senderLow) && (!m.senderRole || m.senderRole === userProfile.role)) return true;
+    }
+    return false;
+  }
+
+  function isMsgToMe(m: EnrichedChatMessage): boolean {
+    if (!m) return false;
+    const myIds = new Set([
+      myId,
+      userProfile.id,
+      userProfile.studentId,
+      userProfile.facultyId,
+      userProfile.email ? userProfile.email.toLowerCase().trim() : '',
+      ...((userProfile as any).aliases || [])
+    ].filter(Boolean));
+
+    if (m.receiverId && myIds.has(m.receiverId)) return true;
+
+    const myName = userProfile.name ? userProfile.name.trim().toLowerCase() : '';
+    const myPrevNames: string[] = ((userProfile as any).previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+    if (m.receiverName) {
+      const receiverLow = m.receiverName.trim().toLowerCase();
+      if (myName && receiverLow === myName) return true;
+      if (myPrevNames.includes(receiverLow)) return true;
+    }
+    return false;
+  }
+
   // Contacts generation based on student / faculty / admin role
   const getContacts = () => {
     let list: any[] = [];
     const dynPeople = getDynamicCampusPeople(
       userProfile.role,
-      userProfile.id || (userProfile as any).uid || (userProfile.role === 'admin' ? 'admin-cur' : userProfile.role === 'faculty' ? 'fac-1' : '2023-10492'),
+      userProfile.role === 'student' ? (userProfile.studentId || userProfile.id) : (userProfile.id || userProfile.facultyId),
       userProfile.name,
       userProfile.avatar,
       userProfile.email
     );
 
     if (userProfile.role === 'student') {
-      const teachersMap = new Map();
+      const teachersMap = new Map<string, any>();
       classes.forEach(c => {
-        const matchedT = dynPeople.find(p => p.id === c.facultyId || p.name === c.facultyName);
+        const matchedT = dynPeople.find(p => p.id === c.facultyId || p.facultyId === c.facultyId || p.name === c.facultyName);
         const id = c.facultyId || matchedT?.id || 'fac-1';
         if (!teachersMap.has(id)) {
           teachersMap.set(id, {
@@ -422,7 +688,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             name: c.facultyName,
             role: 'faculty',
             avatar: matchedT?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-            courseCode: 'Faculty Member'
+            courseCode: 'Faculty Member',
+            aliases: Array.from(new Set([id, c.facultyId, matchedT?.id, matchedT?.facultyId, ...(matchedT?.aliases || [])].filter(Boolean) as string[])),
+            previousNames: matchedT?.previousNames || []
           });
         }
       });
@@ -435,7 +703,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             name: f.name,
             role: 'faculty',
             avatar: f.avatar,
-            courseCode: f.dept || 'Faculty Member'
+            courseCode: f.dept || 'Faculty Member',
+            aliases: Array.from(new Set([f.id, f.facultyId, f.uid, ...(f.aliases || [])].filter(Boolean) as string[])),
+            previousNames: f.previousNames || []
           });
         }
       });
@@ -451,17 +721,70 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       enrollments
         .filter(e => myClassIds.includes(e.classId))
         .forEach(e => {
-          if (!studentMap.has(e.studentId)) {
-            const matchedS = dynPeople.find(p => p.id === e.studentId || p.name === e.studentName);
-            studentMap.set(e.studentId, {
-              id: e.studentId,
-              name: e.studentName,
+          const sId = (e.studentId || '').trim();
+          if (!sId) return;
+
+          const matchedS = dynPeople.find(p => 
+            p.id === sId || 
+            p.studentId === sId || 
+            p.uid === sId ||
+            (p.aliases && p.aliases.includes(sId)) ||
+            (e.studentEmail && p.email && p.email.toLowerCase().trim() === e.studentEmail.toLowerCase().trim()) ||
+            (p.name && e.studentName && p.name.trim().toLowerCase() === e.studentName.trim().toLowerCase()) ||
+            (p.previousNames && e.studentName && p.previousNames.includes(e.studentName.trim().toLowerCase()))
+          );
+
+          if (!studentMap.has(sId)) {
+            const canonicalName = matchedS?.name || e.studentName;
+            const canonicalAvatar = matchedS?.avatar || e.studentAvatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150';
+            const studentAliases = [
+              sId,
+              matchedS?.id,
+              matchedS?.uid,
+              matchedS?.studentId,
+              e.studentEmail,
+              matchedS?.email,
+              ...(matchedS?.aliases || [])
+            ].filter(Boolean) as string[];
+
+            studentMap.set(sId, {
+              id: sId,
+              name: canonicalName,
               role: 'student',
-              avatar: matchedS?.avatar || e.studentAvatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
-              courseCode: 'Student'
+              avatar: canonicalAvatar,
+              courseCode: 'Student',
+              email: e.studentEmail || matchedS?.email || '',
+              aliases: Array.from(new Set(studentAliases)),
+              previousNames: Array.from(new Set([e.studentName?.toLowerCase(), ...(matchedS?.previousNames || [])].filter(Boolean)))
             });
           }
         });
+
+      // Also blend registered students from dynPeople so contacts never vanish on refresh or before enrollment load
+      dynPeople.filter(p => p.role === 'student').forEach(s => {
+        const sId = s.id || s.studentId;
+        if (!sId) return;
+        const alreadyIn = Array.from(studentMap.values()).some(existing => 
+          existing.id === sId || 
+          (existing.aliases && (existing.aliases.includes(sId) || existing.aliases.includes(s.uid) || existing.aliases.includes(s.studentId))) ||
+          (existing.email && s.email && existing.email.toLowerCase() === s.email.toLowerCase()) ||
+          (existing.name && s.name && existing.name.toLowerCase() === s.name.toLowerCase()) ||
+          (s.previousNames && s.previousNames.includes(existing.name?.toLowerCase()))
+        );
+        if (!alreadyIn) {
+          studentMap.set(sId, {
+            id: sId,
+            name: s.name,
+            role: 'student',
+            avatar: s.avatar || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=150',
+            courseCode: s.dept || 'CCS Student',
+            email: s.email || '',
+            aliases: Array.from(new Set([sId, s.id, s.uid, s.studentId, s.email, ...(s.aliases || [])].filter(Boolean))),
+            previousNames: s.previousNames || []
+          });
+        }
+      });
+
       list = Array.from(studentMap.values());
     } else if (userProfile.role === 'admin') {
       // Admins see all registered admins including current user!
@@ -471,99 +794,148 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         role: p.role,
         avatar: p.avatar,
         courseCode: p.dept || 'Registrar Board',
-        email: p.email
+        email: p.email,
+        aliases: [p.id, p.uid, p.email, ...(p.aliases || [])].filter(Boolean) as string[],
+        previousNames: p.previousNames || []
       }));
       list = [...registeredAdmins];
     }
 
     // Blend extra conversation contacts dynamically scanned from messages
-    const myId = userProfile.id || (userProfile as any).uid || (userProfile.role === 'student' 
-      ? (userProfile.studentId || '2023-10492') 
-      : userProfile.role === 'faculty' 
-        ? (userProfile.facultyId || 'fac-1') 
-        : 'admin-cur');
-
     messages.forEach(m => {
       const isChannel = channels.some(ch => ch.id === m.receiverId);
       if (isChannel) return;
 
-      const otherId = m.senderId === myId ? m.receiverId : (m.receiverId === myId ? m.senderId : null);
-      if (otherId && otherId !== myId) {
-        if (!list.some(item => item.id === otherId)) {
-          const match = dynPeople.find(p => p.id === otherId);
-          if (match) {
-            if (userProfile.role === 'admin' && match.role !== 'admin') {
-              return;
-            }
-            if (userProfile.role !== 'admin' && match.role === 'admin') {
-              return;
-            }
-            list.push({
-              id: match.id,
-              name: match.name,
-              role: match.role,
-              avatar: match.avatar,
-              courseCode: match.dept
-            });
-          } else {
-            let registeredList: any[] = [];
-            try {
-              registeredList = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
-            } catch {
-              // ignore
-            }
-            const regUser = registeredList.find((u: any) => u.id === otherId || u.uid === otherId);
-            if (regUser) {
-              if (userProfile.role === 'admin' && regUser.role !== 'admin') {
-                return;
-              }
-              if (userProfile.role !== 'admin' && regUser.role === 'admin') {
-                return;
-              }
-              list.push({
-                id: regUser.id || regUser.uid,
-                name: regUser.name,
-                role: regUser.role,
-                avatar: regUser.avatar || '',
-                courseCode: regUser.department || 'Academic Portal'
-              });
-            } else {
-              if (userProfile.role === 'admin') {
-                return;
-              }
-              const otherName = m.senderId === myId ? m.receiverName : m.senderName;
-              const otherRole = m.senderId === myId ? 'User' : m.senderRole;
-              if (otherRole === 'admin') {
-                return;
-              }
-              list.push({
-                id: otherId,
-                name: otherName,
-                role: otherRole,
-                avatar: '',
-                courseCode: 'Direct Message'
-              });
-            }
+      const fromMe = isMsgFromMe(m);
+      const toMe = isMsgToMe(m);
+
+      let otherId: string | null = null;
+      let otherName: string | null = null;
+      let otherRole: string = 'student';
+
+      if (fromMe && !toMe) {
+        otherId = m.receiverId;
+        otherName = m.receiverName;
+        otherRole = 'User';
+      } else if (toMe && !fromMe) {
+        otherId = m.senderId;
+        otherName = m.senderName;
+        otherRole = m.senderRole || 'User';
+      } else {
+        // Self message or unrelated, ignore
+        return;
+      }
+
+      if (!otherId) return;
+
+      const otherNameLower = otherName ? otherName.trim().toLowerCase() : '';
+
+      // Check if otherId or otherName already exists in list (matching id, aliases, email, name, or previousNames)
+      const existingInList = list.find(item => {
+        if (item.id === otherId) return true;
+        if (item.aliases && item.aliases.includes(otherId)) return true;
+        if (otherNameLower && item.name && item.name.trim().toLowerCase() === otherNameLower) return true;
+        if (otherNameLower && item.previousNames && item.previousNames.includes(otherNameLower)) return true;
+        return false;
+      });
+
+      if (existingInList) {
+        if (!existingInList.aliases) existingInList.aliases = [existingInList.id];
+        if (!existingInList.aliases.includes(otherId)) existingInList.aliases.push(otherId);
+        if (otherNameLower) {
+          if (!existingInList.previousNames) existingInList.previousNames = [];
+          if (!existingInList.previousNames.includes(otherNameLower) && existingInList.name?.trim().toLowerCase() !== otherNameLower) {
+            existingInList.previousNames.push(otherNameLower);
           }
         }
+        return;
       }
-    });
 
-    extraConversationIds.forEach(id => {
-      const match = dynPeople.find(p => p.id === id);
-      if (match && !list.some(item => item.id === id)) {
-        if (userProfile.role === 'admin' && match.role !== 'admin') {
+      // Check dynPeople
+      const match = dynPeople.find(p => 
+        p.id === otherId || 
+        p.uid === otherId || 
+        p.studentId === otherId ||
+        (p.aliases && p.aliases.includes(otherId)) ||
+        (otherNameLower && p.name && p.name.trim().toLowerCase() === otherNameLower) ||
+        (otherNameLower && p.previousNames && p.previousNames.includes(otherNameLower))
+      );
+
+      if (match) {
+        const matchAlreadyInList = list.find(item => 
+          item.id === match.id ||
+          (item.aliases && (item.aliases.includes(match.id) || item.aliases.includes(match.studentId) || item.aliases.includes(match.uid) || (match.aliases && match.aliases.some((a: string) => item.aliases.includes(a))))) ||
+          (item.email && match.email && item.email.toLowerCase().trim() === match.email.toLowerCase().trim()) ||
+          (item.name && match.name && item.name.trim().toLowerCase() === match.name.trim().toLowerCase()) ||
+          (match.previousNames && match.previousNames.includes(item.name?.trim().toLowerCase())) ||
+          (item.previousNames && item.previousNames.includes(match.name?.trim().toLowerCase()))
+        );
+
+        if (matchAlreadyInList) {
+          if (!matchAlreadyInList.aliases) matchAlreadyInList.aliases = [matchAlreadyInList.id];
+          if (!matchAlreadyInList.aliases.includes(otherId)) matchAlreadyInList.aliases.push(otherId);
+          if (match.id && !matchAlreadyInList.aliases.includes(match.id)) matchAlreadyInList.aliases.push(match.id);
+          if (match.aliases) {
+            match.aliases.forEach((a: string) => {
+              if (!matchAlreadyInList.aliases.includes(a)) matchAlreadyInList.aliases.push(a);
+            });
+          }
+          if (otherNameLower) {
+            if (!matchAlreadyInList.previousNames) matchAlreadyInList.previousNames = [];
+            if (!matchAlreadyInList.previousNames.includes(otherNameLower) && matchAlreadyInList.name?.trim().toLowerCase() !== otherNameLower) {
+              matchAlreadyInList.previousNames.push(otherNameLower);
+            }
+          }
           return;
         }
-        if (userProfile.role !== 'admin' && match.role === 'admin') {
-          return;
-        }
+
+        if (userProfile.role === 'admin' && match.role !== 'admin') return;
+        if (userProfile.role !== 'admin' && match.role === 'admin') return;
+
         list.push({
           id: match.id,
           name: match.name,
           role: match.role,
           avatar: match.avatar,
-          courseCode: match.dept
+          courseCode: match.dept,
+          email: match.email || '',
+          aliases: Array.from(new Set([match.id, match.uid, match.studentId, match.facultyId, otherId, ...(match.aliases || [])].filter(Boolean))),
+          previousNames: Array.from(new Set([otherNameLower, ...(match.previousNames || [])].filter(Boolean)))
+        });
+      } else {
+        if (userProfile.role === 'admin') return;
+        if (otherRole === 'admin') return;
+
+        list.push({
+          id: otherId,
+          name: otherName || 'Direct Message',
+          role: otherRole,
+          avatar: '',
+          courseCode: 'Direct Message',
+          aliases: [otherId],
+          previousNames: otherNameLower ? [otherNameLower] : []
+        });
+      }
+    });
+
+    extraConversationIds.forEach(id => {
+      const match = dynPeople.find(p => p.id === id || (p.aliases && p.aliases.includes(id)));
+      const isAlreadyInList = list.some(item => 
+        item.id === id || 
+        (item.aliases && item.aliases.includes(id)) ||
+        (match && (item.id === match.id || (item.name && match.name && item.name.trim().toLowerCase() === match.name.trim().toLowerCase() && item.role === match.role)))
+      );
+      if (match && !isAlreadyInList) {
+        if (userProfile.role === 'admin' && match.role !== 'admin') return;
+        if (userProfile.role !== 'admin' && match.role === 'admin') return;
+        list.push({
+          id: match.id,
+          name: match.name,
+          role: match.role,
+          avatar: match.avatar,
+          courseCode: match.dept,
+          aliases: Array.from(new Set([match.id, match.uid, match.studentId, match.facultyId, id, ...(match.aliases || [])].filter(Boolean))),
+          previousNames: match.previousNames || []
         });
       }
     });
@@ -575,6 +947,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     if (initId) {
       const exists = list.some(item => 
         item.id === initId || 
+        (item.aliases && item.aliases.includes(initId)) ||
         (initName && item.name?.toLowerCase() === initName.toLowerCase()) ||
         (item.id && item.id.replace('fac-0', 'fac-') === initId.replace('fac-0', 'fac-'))
       );
@@ -585,24 +958,102 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
           name: initName || matchedP?.name || 'Faculty Member',
           role: matchedP?.role || 'faculty',
           avatar: matchedP?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-          courseCode: matchedP?.dept || 'Faculty Member'
+          courseCode: matchedP?.dept || 'Faculty Member',
+          aliases: Array.from(new Set([initId, matchedP?.id, matchedP?.uid, ...(matchedP?.aliases || [])].filter(Boolean))),
+          previousNames: matchedP?.previousNames || []
         });
       }
     }
 
-    // Deduplicate by ID and Name to ensure strictly ONE contact per person
+    // Deduplicate by ID, Name, Email, and Aliases to ensure strictly ONE contact per person
     const seenIds = new Set<string>();
     const seenNames = new Set<string>();
-    return list.filter(el => {
-      if (!el || !el.id) return false;
-      const cleanName = (el.name || '').trim().toLowerCase();
-      if (seenIds.has(el.id) || (cleanName && seenNames.has(cleanName))) {
-        return false;
+    const seenEmails = new Set<string>();
+    const seenAliases = new Set<string>();
+    const deduplicated: any[] = [];
+
+    const myIds = new Set([
+      myId,
+      userProfile.id,
+      userProfile.studentId,
+      userProfile.facultyId,
+      userProfile.email ? userProfile.email.toLowerCase().trim() : '',
+      ...((userProfile as any).aliases || [])
+    ].filter(Boolean));
+    const myName = userProfile.name ? userProfile.name.trim().toLowerCase() : '';
+    const myPrevNames: string[] = ((userProfile as any).previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+
+    list.forEach(el => {
+      if (!el || !el.id) return;
+
+      // Filter out self-contact in Direct Chats so students or faculty never see themselves as a chat partner
+      const isSelf = 
+        myIds.has(el.id) ||
+        (el.email && myIds.has(el.email.toLowerCase().trim())) ||
+        (myName && el.name && el.name.trim().toLowerCase() === myName && el.role === userProfile.role) ||
+        (el.aliases && el.aliases.some((a: string) => myIds.has(a))) ||
+        (el.name && myPrevNames.includes(el.name.trim().toLowerCase())) ||
+        (myName && el.previousNames && el.previousNames.includes(myName));
+
+      if (isSelf && userProfile.role !== 'admin') {
+        return;
       }
-      seenIds.add(el.id);
-      if (cleanName) seenNames.add(cleanName);
-      return true;
+
+      const cleanId = String(el.id).trim();
+      const cleanName = el.name ? String(el.name).trim().toLowerCase() : '';
+      const cleanEmail = el.email ? String(el.email).trim().toLowerCase() : '';
+      const elAliases = (el.aliases || [cleanId]) as string[];
+      const elPrevNames = ((el.previousNames || []) as string[]).map(n => String(n).trim().toLowerCase());
+
+      const hasDuplicate = 
+        seenIds.has(cleanId) ||
+        (cleanEmail && seenEmails.has(cleanEmail)) ||
+        (cleanName && el.role && seenNames.has(`${el.role}:${cleanName}`)) ||
+        elAliases.some(a => seenAliases.has(a)) ||
+        elPrevNames.some(n => seenNames.has(`${el.role}:${n}`));
+
+      if (hasDuplicate) {
+        // Merge into existing deduplicated entry
+        const existing = deduplicated.find(d => 
+          d.id === cleanId ||
+          (cleanEmail && d.email && d.email.toLowerCase().trim() === cleanEmail) ||
+          (cleanName && d.role === el.role && d.name && d.name.trim().toLowerCase() === cleanName) ||
+          (d.aliases && elAliases.some((a: string) => d.aliases.includes(a))) ||
+          (elPrevNames.length > 0 && d.name && elPrevNames.includes(d.name.trim().toLowerCase())) ||
+          (d.previousNames && cleanName && d.previousNames.includes(cleanName))
+        );
+        if (existing) {
+          existing.aliases = Array.from(new Set([...(existing.aliases || [existing.id]), ...elAliases, cleanId]));
+          existing.previousNames = Array.from(new Set([...(existing.previousNames || []), ...elPrevNames, cleanName].filter(Boolean)));
+          if (el.avatar && (!existing.avatar || existing.avatar.includes('photo-1534528741775'))) {
+            existing.avatar = el.avatar;
+          }
+          if (el.email && !existing.email) {
+            existing.email = el.email;
+          }
+          if (el.name && (!existing.name || existing.name === 'Academic User' || existing.name === 'Direct Message')) {
+            existing.name = el.name;
+          }
+        }
+        return;
+      }
+
+      seenIds.add(cleanId);
+      if (cleanEmail) seenEmails.add(cleanEmail);
+      if (cleanName && el.role) seenNames.add(`${el.role}:${cleanName}`);
+      elAliases.forEach(a => seenAliases.add(a));
+      elPrevNames.forEach(n => {
+        if (el.role) seenNames.add(`${el.role}:${n}`);
+      });
+
+      deduplicated.push({
+        ...el,
+        aliases: elAliases,
+        previousNames: elPrevNames
+      });
     });
+
+    return deduplicated;
   };
 
   const getChannels = () => {
@@ -623,6 +1074,65 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
   const channels = getChannels();
   const contacts = getContacts();
+
+  const dynPeopleForSearch = getDynamicCampusPeople(
+    userProfile.role,
+    userProfile.id || (userProfile as any).uid || (userProfile.role === 'admin' ? 'admin-cur' : userProfile.role === 'faculty' ? 'fac-1' : '2023-10492'),
+    userProfile.name,
+    userProfile.avatar,
+    userProfile.email
+  );
+
+  const getActiveMetadata = () => {
+    const ch = channels.find(c => c.id === activeContactId);
+    if (ch) {
+      return { 
+        id: ch.id, 
+        name: ch.name, 
+        isChannel: true, 
+        code: ch.code, 
+        courseCode: ch.code 
+      };
+    }
+    const co = contacts.find(c => 
+      c.id === activeContactId || 
+      (c.aliases && c.aliases.includes(activeContactId)) ||
+      (c.name && activeContactId && c.name.toLowerCase() === activeContactId.toLowerCase()) ||
+      (c.id && activeContactId && c.id.replace('-', '') === activeContactId.replace('-', '')) ||
+      (c.id && activeContactId && c.id.replace('fac-0', 'fac-') === activeContactId.replace('fac-0', 'fac-'))
+    );
+    if (co) {
+      return { 
+        id: co.id, 
+        name: co.name, 
+        isChannel: false, 
+        avatar: co.avatar, 
+        role: co.role, 
+        courseCode: co.courseCode,
+        aliases: co.aliases || [co.id]
+      };
+    }
+    const person = dynPeopleForSearch.find(p => 
+      p.id === activeContactId || 
+      (p.name && activeContactId && p.name.toLowerCase() === activeContactId.toLowerCase()) ||
+      (p.id && activeContactId && p.id.replace('-', '') === activeContactId.replace('-', '')) ||
+      (p.id && activeContactId && p.id.replace('fac-0', 'fac-') === activeContactId.replace('fac-0', 'fac-'))
+    );
+    if (person) {
+      return {
+        id: person.id,
+        name: person.name,
+        isChannel: false,
+        avatar: person.avatar,
+        role: person.role,
+        courseCode: person.dept || 'Faculty Member',
+        aliases: [person.id, (person as any).studentId, (person as any).facultyId, (person as any).uid].filter(Boolean) as string[]
+      };
+    }
+    return null;
+  };
+
+  const activeMeta = getActiveMetadata();
 
   const prevInitialContactRef = useRef<any>(null);
 
@@ -650,23 +1160,21 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       }
       setMobileShowChat(true);
     } else {
-      setMobileShowChat(false);
-      if (userProfile.role === 'admin') {
-        if (mode === 'tickets') {
-          if (!activeContactId && adminTickets && adminTickets.length > 0) {
-            setActiveContactId(adminTickets[0].id);
-          }
-        } else {
-          if (!activeContactId) {
+      if (!activeContactId) {
+        setMobileShowChat(false);
+        if (userProfile.role === 'admin') {
+          if (mode === 'tickets') {
+            if (adminTickets && adminTickets.length > 0) {
+              setActiveContactId(adminTickets[0].id);
+            }
+          } else {
             if (channels.length > 0) {
               setActiveContactId(channels[0].id);
             } else if (contacts.length > 0) {
               setActiveContactId(contacts[0].id);
             }
           }
-        }
-      } else {
-        if (!activeContactId) {
+        } else {
           if (channels.length > 0) {
             setActiveContactId(channels[0].id);
           } else if (contacts.length > 0) {
@@ -691,12 +1199,19 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   }, [activeContactId]);
 
   // Helper to count unread messages for a specific room or contact
-  const getUnreadCount = (id: string) => {
+  const getUnreadCount = (id: string, itemMeta?: any) => {
+    const aliases = itemMeta?.aliases || [id];
+    const prevNames: string[] = itemMeta?.previousNames || [];
+    const nameLower = itemMeta?.name ? itemMeta.name.trim().toLowerCase() : '';
+
     return messages.filter(m => {
-      if (m.senderId === myId) return false;
+      if (isMsgFromMe(m)) return false;
+      if (m.read) return false;
       const isForThisRoom = m.receiverId === id;
-      const isDirectForMe = m.senderId === id && m.receiverId === myId;
-      return (isForThisRoom || isDirectForMe) && !m.read;
+      const isDirectForMe = 
+        (m.senderId === id || aliases.includes(m.senderId) || (nameLower && m.senderName?.trim().toLowerCase() === nameLower) || (m.senderName && prevNames.includes(m.senderName.trim().toLowerCase()))) &&
+        (isMsgToMe(m) || !m.receiverId || m.receiverId === myId);
+      return isForThisRoom || isDirectForMe;
     }).length;
   };
 
@@ -706,51 +1221,41 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     
     setMessages(prev => {
       let changed = false;
+      const contactAliases = (activeMeta as any)?.aliases || [activeContactId];
+      const contactPrevNames: string[] = ((activeMeta as any)?.previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+      const contactNameLower = activeMeta?.name ? activeMeta.name.trim().toLowerCase() : '';
+
       const updated = prev.map(m => {
-        const isFromActiveOther = m.senderId === activeContactId && m.receiverId === myId;
-        const isForActiveChannel = m.receiverId === activeContactId && m.senderId !== myId;
+        const isFromActiveOther = 
+          (m.senderId === activeContactId || contactAliases.includes(m.senderId) || (contactNameLower && m.senderName?.trim().toLowerCase() === contactNameLower) || (m.senderName && contactPrevNames.includes(m.senderName.trim().toLowerCase()))) &&
+          (isMsgToMe(m) || m.receiverId === myId || !m.receiverId);
+        const isForActiveChannel = m.receiverId === activeContactId && !isMsgFromMe(m);
+
         if ((isFromActiveOther || isForActiveChannel) && !m.read) {
           changed = true;
-          return { ...m, read: true };
+          const readMsg = { ...m, read: true };
+          saveMessageToFirestore(false, readMsg).catch(() => {});
+          return readMsg;
         }
         return m;
       });
-      return changed ? updated : prev;
+
+      if (changed) {
+        try {
+          localStorage.setItem('cp_chat_messages_v2', JSON.stringify(updated));
+          window.dispatchEvent(new CustomEvent('classpulse-messages-updated', { detail: { messages: updated } }));
+        } catch {}
+        return updated;
+      }
+      return prev;
     });
-  }, [activeContactId, myId]);
+  }, [activeContactId, myId, activeMeta]);
 
   // ACTIVE RECURRENT LIVE CHAT SIMULATION - Completely disabled to prevent automated interruptions
   useEffect(() => {
     // Disabled as requested: "don't automate response make it like message app wait if the receiver/user response."
     return () => {};
   }, [activeContactId, channels, userProfile.name]);
-
-  // Universal identity matching functions for bulletproof chat routing
-  const isMsgFromMe = (m: EnrichedChatMessage): boolean => {
-    if (!m) return false;
-    if (m.senderId && (
-      m.senderId === myId ||
-      (userProfile.id && m.senderId === userProfile.id) ||
-      (userProfile.studentId && m.senderId === userProfile.studentId) ||
-      (userProfile.facultyId && m.senderId === userProfile.facultyId) ||
-      (userProfile.email && m.senderId.toLowerCase() === userProfile.email.toLowerCase())
-    )) return true;
-    if (m.senderName && userProfile.name && m.senderName.trim().toLowerCase() === userProfile.name.trim().toLowerCase() && m.senderRole === userProfile.role) return true;
-    return false;
-  };
-
-  const isMsgToMe = (m: EnrichedChatMessage): boolean => {
-    if (!m) return false;
-    if (m.receiverId && (
-      m.receiverId === myId ||
-      (userProfile.id && m.receiverId === userProfile.id) ||
-      (userProfile.studentId && m.receiverId === userProfile.studentId) ||
-      (userProfile.facultyId && m.receiverId === userProfile.facultyId) ||
-      (userProfile.email && m.receiverId.toLowerCase() === userProfile.email.toLowerCase())
-    )) return true;
-    if (m.receiverName && userProfile.name && m.receiverName.trim().toLowerCase() === userProfile.name.trim().toLowerCase()) return true;
-    return false;
-  };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -797,62 +1302,6 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
     speakText("Message transmitted.", accessibility.readAloud);
   };
 
-  const dynPeopleForSearch = getDynamicCampusPeople(
-    userProfile.role,
-    userProfile.id || (userProfile as any).uid || (userProfile.role === 'admin' ? 'admin-cur' : userProfile.role === 'faculty' ? 'fac-1' : '2023-10492'),
-    userProfile.name,
-    userProfile.avatar,
-    userProfile.email
-  );
-
-  const getActiveMetadata = () => {
-    const ch = channels.find(c => c.id === activeContactId);
-    if (ch) {
-      return { 
-        id: ch.id, 
-        name: ch.name, 
-        isChannel: true, 
-        code: ch.code, 
-        courseCode: ch.code 
-      };
-    }
-    const co = contacts.find(c => 
-      c.id === activeContactId || 
-      (c.name && activeContactId && c.name.toLowerCase() === activeContactId.toLowerCase()) ||
-      (c.id && activeContactId && c.id.replace('-', '') === activeContactId.replace('-', '')) ||
-      (c.id && activeContactId && c.id.replace('fac-0', 'fac-') === activeContactId.replace('fac-0', 'fac-'))
-    );
-    if (co) {
-      return { 
-        id: co.id, 
-        name: co.name, 
-        isChannel: false, 
-        avatar: co.avatar, 
-        role: co.role, 
-        courseCode: co.courseCode 
-      };
-    }
-    const person = dynPeopleForSearch.find(p => 
-      p.id === activeContactId || 
-      (p.name && activeContactId && p.name.toLowerCase() === activeContactId.toLowerCase()) ||
-      (p.id && activeContactId && p.id.replace('-', '') === activeContactId.replace('-', '')) ||
-      (p.id && activeContactId && p.id.replace('fac-0', 'fac-') === activeContactId.replace('fac-0', 'fac-'))
-    );
-    if (person) {
-      return {
-        id: person.id,
-        name: person.name,
-        isChannel: false,
-        avatar: person.avatar,
-        role: person.role,
-        courseCode: person.dept || 'Faculty Member'
-      };
-    }
-    return null;
-  };
-
-  const activeMeta = getActiveMetadata();
-
   // Filter messages for current discussion
   const isActiveChannel = channels.some(ch => ch.id === activeContactId);
   
@@ -866,22 +1315,30 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       );
     }
     
-    // Check if message is related to active direct chat contact
+    // Check if message is related to active direct chat contact (matching id, aliases, name, or previousNames)
+    const contactAliases = (activeMeta as any)?.aliases || [activeContactId];
+    const contactPrevNames: string[] = ((activeMeta as any)?.previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+    const contactNameLower = activeMeta?.name ? activeMeta.name.trim().toLowerCase() : '';
+
     const matchesContactAsSender = 
       m.senderId === activeContactId ||
+      contactAliases.includes(m.senderId) ||
       (activeMeta?.id && m.senderId === activeMeta.id) ||
-      (activeMeta?.name && m.senderName && m.senderName.trim().toLowerCase() === activeMeta.name.trim().toLowerCase());
+      (contactNameLower && m.senderName && m.senderName.trim().toLowerCase() === contactNameLower) ||
+      (m.senderName && contactPrevNames.includes(m.senderName.trim().toLowerCase()));
 
     const matchesContactAsReceiver = 
       m.receiverId === activeContactId ||
+      contactAliases.includes(m.receiverId) ||
       (activeMeta?.id && m.receiverId === activeMeta.id) ||
-      (activeMeta?.name && m.receiverName && m.receiverName.trim().toLowerCase() === activeMeta.name.trim().toLowerCase());
+      (contactNameLower && m.receiverName && m.receiverName.trim().toLowerCase() === contactNameLower) ||
+      (m.receiverName && contactPrevNames.includes(m.receiverName.trim().toLowerCase()));
 
     const sentByMeToContact = isMsgFromMe(m) && matchesContactAsReceiver;
     const sentByContactToMe = matchesContactAsSender && (isMsgToMe(m) || !m.receiverId || m.receiverId === myId);
 
     // Also support fallback when testing/demoing self chat
-    const isSelfContact = activeContactId === myId || (activeMeta?.name && userProfile.name && activeMeta.name.trim().toLowerCase() === userProfile.name.trim().toLowerCase());
+    const isSelfContact = activeContactId === myId || (contactNameLower && userProfile.name && contactNameLower === userProfile.name.trim().toLowerCase());
     if (isSelfContact && isMsgFromMe(m)) return true;
 
     return sentByMeToContact || sentByContactToMe;
@@ -1011,10 +1468,29 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
           <div>
             <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest px-2.5 block pb-2">Direct Chats</span>
             {filteredContacts.map(c => {
-              const unreadCount = getUnreadCount(c.id);
-              const isMe = c.id === myId || 
-                           (c.email && userProfile.email && c.email.toLowerCase() === userProfile.email.toLowerCase()) ||
-                           (c.name && userProfile.name && c.name.toLowerCase() === userProfile.name.toLowerCase() && c.role === userProfile.role);
+              const unreadCount = getUnreadCount(c.id, c);
+              const myIds = new Set([
+                myId,
+                userProfile.id,
+                userProfile.studentId,
+                userProfile.facultyId,
+                userProfile.email ? userProfile.email.toLowerCase().trim() : '',
+                ...((userProfile as any).aliases || [])
+              ].filter(Boolean));
+              const myName = userProfile.name ? userProfile.name.trim().toLowerCase() : '';
+              const myPrevNames: string[] = ((userProfile as any).previousNames || []).map((n: string) => String(n).trim().toLowerCase());
+
+              const isMe = 
+                myIds.has(c.id) || 
+                (c.email && myIds.has(c.email.toLowerCase().trim())) ||
+                (myName && c.name && c.name.toLowerCase().trim() === myName && c.role === userProfile.role) ||
+                (c.aliases && c.aliases.some((a: string) => myIds.has(a))) ||
+                (c.name && myPrevNames.includes(c.name.toLowerCase().trim())) ||
+                (myName && c.previousNames && c.previousNames.includes(myName));
+
+              if (isMe && userProfile.role !== 'admin') {
+                return null;
+              }
               return (
                 <button
                   key={c.id}

@@ -395,23 +395,10 @@ html, body {
   overscroll-behavior-y: none;
 }
 
-/* Gentle transitions of major theme attributes without breaking Framer Motion animations or interactive scaling */
-.trans-all-theme,
-.trans-all-theme div,
-.trans-all-theme header,
-.trans-all-theme aside,
-.trans-all-theme nav,
-.trans-all-theme button,
-.trans-all-theme select,
-.trans-all-theme input,
-.trans-all-theme p,
-.trans-all-theme h1,
-.trans-all-theme h2,
-.trans-all-theme h3,
-.trans-all-theme h4,
-.trans-all-theme h5 {
-  transition-property: background-color, border-color, text-decoration-color, fill, stroke, color, box-shadow;
-  transition-duration: 250ms;
+/* Smooth transitions for theme containers only, without thrashing individual DOM elements or mobile inputs */
+.trans-all-theme {
+  transition-property: background-color, color;
+  transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 

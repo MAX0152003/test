@@ -58,6 +58,8 @@ export interface UserProfile {
   bio?: string;
   phone?: string;
   joinedAt?: string;
+  previousNames?: string[];
+  aliases?: string[];
 }
 
 export interface AccessibilityConfig {

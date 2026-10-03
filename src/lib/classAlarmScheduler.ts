@@ -72,49 +72,62 @@ export interface ClassAlarmPayload {
   url?: string;
 }
 
-// Dispatches a native phone/desktop pop-up system notification
+// Dispatches a native phone/desktop pop-up system notification (works inside and outside the app)
 export async function triggerClassAlarmNotification(payload: ClassAlarmPayload): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
   const { title, message, classCode, screen = 'schedule' } = payload;
 
-  // Play audio chime and haptic feedback
+  // 1. Play audio chime and haptic feedback
   playAlarmChimeSequence();
 
-  // Try dispatching via Service Worker first (best for background & phone locks)
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  // 2. Dispatch custom in-app event so the app displays the interactive Alarm popup modal
+  try {
+    window.dispatchEvent(new CustomEvent('classpulse-alarm-popup', { detail: payload }));
+  } catch (e) {
+    // Non-blocking
+  }
+
+  // 3. Try dispatching via Service Worker registration (the gold standard for lock screen & background)
+  if ('serviceWorker' in navigator) {
     try {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'SHOW_NOTIFICATION',
-        title,
-        options: {
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000))
+      ]);
+
+      if (reg && 'showNotification' in reg) {
+        await reg.showNotification(title, {
           body: message,
-          icon: '/favicon.ico',
-          badge: '/favicon.ico',
+          icon: '/icon.svg',
+          badge: '/icon.svg',
           tag: `classpulse-alarm-${classCode || 'generic'}-${Date.now()}`,
+          vibrate: [500, 200, 500, 200, 800],
+          requireInteraction: true,
           data: {
             screen,
             url: window.location.origin
           },
           actions: [
             { action: 'open_scan', title: '📸 Scan QR' },
-            { action: 'view_sched', title: '📅 View Timetable' }
+            { action: 'view_sched', title: '📅 View Timetable' },
+            { action: 'dismiss', title: 'Dismiss' }
           ]
-        }
-      });
-      return true;
+        });
+        return true;
+      }
     } catch (e) {
-      console.warn('[ClassPulse] Service Worker postMessage notification failed:', e);
+      console.warn('[ClassPulse] Service Worker showNotification notice:', e);
     }
   }
 
-  // Fallback to direct Window Notification API
+  // 4. Fallback to direct Window Notification API
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
       const notif = new Notification(title, {
         body: message,
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
         tag: `classpulse-alarm-${classCode || 'generic'}-${Date.now()}`,
         requireInteraction: true
       });
@@ -130,6 +143,49 @@ export async function triggerClassAlarmNotification(payload: ClassAlarmPayload):
   }
 
   return false;
+}
+
+// Schedule an alarm to fire in the background / outside the app after delaySeconds
+export async function scheduleAlarmOutsideApp(payload: ClassAlarmPayload, delaySeconds = 4): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  const delayMs = Math.max(1000, delaySeconds * 1000);
+  const alarmId = `alarm-outside-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  // Send schedule request to Service Worker so it runs even if tab is minimized or user locks screen
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    try {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'SCHEDULE_ALARM',
+        alarmId,
+        delayMs,
+        title: payload.title,
+        options: {
+          body: payload.message,
+          icon: '/icon.svg',
+          badge: '/icon.svg',
+          tag: alarmId,
+          data: {
+            screen: payload.screen || 'schedule',
+            url: window.location.origin
+          },
+          actions: [
+            { action: 'open_scan', title: '📸 Scan QR' },
+            { action: 'view_sched', title: '📅 Timetable' }
+          ]
+        }
+      });
+    } catch (e) {
+      console.warn('[ClassPulse] Failed to message SW to schedule alarm:', e);
+    }
+  }
+
+  // Also set a client timer fallback in case SW is not yet active
+  setTimeout(() => {
+    triggerClassAlarmNotification(payload);
+  }, delayMs);
+
+  return true;
 }
 
 // Convert "08:30 AM" or "2:15 PM" to minutes from midnight

@@ -534,7 +534,13 @@ export async function saveMessageToFirestore(
     `saveMessage:${messageObj.id}`,
     async () => {
       try {
-        await setDoc(doc(db, colPath, messageObj.id), sanitizeForFirestore(messageObj), { merge: true });
+        const msgText = (messageObj as any).text || messageObj.message || '';
+        const payload = sanitizeForFirestore({
+          ...messageObj,
+          message: msgText,
+          text: msgText
+        });
+        await setDoc(doc(db, colPath, messageObj.id), payload, { merge: true });
         console.log(`Message ${messageObj.id} sent and committed to Firestore.`);
       } catch (error) {
         handleFirestoreError(error, OperationType.WRITE, `${colPath}/${messageObj.id}`);
@@ -572,21 +578,21 @@ export async function saveUserProfileToFirestore(
         };
         await setDoc(doc(db, 'registered_users', profile.id), regUserDoc, { merge: true });
 
-        // Update local registered users cache
+        // Update local registered users cache with robust consolidation
         if (typeof localStorage !== 'undefined') {
           try {
             const currentReg: any[] = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
-            let matched = false;
-            const updatedReg = currentReg.map(u => {
-              if (u.id === profile.id || (u.email && profile.email && u.email.toLowerCase() === profile.email.toLowerCase())) {
-                matched = true;
-                return { ...u, ...regUserDoc };
-              }
-              return u;
-            });
-            if (!matched) {
-              updatedReg.push(regUserDoc);
-            }
+            const isMatch = (u: any) => {
+              if (!u) return false;
+              if (u.id === profile.id) return true;
+              if (profile.email && u.email && u.email.toLowerCase() === profile.email.toLowerCase()) return true;
+              if (profile.studentId && (u.studentId === profile.studentId || u.uid === profile.studentId || u.id === profile.studentId)) return true;
+              if (profile.facultyId && (u.facultyId === profile.facultyId || u.uid === profile.facultyId || u.id === profile.facultyId)) return true;
+              if (u.role === profile.role && u.name && profile.name && u.name.trim().toLowerCase() === profile.name.trim().toLowerCase()) return true;
+              return false;
+            };
+            const nonMatching = currentReg.filter(u => !isMatch(u));
+            const updatedReg = [regUserDoc, ...nonMatching];
             localStorage.setItem('classpulse_registered_users', JSON.stringify(updatedReg));
             localStorage.setItem('classpulse_registered_admins', JSON.stringify(updatedReg.filter(u => u.role === 'admin')));
             if (typeof window !== 'undefined') {
@@ -881,15 +887,50 @@ export function listenToRegisteredUsers(
           try {
             localUsers = JSON.parse(localStorage.getItem('classpulse_registered_users') || '[]');
           } catch {}
-          const userMap = new Map<string, any>();
-          localUsers.filter(u => !isUserDeleted(u)).forEach(u => u.id && userMap.set(u.id, u));
-          users.filter(u => !isUserDeleted(u)).forEach(u => u.id && userMap.set(u.id, u));
-          const merged = Array.from(userMap.values());
 
-          localStorage.setItem('classpulse_registered_users', JSON.stringify(merged));
-          localStorage.setItem('classpulse_registered_admins', JSON.stringify(merged.filter(u => u.role === 'admin')));
+          const dedupedUsers: any[] = [];
+          const seenKeys = new Set<string>();
+          const allCandidates = [
+            ...users.filter(u => !isUserDeleted(u)),
+            ...localUsers.filter(u => !isUserDeleted(u))
+          ];
+
+          allCandidates.forEach(u => {
+            if (!u || !u.id) return;
+            const emailKey = u.email ? `email:${String(u.email).toLowerCase().trim()}` : '';
+            const studentKey = u.studentId 
+              ? `student:${String(u.studentId).trim()}` 
+              : (u.uid && u.role === 'student' ? `student:${String(u.uid).trim()}` : '');
+            const idKey = `id:${String(u.id).trim()}`;
+
+            const isDuplicate = 
+              seenKeys.has(idKey) || 
+              (emailKey && seenKeys.has(emailKey)) || 
+              (studentKey && seenKeys.has(studentKey));
+
+            if (isDuplicate) {
+              const existing = dedupedUsers.find(d => 
+                d.id === u.id || 
+                (emailKey && d.email && `email:${String(d.email).toLowerCase().trim()}` === emailKey) ||
+                (studentKey && (d.studentId === u.studentId || d.uid === u.studentId || d.studentId === u.uid))
+              );
+              if (existing) {
+                // Merge latest attributes
+                Object.assign(existing, u);
+              }
+              return;
+            }
+
+            seenKeys.add(idKey);
+            if (emailKey) seenKeys.add(emailKey);
+            if (studentKey) seenKeys.add(studentKey);
+            dedupedUsers.push({ ...u });
+          });
+
+          localStorage.setItem('classpulse_registered_users', JSON.stringify(dedupedUsers));
+          localStorage.setItem('classpulse_registered_admins', JSON.stringify(dedupedUsers.filter(u => u.role === 'admin')));
           window.dispatchEvent(new Event('registered-users-changed'));
-          if (onSync) onSync(merged);
+          if (onSync) onSync(dedupedUsers);
         }
       },
       (error) => {
