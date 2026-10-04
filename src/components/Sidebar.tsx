@@ -14,7 +14,6 @@ import {
   Scan,
   MessageSquare,
   Bell,
-  Clock,
   UserCircle,
   Users,
   Inbox,
@@ -159,7 +158,6 @@ export default function Sidebar({
               { id: 'consultations', label: 'Consultations', icon: CalendarClock, badge: pendingConsultationCount },
               { id: 'excuse-letters', label: 'Excuse Letters', icon: FileText, badge: pendingExcuseCount },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages },
-              { id: 'alarms', label: 'Smart Alarms', icon: Clock },
               { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifications },
             ]
           },
@@ -184,7 +182,6 @@ export default function Sidebar({
               { id: 'students-monitoring', label: 'Students Directory', icon: Users },
               { id: 'excuse-inbox', label: 'Excuse Inbox', icon: Inbox, badge: pendingExcuseCount },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages },
-              { id: 'alarms', label: 'Smart Alarms', icon: Clock },
               { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifications },
             ]
           },
@@ -210,7 +207,6 @@ export default function Sidebar({
               { id: 'reports', label: 'Reports Export', icon: Download },
               { id: 'tickets', label: 'Help Tickets', icon: HelpCircle, badge: pendingTicketsCount },
               { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages },
-              { id: 'alarms', label: 'Smart Alarms', icon: Clock },
               { id: 'notifications', label: 'Notifications', icon: Bell, badge: unreadNotifications },
             ]
           },
@@ -255,12 +251,6 @@ export default function Sidebar({
   const roleNav = getRoleNavColors();
 
   const handleNavClick = (screenId: string, label: string) => {
-    if (screenId === 'alarms') {
-      window.dispatchEvent(new CustomEvent('open-alarm-modal'));
-      setIsOpen(false);
-      speakText("Opening Smart Alarms and Notifications Center", accessibility.readAloud);
-      return;
-    }
     setScreen(screenId);
     setIsOpen(false);
     speakText(`Navigation: switched to ${label}`, accessibility.readAloud);

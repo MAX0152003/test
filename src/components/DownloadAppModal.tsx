@@ -23,6 +23,7 @@ import {
   FileCode2,
   Monitor
 } from 'lucide-react';
+import { autoPermissions } from '../lib/autoPermissions';
 
 interface DownloadAppModalProps {
   isOpen: boolean;
@@ -64,6 +65,7 @@ export default function DownloadAppModal({
       try {
         localStorage.setItem('cp_is_installed', 'true');
       } catch (e) {}
+      autoPermissions.requestAllPermissions(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -172,6 +174,7 @@ export default function DownloadAppModal({
         if (outcome === 'accepted') {
           setIsInstalled(true);
           setInstallStatusMessage('ClassPulse is now installed on your device!');
+          autoPermissions.requestAllPermissions(true);
         }
         setDeferredPrompt(null);
       } catch (err) {

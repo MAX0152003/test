@@ -30,9 +30,6 @@ import { UserProfile, AccessibilityConfig, ClassSession, ViewDensity } from '../
 import { speakText } from './AccessibilitySettings';
 import { saveUserCredentialToFirestore, saveUserProfileToFirestore } from '../lib/firestoreSync';
 import { formatMsuId, isValidMsuId } from '../lib/msuUtils';
-import { triggerTestDeviceAlarm, requestSystemNotificationPermission } from '../lib/classAlarmScheduler';
-import { nativeAlarmBridge } from '../lib/nativeAlarmBridge';
-import NativeAlarmManagerModal from './NativeAlarmManagerModal';
 import { Enrollment } from '../types';
 import { ImageCropModal } from './ImageCropModal';
 
@@ -66,7 +63,6 @@ export default function Settings({
 }: SettingsProps) {
   // 1. Current category selection
   const [activeCategory, setActiveCategory] = React.useState<'account' | 'appearance' | 'notifications' | 'security'>('account');
-  const [isAlarmModalOpen, setIsAlarmModalOpen] = React.useState(false);
 
   // 2. Account Profile Form states (requires manual save)
   const [name, setName] = React.useState(userProfile.name);
@@ -1159,90 +1155,12 @@ export default function Settings({
                     <span className="w-4 h-4 rounded-full bg-white dark:bg-zinc-950 block shadow-sm" />
                   </button>
                 </div>
-
-                {/* 5. Native Phone Mobile Alarm & Scheduled Background Alerts Subsystem */}
-                <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-left space-y-3 mt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Smartphone className="w-5 h-5 text-emerald-500" />
-                      <span className="text-[11px] font-black uppercase text-zinc-900 dark:text-zinc-100 tracking-wider">
-                        Native Smartphone Alarm & Notification Engine
-                      </span>
-                    </div>
-                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                      ANDROID / iOS
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    Integrate your enrolled class schedule directly with your phone's native alarm subsystem, device lock screen wake-up, ringtone sound chime, and vibration patterns even when the browser or app is closed.
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsAlarmModalOpen(true)}
-                      className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl cursor-pointer active:scale-95 transition-all shadow-md flex items-center gap-1.5"
-                    >
-                      <Smartphone className="w-4 h-4" />
-                      Manage Scheduled Phone Alarms & Triggers
-                    </button>
-                  </div>
-                </div>
-
-                {/* 6. Device Native Notification Permissions & Testing Suite */}
-                <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-left space-y-3 mt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 tracking-wider">
-                      🔔 Phone & Desktop Native Alarm Diagnostic
-                    </span>
-                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                      STATUS: {typeof window !== 'undefined' && 'Notification' in window ? Notification.permission.toUpperCase() : 'SUPPORTED'}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    Test your device's built-in pop-up screen notification and sound alert. This verifies that you will receive class status notifications on your home screen or lock screen even when you are not currently in the app.
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const res迷 = await nativeAlarmBridge.requestPermissions();
-                        if (res迷.notifications === 'granted') {
-                          if (typeof window !== 'undefined' && (window as any).showToast) {
-                            (window as any).showToast("Screen notifications enabled!", "success");
-                          }
-                        }
-                      }}
-                      className="px-3.5 py-2 bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-xl cursor-pointer active:scale-95 transition-all"
-                    >
-                      Request / Renew Screen Permissions
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerTestDeviceAlarm(userProfile.role || 'faculty');
-                      }}
-                      className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black rounded-xl cursor-pointer active:scale-95 transition-all shadow-xs"
-                    >
-                      Test Pop-up Alarm on Screen Now
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           )}
 
         </div>
       </div>
-
-      {/* Native Smartphone Alarm & Background Alert Manager Modal */}
-      <NativeAlarmManagerModal
-        isOpen={isAlarmModalOpen}
-        onClose={() => setIsAlarmModalOpen(false)}
-        classes={classes}
-        enrollments={enrollments}
-        userProfile={userProfile}
-        readAloudEnabled={accessibility.readAloud}
-      />
 
       {/* Image Cropping & Re-alignment Modal */}
       <ImageCropModal

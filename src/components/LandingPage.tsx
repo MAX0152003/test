@@ -128,7 +128,7 @@ export default function LandingPage({ onEnterPortal, accessibility, onToggleThem
       <div className="block lg:hidden w-full pb-12 text-left">
         
         {/* Mobile App Header */}
-        <header id="mobile-landing-header" className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/95 dark:bg-zinc-950/95 border-b border-zinc-200/80 dark:border-zinc-800/80 px-4 py-3 flex items-center justify-between shadow-2xs">
+        <header id="mobile-landing-header" className="sticky top-0 z-40 w-full bg-white dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800/80 px-4 pt-[max(0.75rem,env(safe-area-inset-top,0rem))] pb-3 flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-500 text-black flex items-center justify-center font-black shadow-md shadow-emerald-500/20 shrink-0">
               <Activity className="w-4.5 h-4.5 stroke-[2.5]" />

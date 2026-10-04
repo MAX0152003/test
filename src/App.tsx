@@ -85,6 +85,7 @@ import { offlineAttendanceBuffer } from './lib/offlineAttendanceBuffer';
 import { nativeAlarmBridge } from './lib/nativeAlarmBridge';
 import { AlarmCenterModal } from './components/AlarmCenterModal';
 import { ActiveAlarmBanner } from './components/ActiveAlarmBanner';
+import { autoPermissions } from './lib/autoPermissions';
 import { 
   Wifi, 
   WifiOff, 
@@ -103,7 +104,6 @@ import {
   Scan,
   MessageSquare,
   CheckCircle,
-  Clock,
   Sparkles,
   GraduationCap,
   Building2,
@@ -243,14 +243,30 @@ export default function App() {
   const [authInitialMode, setAuthInitialMode] = React.useState<'login' | 'register'>('login');
 
   React.useEffect(() => {
-    // Listen for appinstalled event to flag installation
+    // If running in installed standalone APK/PWA mode, automatically configure all system permissions
+    if (isInstalledApp) {
+      autoPermissions.requestAllPermissions();
+    }
+
+    // Listen for appinstalled event to flag installation and trigger automatic permissions prompt
     const handleAppInstalled = () => {
       safeStorage.setItem('cp_is_installed', 'true');
       setUnauthView('auth');
+      autoPermissions.requestAllPermissions(true);
     };
+
+    // When installing (e.g. beforeinstallprompt triggered)
+    const handleBeforeInstall = () => {
+      autoPermissions.requestAllPermissions();
+    };
+
     window.addEventListener('appinstalled', handleAppInstalled);
-    return () => window.removeEventListener('appinstalled', handleAppInstalled);
-  }, []);
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => {
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, [isInstalledApp]);
 
   const [activeScreen, setActiveScreen] = React.useState<string>(() => {
     return safeStorage.getItem('cp_screen') || 'dashboard';
@@ -2632,8 +2648,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Top Operational bar - Deeply Adaptive with Safe-Area Inset Support for notch/status-bar */}
-            <header className={`flex px-2 sm:px-6 pt-[max(0.625rem,env(safe-area-inset-top,0.625rem))] pb-2 sm:pb-2.5 items-center justify-between gap-1.5 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-850 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl text-zinc-900 dark:text-zinc-100 relative ${
+            {/* Top Operational bar - Clean solid background, no blur bleeding over the top */}
+            <header className={`flex px-2 sm:px-6 ${isOffline ? 'pt-2' : 'pt-[max(0.5rem,env(safe-area-inset-top,0rem))]'} pb-2 sm:pb-2.5 items-center justify-between gap-1.5 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative ${
               isSearchOpen ? 'z-[100]' : 'z-30'
             }`}>
               
@@ -2669,24 +2685,10 @@ export default function App() {
                 setIsSearchOpen={setIsSearchOpen}
               />
 
-              {/* Right controllers: Alarm Button, Messages Shortcut, Notification Bell & Profile Circle Avatar */}
+              {/* Right controllers: Messages Shortcut, Notification Bell & Profile Circle Avatar */}
               <div className={`items-center gap-1 sm:gap-2 shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
-                {/* Smartphone Alarms & Notification Engine Shortcut Button */}
-                <button
-                  onClick={() => {
-                    setIsAlarmModalOpen(true);
-                    speakText("Opening Smartphone Alarms and Notifications Center", accessibility.readAloud);
-                  }}
-                  type="button"
-                  className="p-1.5 sm:p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 shrink-0"
-                  title="Smartphone Alarms & Class Reminders"
-                >
-                  <Clock className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-500" />
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-1 ring-white dark:ring-zinc-950" />
-                </button>
-
                 {/* Messages Shortcut Button with Live Unread Badge */}
                 <button
                   onClick={() => {
