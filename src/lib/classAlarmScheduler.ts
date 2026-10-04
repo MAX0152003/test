@@ -97,7 +97,7 @@ export async function triggerClassAlarmNotification(payload: ClassAlarmPayload):
       ]);
 
       if (reg && 'showNotification' in reg) {
-        await reg.showNotification(title, {
+        await (reg as any).showNotification(title, {
           body: message,
           icon: '/icon.svg',
           badge: '/icon.svg',

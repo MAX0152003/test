@@ -284,18 +284,22 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   return (
     <div 
       ref={searchContainerRef} 
-      className={`transition-all duration-300 mx-1.5 sm:mx-2 relative z-[100] ${
+      className={`transition-all duration-300 mx-1 sm:mx-2 relative z-[100] ${
         isSearchOpen 
           ? 'w-full max-w-full sm:max-w-md md:max-w-lg' 
-          : 'flex-1 max-w-xs sm:max-w-sm md:max-w-md'
+          : 'flex-1 max-w-[130px] xs:max-w-[180px] sm:max-w-sm md:max-w-md'
       }`}
     >
-      <div className="relative flex items-center z-[100] gap-2">
+      <div className="relative flex items-center z-[100] gap-1.5 sm:gap-2">
         <div className="relative flex-1 flex items-center">
           <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none shrink-0" />
           <input
             type="text"
-            placeholder={searchDeptOnly ? `Search in ${user?.department || 'My Department'}...` : "Search courses, faculty, rooms, views... (⌘K)"}
+            placeholder={
+              searchDeptOnly 
+                ? (typeof window !== 'undefined' && window.innerWidth < 640 ? 'My Dept...' : `Search in ${user?.department || 'My Dept'}...`) 
+                : (typeof window !== 'undefined' && window.innerWidth < 640 ? 'Search...' : 'Search courses, faculty, views... (⌘K)')
+            }
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -311,13 +315,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                 handleAddRecentSearch(searchQuery.trim());
               }
             }}
-            className="w-full pl-8 pr-12 sm:pr-14 py-1.5 sm:py-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400"
+            className="w-full pl-7 sm:pl-8 pr-7 sm:pr-12 h-8 sm:h-8.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-xs focus:ring-1 focus:ring-emerald-500 focus:bg-white dark:focus:bg-zinc-950 transition-all outline-none placeholder:text-zinc-400 truncate"
           />
           {searchQuery ? (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+              className="absolute right-1.5 sm:right-2 p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-xs cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
               title="Clear search input"
             >
               <X className="w-3.5 h-3.5" />
@@ -335,7 +339,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               setIsSearchOpen(false);
               setIsMobileBarVisible(true);
             }}
-            className="sm:hidden px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 shrink-0 cursor-pointer rounded-lg hover:bg-emerald-500/10 transition-colors"
+            className="sm:hidden px-2 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 shrink-0 cursor-pointer rounded-lg hover:bg-emerald-500/10 transition-colors"
           >
             Cancel
           </button>

@@ -1179,9 +1179,9 @@ export default function DashboardStudent({
               </div>
             </div>
             
-            {/* Background Graphic */}
-            <div className="absolute right-0 bottom-0 opacity-10 transform translate-y-4 translate-x-4">
-              <Scan className="w-36 h-36 text-white" />
+            {/* Background Graphic - hidden on mobile to prevent overlapping */}
+            <div className="hidden sm:block absolute right-0 bottom-0 opacity-10 transform translate-y-4 translate-x-4 pointer-events-none">
+              <Scan className="w-32 h-32 text-white" />
             </div>
           </div>
 
@@ -1240,37 +1240,19 @@ export default function DashboardStudent({
             )
           )}
 
-          {/* Student Quick Action & Excuse Letter Desk */}
-          <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-3 sm:space-y-4 text-left">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-900">
+          {/* Student Quick Action Desk */}
+          <div className="p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 shadow-sm space-y-3 sm:space-y-4 text-left">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2.5 border-b border-zinc-100 dark:border-zinc-900">
               <div>
-                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-emerald-500" />
-                  Student Quick Actions & Excuse Portal
+                <h3 className="font-extrabold text-sm sm:text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                  Student Quick Actions & Class Portal
                 </h3>
-                <p className="text-xs text-zinc-400">File official excuse certs/letters, fast-access the QR scanner, or message professors directly.</p>
+                <p className="text-[11px] sm:text-xs text-zinc-400">File excuse letters, scan QR codes, access smart phone alarms, or message instructors.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
-              <button
-                type="button"
-                id="quick-excuse-letters-btn"
-                onClick={() => {
-                  setScreen('excuse-letters');
-                  speakText("Opening Excuse Letters management inbox.", accessibility.readAloud);
-                }}
-                className="p-3.5 sm:p-4 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
-              >
-                <div className="p-1.5 rounded-lg bg-emerald-500 text-black w-fit">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Excuse Letters</h4>
-                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">Submit, edit & track excuse status</p>
-                </div>
-              </button>
-
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               <button
                 type="button"
                 id="quick-scan-attendance-qr-btn"
@@ -1278,14 +1260,50 @@ export default function DashboardStudent({
                   setScreen('attendance');
                   speakText("Opening QR attendance scanner.", accessibility.readAloud);
                 }}
-                className="p-3.5 sm:p-4 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
+                className="p-3 sm:p-3.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/15 border border-indigo-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5rem]"
               >
                 <div className="p-1.5 rounded-lg bg-indigo-500 text-white w-fit">
-                  <Scan className="w-4 h-4" />
+                  <Scan className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Scan Attendance QR</h4>
-                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">Check into class live</p>
+                <div className="mt-2">
+                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider truncate">Scan QR Code</h4>
+                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5 truncate">Check into class live</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                id="quick-smart-alarms-btn"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open-alarm-modal'));
+                  speakText("Opening Smartphone Alarms and Notifications Center.", accessibility.readAloud);
+                }}
+                className="p-3 sm:p-3.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5rem]"
+              >
+                <div className="p-1.5 rounded-lg bg-amber-500 text-black w-fit">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </div>
+                <div className="mt-2">
+                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider truncate">Smart Alarms</h4>
+                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5 truncate">Class popups & timers</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                id="quick-excuse-letters-btn"
+                onClick={() => {
+                  setScreen('excuse-letters');
+                  speakText("Opening Excuse Letters management inbox.", accessibility.readAloud);
+                }}
+                className="p-3 sm:p-3.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5rem]"
+              >
+                <div className="p-1.5 rounded-lg bg-emerald-500 text-black w-fit">
+                  <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </div>
+                <div className="mt-2">
+                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider truncate">Excuse Letters</h4>
+                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5 truncate">Submit & track status</p>
                 </div>
               </button>
 
@@ -1296,14 +1314,14 @@ export default function DashboardStudent({
                   setScreen('messages');
                   speakText("Opening professor direct message interface.", accessibility.readAloud);
                 }}
-                className="p-3.5 sm:p-4 rounded-xl bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5.5rem]"
+                className="p-3 sm:p-3.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/15 border border-orange-500/20 text-left transition-all hover:scale-[1.01] cursor-pointer flex flex-col justify-between min-h-[5rem]"
               >
                 <div className="p-1.5 rounded-lg bg-orange-500 text-white w-fit">
-                  <MessageSquare className="w-4 h-4" />
+                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">Message Professor</h4>
-                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5">Reach out to lecturers live</p>
+                <div className="mt-2">
+                  <h4 className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider truncate">Message Faculty</h4>
+                  <p className="text-[10px] text-zinc-400 leading-tight mt-0.5 truncate">Reach out to lecturers</p>
                 </div>
               </button>
             </div>

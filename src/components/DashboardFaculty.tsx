@@ -1421,6 +1421,20 @@ export default function DashboardFaculty({
                 Updating your status alerts students in your active rosters through schedule broadcasts.
               </p>
 
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('open-alarm-modal'));
+                    speakText("Opening Smartphone Alarms and Notifications Center.", accessibility.readAloud);
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Smart Class Alarms & Timers</span>
+                </button>
+              </div>
+
               {/* Message Admin Inline Help Panel */}
               <div className="pt-3.5 border-t border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs mt-1 shrink-0">
                 <span className="text-zinc-500 font-medium">Administrative Help?</span>
@@ -1441,7 +1455,7 @@ export default function DashboardFaculty({
             <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
               
               <div className="p-5 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 flex flex-col justify-between shadow-[0_2px_12px_rgba(0,0,0,0.01)] relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/[0.02] rounded-full blur-2xl group-hover:scale-110 transition-transform" />
+                <div className="pointer-events-none absolute top-0 right-0 p-8 w-32 h-32 bg-emerald-500/5 dark:bg-emerald-500/[0.02] rounded-full blur-2xl group-hover:scale-110 transition-transform" />
                 <div className="space-y-1 text-left relative z-10">
                   <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400">Class Statistics</span>
                   <h4 className="text-3xl font-black font-mono text-zinc-900 dark:text-zinc-100 mt-2">{totalClasses} Sections</h4>
@@ -1454,7 +1468,7 @@ export default function DashboardFaculty({
               </div>
 
               <div className="p-5 rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-850/80 flex flex-col justify-between shadow-[0_2px_12px_rgba(0,0,0,0.01)] relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 w-32 h-32 bg-indigo-500/5 dark:bg-indigo-500/[0.02] rounded-full blur-2xl group-hover:scale-110 transition-transform" />
+                <div className="pointer-events-none absolute top-0 right-0 p-8 w-32 h-32 bg-indigo-500/5 dark:bg-indigo-500/[0.02] rounded-full blur-2xl group-hover:scale-110 transition-transform" />
                 <div className="space-y-1 text-left relative z-10">
                   <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400">Total Rosters Count</span>
                   <h4 className="text-3xl font-black font-mono text-zinc-900 dark:text-zinc-100 mt-2">{currentStudentsCount} Students</h4>

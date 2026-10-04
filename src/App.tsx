@@ -83,6 +83,8 @@ import SettingsPage from './components/Settings';
 import { idbStorage } from './lib/idbStorage';
 import { offlineAttendanceBuffer } from './lib/offlineAttendanceBuffer';
 import { nativeAlarmBridge } from './lib/nativeAlarmBridge';
+import { AlarmCenterModal } from './components/AlarmCenterModal';
+import { ActiveAlarmBanner } from './components/ActiveAlarmBanner';
 import { 
   Wifi, 
   WifiOff, 
@@ -317,6 +319,33 @@ export default function App() {
 
   // Real-time unread messages count tracker
   const [unreadMessagesCount, setUnreadMessagesCount] = React.useState<number>(0);
+
+  // Smartphone Alarm Center & In-App Pop-up notification state
+  const [isAlarmModalOpen, setIsAlarmModalOpen] = React.useState<boolean>(false);
+  const [activeAlarmPopup, setActiveAlarmPopup] = React.useState<ClassAlarmPayload | null>(null);
+
+  React.useEffect(() => {
+    const handleAlarmPopup = (e: any) => {
+      if (e.detail) {
+        setActiveAlarmPopup(e.detail);
+      }
+    };
+    const handleOpenAlarmModal = () => setIsAlarmModalOpen(true);
+
+    window.addEventListener('classpulse-alarm-popup', handleAlarmPopup);
+    window.addEventListener('open-alarm-modal', handleOpenAlarmModal);
+    return () => {
+      window.removeEventListener('classpulse-alarm-popup', handleAlarmPopup);
+      window.removeEventListener('open-alarm-modal', handleOpenAlarmModal);
+    };
+  }, []);
+
+  const handleSnoozeAlarm = (minutes = 5) => {
+    setActiveAlarmPopup(null);
+    if (typeof window !== 'undefined' && (window as any).showToast) {
+      (window as any).showToast(`Alarm snoozed for ${minutes} minutes.`, 'info');
+    }
+  };
 
   const mainScrollRef = React.useRef<HTMLDivElement>(null);
   const prevLabRoomsRef = React.useRef<Record<string, 'occupied' | 'available' | 'maintenance'>>({});
@@ -2580,7 +2609,7 @@ export default function App() {
             
             {/* Top Offline Mode / Sync Persistent Banner */}
             {isOffline && (
-              <div className="bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-500/20 px-3 sm:px-6 py-1.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 shrink-0 font-medium z-20">
+              <div className="bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-500/20 px-3 sm:px-6 pt-[max(0.5rem,env(safe-area-inset-top,0.5rem))] pb-1.5 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200 shrink-0 font-medium z-20">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
                   <span className="font-extrabold text-[11px] uppercase tracking-wider text-amber-700 dark:text-amber-400 shrink-0">Offline Mode Active</span>
@@ -2603,25 +2632,25 @@ export default function App() {
               </div>
             )}
 
-            {/* Top Operational bar - Applies to all screen sizes including mobile */}
-            <header className={`flex px-2.5 sm:px-6 py-2 sm:py-2.5 items-center justify-between gap-2 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-850 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl text-zinc-900 dark:text-zinc-100 relative ${
+            {/* Top Operational bar - Deeply Adaptive with Safe-Area Inset Support for notch/status-bar */}
+            <header className={`flex px-2 sm:px-6 pt-[max(0.625rem,env(safe-area-inset-top,0.625rem))] pb-2 sm:pb-2.5 items-center justify-between gap-1.5 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-850 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl text-zinc-900 dark:text-zinc-100 relative ${
               isSearchOpen ? 'z-[100]' : 'z-30'
             }`}>
               
               {/* Left Header Logo & Role display */}
-              <div className={`items-center gap-2 sm:gap-3 text-left shrink-0 transition-all duration-300 ${
+              <div className={`items-center gap-1.5 sm:gap-2.5 text-left shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10 shrink-0">
                   <Activity className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                 </div>
-                <span className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 hidden sm:inline">ClassPulse</span>
-                <span className={`text-xs font-bold tracking-wide px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border shadow-2xs ${
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 hidden md:inline">ClassPulse</span>
+                <span className={`text-[10px] sm:text-xs font-bold tracking-wide px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full border shadow-2xs shrink-0 capitalize ${
                   user.role === 'student' ? 'bg-[#03213D] text-white border-[#03213D]/20' :
                   user.role === 'faculty' ? 'bg-emerald-600 text-white border-emerald-500/20' :
                   'bg-[#CC762A] text-white border-[#CC762A]/20'
                 }`}>
-                  {user.role === 'student' ? 'Student' : user.role === 'faculty' ? 'Faculty' : 'Admin'}
+                  {user.role}
                 </span>
               </div>
 
@@ -2640,10 +2669,24 @@ export default function App() {
                 setIsSearchOpen={setIsSearchOpen}
               />
 
-              {/* Right controllers: Messages Shortcut, Notification Bell & Profile Circle Avatar */}
-              <div className={`items-center gap-2 sm:gap-2.5 shrink-0 transition-all duration-300 ${
+              {/* Right controllers: Alarm Button, Messages Shortcut, Notification Bell & Profile Circle Avatar */}
+              <div className={`items-center gap-1 sm:gap-2 shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
+                {/* Smartphone Alarms & Notification Engine Shortcut Button */}
+                <button
+                  onClick={() => {
+                    setIsAlarmModalOpen(true);
+                    speakText("Opening Smartphone Alarms and Notifications Center", accessibility.readAloud);
+                  }}
+                  type="button"
+                  className="p-1.5 sm:p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 text-zinc-600 dark:text-zinc-400 shrink-0"
+                  title="Smartphone Alarms & Class Reminders"
+                >
+                  <Clock className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-500" />
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-pulse ring-1 ring-white dark:ring-zinc-950" />
+                </button>
+
                 {/* Messages Shortcut Button with Live Unread Badge */}
                 <button
                   onClick={() => {
@@ -2651,16 +2694,16 @@ export default function App() {
                     speakText("Navigating to messages", accessibility.readAloud);
                   }}
                   type="button"
-                  className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 ${
+                  className={`p-1.5 sm:p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 shrink-0 ${
                     activeScreen === 'messages'
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-bold shadow-2xs'
                       : 'text-zinc-600 dark:text-zinc-400'
                   }`}
                   title="Messages"
                 >
-                  <MessageSquare className="w-4.5 h-4.5" />
+                  <MessageSquare className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                   {unreadMessagesCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-emerald-500 text-black rounded-full flex items-center justify-center text-[10px] font-black leading-none font-mono ring-1 ring-white dark:ring-zinc-950 shadow-xs animate-pulse">
+                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 bg-emerald-500 text-black rounded-full flex items-center justify-center text-[9px] font-black leading-none font-mono ring-1 ring-white dark:ring-zinc-950 shadow-xs animate-pulse">
                       {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
                     </span>
                   )}
@@ -2672,16 +2715,16 @@ export default function App() {
                     speakText("Navigating to notification center", accessibility.readAloud);
                   }}
                   type="button"
-                  className={`p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 ${
+                  className={`p-1.5 sm:p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 shrink-0 ${
                     activeScreen === 'notifications'
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-bold shadow-2xs'
                       : 'text-zinc-600 dark:text-zinc-400'
                   }`}
                   title="Notifications"
                 >
-                  <Bell className="w-4.5 h-4.5" />
+                  <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
                   {filteredNotificationsForMe.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold leading-none font-mono">
+                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-bold leading-none font-mono">
                       {filteredNotificationsForMe.filter(n => !n.read).length}
                     </span>
                   )}
@@ -2704,11 +2747,11 @@ export default function App() {
                   <img
                     src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"}
                     alt={user.name}
-                    className="w-8 h-8 rounded-full object-cover"
+                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
                     referrerPolicy="no-referrer"
                   />
                   <span 
-                    className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-950 ${
+                    className={`absolute bottom-0 right-0 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full border-2 border-white dark:border-zinc-950 ${
                       isOffline 
                         ? 'bg-amber-500 shadow-xs shadow-amber-500/50' 
                         : 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse'
@@ -3019,6 +3062,24 @@ export default function App() {
       <DownloadAppModal
         isOpen={isDownloadAppModalOpen}
         onClose={() => setIsDownloadAppModalOpen(false)}
+      />
+
+      {/* Smartphone Alarm Center Modal */}
+      <AlarmCenterModal
+        isOpen={isAlarmModalOpen}
+        onClose={() => setIsAlarmModalOpen(false)}
+        user={user}
+        classes={classes}
+        enrollments={enrollments}
+        readAloud={accessibility.readAloud}
+      />
+
+      {/* Floating In-App Active Alarm Banner Popup */}
+      <ActiveAlarmBanner
+        activeAlarm={activeAlarmPopup}
+        onDismiss={() => setActiveAlarmPopup(null)}
+        onNavigate={(screen) => handleSetScreen(screen)}
+        onSnooze={handleSnoozeAlarm}
       />
 
     </div>
