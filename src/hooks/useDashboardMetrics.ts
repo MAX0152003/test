@@ -159,12 +159,15 @@ export function useDashboardMetrics({
     // Weighted attendance calculation (late counts as 0.7 presence, excused not penalized as absent)
     const rate = total > 0 
       ? Math.round(((presents + (lates * 0.7) + (excused * 0.9)) / total) * 100)
-      : 100;
+      : 0;
 
     let standing: 'GOOD STANDING' | 'NEEDS ATTENTION' | 'CRITICAL ATTENTION' = 'GOOD STANDING';
     let badgeColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
 
-    if (rate < 75 || absents >= 3) {
+    if (total === 0) {
+      standing = 'GOOD STANDING';
+      badgeColor = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700';
+    } else if (rate < 75 || absents >= 3) {
       standing = 'CRITICAL ATTENTION';
       badgeColor = 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20';
     } else if (rate < 85 || absents > 0 || lates >= 2) {

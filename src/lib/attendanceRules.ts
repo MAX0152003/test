@@ -94,7 +94,7 @@ export function calculateStudentStanding(studentRecords: AttendanceRecord[]): At
   const positiveAttendance = presentCount + lateCount + excusedCount;
   const attendanceRate = totalRecords > 0 
     ? Math.round((positiveAttendance / totalRecords) * 100) 
-    : 100;
+    : 0;
 
   // Evaluate drop conditions
   const dropReasons: string[] = [];
@@ -239,7 +239,7 @@ export function calculateEarlyWarningRisk(studentRecords: AttendanceRecord[]): E
   const projectedAttendanceIfAttendingNext = (nextClassesCount: number) => {
     const positive = standing.presentCount + standing.lateCount + standing.excusedCount + nextClassesCount;
     const total = standing.totalRecords + nextClassesCount;
-    return total > 0 ? Math.round((positive / total) * 100) : 100;
+    return total > 0 ? Math.round((positive / total) * 100) : 0;
   };
 
   const percentageUsed = Math.min(100, Math.round((standing.absentCount / allowableTotal) * 100));
@@ -303,7 +303,7 @@ export function calculateAttendanceGrade(
 
   const attendancePercentage = divisorSessions > 0 
     ? Math.min(100, Math.round((effectivePresent / divisorSessions) * 100))
-    : 100;
+    : 0;
 
   const weightedScore = (attendancePercentage * (config.attendanceWeight / 100));
 

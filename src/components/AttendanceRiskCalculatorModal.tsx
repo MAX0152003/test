@@ -64,7 +64,7 @@ export const AttendanceRiskCalculatorModal: React.FC<AttendanceRiskCalculatorMod
   const simTotalSessions = currentStanding.totalRecords + simulatedFutureSessions;
   const simPositive = (currentStanding.presentCount + currentStanding.lateCount + currentStanding.excusedCount) + 
                       Math.max(0, simulatedFutureSessions - simulatedFutureAbsences);
-  const simProjectedRate = simTotalSessions > 0 ? Math.round((simPositive / simTotalSessions) * 100) : 100;
+  const simProjectedRate = simTotalSessions > 0 ? Math.round((simPositive / simTotalSessions) * 100) : 0;
   const simRemainingAllowable = Math.max(0, 5 - simTotalAbsences);
   const simIsDropped = simTotalAbsences >= 5 || (currentStanding.maxConsecutiveAbsents + simulatedFutureAbsences) >= 3;
 

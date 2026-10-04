@@ -60,7 +60,7 @@ export const AccreditationReportModal: React.FC<AccreditationReportModalProps> =
 
   const overallAttendanceRate = totalAttendanceLogs > 0
     ? Math.round(((presentCount + lateCount + excusedCount) / totalAttendanceLogs) * 100)
-    : 100;
+    : 0;
 
   // Student Absence Metrics
   const studentAbsenceMap = new Map<string, number>();
@@ -104,7 +104,7 @@ export const AccreditationReportModal: React.FC<AccreditationReportModalProps> =
       const abs = classRecs.filter(r => r.status === 'absent').length;
       const enrolled = safeEnrollments.filter(e => e.classId === c.id && !e.deletedByStudent).length || (c as any).enrolledStudents?.length || 0;
       const daysStr = Array.isArray(c.days) ? c.days.join('/') : (c.days || 'MWF');
-      const rate = classRecs.length > 0 ? Math.round((pres / classRecs.length) * 100) : 100;
+      const rate = classRecs.length > 0 ? Math.round((pres / classRecs.length) * 100) : 0;
 
       return [
         `"${c.code || ''}"`,

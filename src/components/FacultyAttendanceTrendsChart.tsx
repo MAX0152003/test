@@ -94,11 +94,11 @@ export default function FacultyAttendanceTrendsChart({
 
       const dailyRate = totalCount > 0 
         ? Math.round(((presentCount + excusedCount + lateCount * 0.7) / totalCount) * 100) 
-        : 100;
+        : 0;
       
       const punctualityRate = (presentCount + lateCount) > 0
         ? Math.round((presentCount / (presentCount + lateCount)) * 100)
-        : 100;
+        : 0;
 
       days.push({
         day: dayNames[i],

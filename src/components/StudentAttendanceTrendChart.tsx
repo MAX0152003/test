@@ -167,15 +167,15 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
 
       const dailyRate = sessionCount > 0 
         ? Math.round(((present + excused + late * 0.7) / sessionCount) * 100)
-        : 100;
+        : 0;
 
       const cumulativeRate = cumulativeTotal > 0
         ? Math.round(((cumulativePresent + cumulativeExcused + cumulativeLate * 0.7) / cumulativeTotal) * 100)
-        : 100;
+        : 0;
 
       const punctualityRate = (present + late) > 0
         ? Math.round((present / (present + late)) * 100)
-        : 100;
+        : 0;
 
       const dObj = new Date(dateStr + 'T00:00:00');
       const displayDate = dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -210,8 +210,8 @@ export const StudentAttendanceTrendChart: React.FC<StudentAttendanceTrendChartPr
     const excused = studentRecords.filter(r => r.status === 'excused').length;
     const absents = studentRecords.filter(r => r.status === 'absent').length;
 
-    const rate = total > 0 ? Math.round(((presents + excused + lates * 0.7) / total) * 100) : 100;
-    const punctuality = (presents + lates) > 0 ? Math.round((presents / (presents + lates)) * 100) : 100;
+    const rate = total > 0 ? Math.round(((presents + excused + lates * 0.7) / total) * 100) : 0;
+    const punctuality = (presents + lates) > 0 ? Math.round((presents / (presents + lates)) * 100) : 0;
 
     // Trajectory calculation (compare last half vs first half of trend points)
     let trajectory: 'up' | 'down' | 'steady' = 'steady';

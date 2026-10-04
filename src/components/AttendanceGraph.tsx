@@ -21,6 +21,7 @@ interface AttendanceGraphProps {
   className: string;
   records?: AttendanceRecord[];
   isDark?: boolean;
+  enrolledCount?: number;
 }
 
 export default function AttendanceGraph({ 
@@ -28,7 +29,8 @@ export default function AttendanceGraph({
   classCode, 
   className, 
   records = [], 
-  isDark: propIsDark 
+  isDark: propIsDark,
+  enrolledCount
 }: AttendanceGraphProps) {
   const [graphMode, setGraphMode] = useState<'pulse' | 'distribution'>('pulse');
 
@@ -51,22 +53,39 @@ export default function AttendanceGraph({
   const present = classRecords.filter(r => r.status === 'present').length;
   const late = classRecords.filter(r => r.status === 'late').length;
   const excused = classRecords.filter(r => r.status === 'excused').length;
-  const absent = classRecords.filter(r => r.status === 'absent').length;
+  const explicitAbsent = classRecords.filter(r => r.status === 'absent').length;
 
-  const presentPercent = total > 0 ? Math.round((present / total) * 100) : 100;
-  const latePercent = total > 0 ? Math.round((late / total) * 100) : 0;
-  const excusedPercent = total > 0 ? Math.round((excused / total) * 100) : 0;
-  const absentPercent = total > 0 ? Math.round((absent / total) * 100) : 0;
+  // Track unique session dates
+  const uniqueDates = useMemo(() => {
+    return Array.from(new Set(classRecords.map(r => r.date)));
+  }, [classRecords]);
+  const sessionCount = uniqueDates.length;
+
+  // Expected aggregate attendees = sessionCount * enrolledCount (or total if enrolledCount not known)
+  const effectiveCapacity = enrolledCount && enrolledCount > 0 && sessionCount > 0
+    ? Math.max(total, sessionCount * enrolledCount)
+    : total;
+
+  // Correct 0 to 100% percentage scaling
+  const presentPercent = effectiveCapacity > 0 ? Math.round((present / effectiveCapacity) * 100) : 0;
+  const latePercent = effectiveCapacity > 0 ? Math.round((late / effectiveCapacity) * 100) : 0;
+  const excusedPercent = effectiveCapacity > 0 ? Math.round((excused / effectiveCapacity) * 100) : 0;
+  
+  // Unrecorded or explicit absences
+  const absent = effectiveCapacity > (present + late + excused)
+    ? (effectiveCapacity - (present + late + excused))
+    : explicitAbsent;
+  const absentPercent = effectiveCapacity > 0 ? Math.round((absent / effectiveCapacity) * 100) : 0;
 
   // Aggregate by date for Recharts
   const chartData = useMemo(() => {
     if (classRecords.length === 0) {
-      // Return 4 reference sample dates if no records yet
+      // 0 records = 0% attendance baseline (0 to 100% scale)
       return [
-        { date: 'Session 1', fullDate: 'Initial Roster', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
-        { date: 'Session 2', fullDate: 'Lecture 2', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
-        { date: 'Session 3', fullDate: 'Lecture 3', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
-        { date: 'Session 4', fullDate: 'Current', rate: 100, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Session 1', fullDate: 'Session 1 (No Data)', rate: 0, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Session 2', fullDate: 'Session 2 (No Data)', rate: 0, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Session 3', fullDate: 'Session 3 (No Data)', rate: 0, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
+        { date: 'Current', fullDate: 'Awaiting Check-in', rate: 0, present: 0, late: 0, excused: 0, absent: 0, total: 0 },
       ];
     }
 
@@ -86,7 +105,14 @@ export default function AttendanceGraph({
       const e = recs.filter(r => r.status === 'excused').length;
       const a = recs.filter(r => r.status === 'absent').length;
       const tot = recs.length;
-      const rate = tot > 0 ? Math.round(((p + e + l * 0.7) / tot) * 100) : 100;
+
+      // Base capacity for this session (enrolled students if known, else recorded count)
+      const sessionCapacity = enrolledCount && enrolledCount > 0 ? Math.max(tot, enrolledCount) : tot;
+      const unrecordedAbsents = sessionCapacity > (p + l + e + a) ? sessionCapacity - (p + l + e + a) : 0;
+      const totalSessionAbsents = a + unrecordedAbsents;
+
+      // Attendance rate correctly calculates from 0 to 100%
+      const rate = sessionCapacity > 0 ? Math.round(((p + e + l * 0.7) / sessionCapacity) * 100) : 0;
 
       let formattedDate = dateStr;
       try {
@@ -104,11 +130,11 @@ export default function AttendanceGraph({
         present: p,
         late: l,
         excused: e,
-        absent: a,
-        total: tot
+        absent: totalSessionAbsents,
+        total: sessionCapacity
       };
     });
-  }, [classRecords]);
+  }, [classRecords, enrolledCount]);
 
   // Custom rich tooltip with ClassPulse branding
   const CustomTooltip = ({ active, payload, label }: any) => {

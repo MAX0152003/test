@@ -312,6 +312,7 @@ export default function SubjectDetailModal({
               className={cls.name} 
               records={records} 
               isDark={isDark}
+              enrolledCount={classEnrollments.length || (cls as any).enrolledCount || 0}
             />
           </div>
 

@@ -356,7 +356,7 @@ export default function StudentWeeklyAttendanceChart({
               {aggregateMetrics.totalPresents}
             </span>
             <span className="text-xs text-zinc-400 font-mono">
-              {aggregateMetrics.totalSessions > 0 ? Math.round((aggregateMetrics.totalPresents / aggregateMetrics.totalSessions) * 100) : 100}%
+              {aggregateMetrics.totalSessions > 0 ? Math.round((aggregateMetrics.totalPresents / aggregateMetrics.totalSessions) * 100) : 0}%
             </span>
           </div>
         </div>

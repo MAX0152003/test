@@ -851,6 +851,7 @@ export default function DashboardFaculty({
     speakText(`Successfully exported all assigned classes attendance records to CSV${filterDesc}`, accessibility.readAloud);
   };
 
+  const totalMonRecords = monClassRecords.length;
   const monClassPresents = monClassRecords.filter(r => r.status === 'present').length;
   const monClassLates = monClassRecords.filter(r => r.status === 'late').length;
   const monClassAbsents = monClassRecords.filter(r => r.status === 'absent').length;
@@ -863,11 +864,10 @@ export default function DashboardFaculty({
     );
     const presentCount = studentRecords.filter(r => r.status === 'present').length;
     const lateCount = studentRecords.filter(r => r.status === 'late').length;
-    const rate = studentRecords.length > 0 ? Math.round(((presentCount + lateCount) / studentRecords.length) * 100) : 100;
-    return rate < 85;
+    const rate = studentRecords.length > 0 ? Math.round(((presentCount + lateCount) / studentRecords.length) * 100) : 0;
+    return totalMonRecords > 0 && rate < 85;
   }).length;
 
-  const totalMonRecords = monClassRecords.length;
   const monClassPresentsRate = totalMonRecords > 0 ? (monClassPresents / totalMonRecords) * 100 : 0;
   const monClassLatesRate = totalMonRecords > 0 ? (monClassLates / totalMonRecords) * 100 : 0;
   const monClassAbsentsRate = totalMonRecords > 0 ? (monClassAbsents / totalMonRecords) * 100 : 0;
@@ -1499,16 +1499,16 @@ export default function DashboardFaculty({
                   const recs = attendanceRecords.filter(r => r.classId === selectedMonitoringClassId && (r.studentId === st.studentId || r.studentName === st.studentName));
                   const pres = recs.filter(r => r.status === 'present').length;
                   const late = recs.filter(r => r.status === 'late').length;
-                  const rate = recs.length > 0 ? Math.round(((pres + late) / recs.length) * 100) : 100;
-                  return rate >= 85;
+                  const rate = recs.length > 0 ? Math.round(((pres + late) / recs.length) * 100) : 0;
+                  return recs.length > 0 && rate >= 85;
                 }).length;
 
                 const borderlineCount = monEnrollments.filter(st => {
                   const recs = attendanceRecords.filter(r => r.classId === selectedMonitoringClassId && (r.studentId === st.studentId || r.studentName === st.studentName));
                   const pres = recs.filter(r => r.status === 'present').length;
                   const late = recs.filter(r => r.status === 'late').length;
-                  const rate = recs.length > 0 ? Math.round(((pres + late) / recs.length) * 100) : 100;
-                  return rate >= 75 && rate < 85;
+                  const rate = recs.length > 0 ? Math.round(((pres + late) / recs.length) * 100) : 0;
+                  return recs.length > 0 && rate >= 75 && rate < 85;
                 }).length;
 
                 const warningCount = (totalStudentsInClass - passingCount - borderlineCount) >= 0 
@@ -4064,7 +4064,7 @@ export default function DashboardFaculty({
                         const pres = studentRecords.filter(r => r.status === 'present').length;
                         const late = studentRecords.filter(r => r.status === 'late').length;
                         const total = studentRecords.length;
-                        const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 100;
+                        const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 0;
                         return rate < 75;
                       });
                     } else if (rosterFilter === 'borderline') {
@@ -4076,7 +4076,7 @@ export default function DashboardFaculty({
                         const pres = studentRecords.filter(r => r.status === 'present').length;
                         const late = studentRecords.filter(r => r.status === 'late').length;
                         const total = studentRecords.length;
-                        const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 100;
+                        const rate = total > 0 ? Math.round(((pres + late) / total) * 100) : 0;
                         return rate >= 75 && rate < 85;
                       });
                     }
