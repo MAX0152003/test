@@ -475,5 +475,46 @@ input[name="contactNumber"]:focus {
   }
 }
 
+/* ==========================================================================
+   🔒 Modal & Overlay Background Scroll Lock Engine
+   Stops the underlying main page and document from scrolling whenever a modal, 
+   drawer, popup, or overlay is open on the screen.
+   ========================================================================== */
+body.modal-open,
+body:has(.fixed.inset-0.z-40),
+body:has(.fixed.inset-0.z-50),
+body:has(.fixed.inset-0.z-55),
+body:has(.fixed.inset-0.z-56),
+body:has(.fixed.inset-0.z-\[90\]),
+body:has(.fixed.inset-0.z-\[100\]),
+body:has(.fixed.inset-0.z-\[99999\]) {
+  overflow: hidden !important;
+  overscroll-behavior: contain !important;
+  touch-action: none;
+}
+
+body.modal-open main,
+body:has(.fixed.inset-0.z-40) main,
+body:has(.fixed.inset-0.z-50) main,
+body:has(.fixed.inset-0.z-55) main,
+body:has(.fixed.inset-0.z-56) main,
+body:has(.fixed.inset-0.z-\[90\]) main,
+body:has(.fixed.inset-0.z-\[100\]) main,
+body:has(.fixed.inset-0.z-\[99999\]) main {
+  overflow: hidden !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* Ensure modal overlays and interactive cards remain fully interactive and scrollable */
+.fixed.inset-0,
+.fixed.inset-0 *,
+[data-scrollable="true"],
+.modal-scrollable-content {
+  pointer-events: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 
 

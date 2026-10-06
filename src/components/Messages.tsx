@@ -13,7 +13,11 @@ import {
   ArrowLeft,
   LifeBuoy,
   PlusCircle,
-  CalendarClock
+  CalendarClock,
+  Check,
+  Search,
+  ThumbsUp,
+  Smile
 } from 'lucide-react';
 import { speakText } from './AccessibilitySettings';
 import { motion, AnimatePresence } from 'motion/react';
@@ -553,6 +557,20 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const ticketMessagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const adminTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-resize chat textarea to fit content seamlessly (Messenger / Instagram style)
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+    if (adminTextareaRef.current) {
+      adminTextareaRef.current.style.height = 'auto';
+      adminTextareaRef.current.style.height = `${Math.min(adminTextareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [inputText]);
 
   // Chat message listener (Firebase Firestore disabled)
   useEffect(() => {
@@ -1275,12 +1293,12 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
       senderRole: userProfile.role,
       receiverId: activeContactId,
       receiverName: destObj?.name || activeMeta?.name || 'Academic Group',
-      message: inputText.trim() || (pendingImg ? "Shared an image" : pendingFile ? "Shared a file" : "Shared a link"),
+      message: inputText.trim() || (pendingImg ? "" : pendingFile ? "Shared a file" : "Shared a link"),
       timestamp: nowStr,
       ...(pendingImg ? { attachmentImg: pendingImg } : {}),
       ...(pendingLink ? { attachmentLink: pendingLink } : {}),
       ...(pendingFile ? { attachmentFile: pendingFile } : {}),
-      read: true
+      read: false
     };
 
     setMessages(prev => [...prev, newMsg]);
@@ -1374,49 +1392,101 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
   }) : [];
 
   const renderSidebar = () => {
+    const activeNowList = contacts.filter(c => !isUserOffline(c)).slice(0, 10);
+
     return (
-        <div id="messenger-sidebar" className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-zinc-200/60 dark:border-zinc-850/60 flex flex-col h-full shrink-0 bg-transparent">
-          <div className="p-2.5 border-b border-zinc-150 dark:border-zinc-900 space-y-2">
-            {onBack && (
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="p-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
-                  title="Back"
-                >
-                  <ArrowLeft className="w-4 h-4 text-emerald-500" />
-                </button>
-              <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">ClassPulse Chat</span>
+        <div id="messenger-sidebar" className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-zinc-200/60 dark:border-zinc-850/60 flex flex-col h-full shrink-0 bg-white dark:bg-zinc-950">
+          <div className="p-3 border-b border-zinc-150 dark:border-zinc-900 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {onBack && (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="p-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 select-none"
+                    title="Back"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-emerald-500" />
+                  </button>
+                )}
+                <h2 className="text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100">Chats</h2>
+              </div>
+              <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 font-mono tracking-wider bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                {contacts.length} peers
+              </span>
+            </div>
+
+            {/* Messenger-inspired Pill Search Bar */}
+            <div className="relative">
+              <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-full px-3.5 py-2 border border-transparent focus-within:border-emerald-500/40 focus-within:bg-zinc-50 dark:focus-within:bg-zinc-900 transition-all">
+                <Search className="w-4 h-4 text-zinc-400 mr-2 shrink-0" />
+                <input
+                  type="text"
+                  value={userSearchText}
+                  onChange={(e) => {
+                    setUserSearchText(e.target.value);
+                  }}
+                  placeholder="Search Messenger..."
+                  className="w-full text-xs sm:text-sm bg-transparent outline-none text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-medium"
+                />
+                {userSearchText && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearchText('')}
+                    className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Facebook / Instagram Stories & Active Peers Row */}
+          {!userSearchText && activeNowList.length > 0 && (
+            <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-900 shrink-0">
+              <div className="flex items-center gap-3 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-1">
+                {activeNowList.map(c => (
+                  <button
+                    key={`story-${c.id}`}
+                    onClick={() => {
+                      setActiveContactId(c.id);
+                      setMobileShowChat(true);
+                    }}
+                    type="button"
+                    className="flex flex-col items-center gap-1 shrink-0 group cursor-pointer focus:outline-none"
+                    title={`Chat with ${c.name}`}
+                  >
+                    <div className="relative">
+                      <div className={`p-0.5 rounded-full ring-2 transition-transform group-hover:scale-105 ${
+                        activeContactId === c.id ? 'ring-emerald-500' : 'ring-emerald-500/60'
+                      }`}>
+                        {c.avatar ? (
+                          <img
+                            src={c.avatar}
+                            alt={c.name}
+                            className="w-11 h-11 rounded-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-sm flex items-center justify-center uppercase">
+                            {c.name ? c.name[0] : '?'}
+                          </div>
+                        )}
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-xs ring-1 ring-emerald-500/50" />
+                    </div>
+                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 max-w-[54px] truncate group-hover:text-emerald-500 transition-colors">
+                      {c.name.split(' ')[0]}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Compact search bar */}
-          <div className="relative">
-            <input
-              type="text"
-              value={userSearchText}
-              onChange={(e) => {
-                setUserSearchText(e.target.value);
-              }}
-              placeholder="Search..."
-              className="w-full text-xs pl-7 pr-7 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-transparent focus:border-emerald-500/30 outline-none text-zinc-900 dark:text-zinc-100 font-semibold"
-            />
-            <span className="absolute left-2 top-2 text-[10px] text-zinc-400">🔍</span>
-            {userSearchText && (
-              <button
-                type="button"
-                onClick={() => setUserSearchText('')}
-                className="absolute right-2 top-2 p-0.5 text-[8px] font-black text-white bg-zinc-400 dark:bg-zinc-800 rounded-full hover:bg-red-500 transition-colors"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Channels/Contacts Unified Iterator list */}
-        <div className="flex-1 overflow-y-auto space-y-4 p-3 text-left pb-28 lg:pb-3">
+          {/* Channels/Contacts Unified Iterator list */}
+          <div className="flex-1 overflow-y-auto space-y-4 p-3 text-left pb-28 lg:pb-3">
           
           {/* Active Channels / Subject Groups (Hidden for Admins) */}
           {userProfile.role !== 'admin' && (
@@ -1469,6 +1539,13 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest px-2.5 block pb-2">Direct Chats</span>
             {filteredContacts.map(c => {
               const unreadCount = getUnreadCount(c.id, c);
+              const contactMsgs = messages.filter(m => 
+                (m.senderId === c.id && (isMsgToMe(m) || m.receiverId === myId)) ||
+                (isMsgFromMe(m) && (m.receiverId === c.id || ((c as any).aliases || []).includes(m.receiverId)))
+              );
+              const lastMsg = contactMsgs[contactMsgs.length - 1];
+              const isLastMsgFromMeAndUnread = lastMsg && isMsgFromMe(lastMsg) && !lastMsg.read;
+
               const myIds = new Set([
                 myId,
                 userProfile.id,
@@ -1541,13 +1618,19 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       <p className={`text-[9px] truncate uppercase font-extrabold mt-0.5 ${activeContactId === c.id ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-500 dark:text-zinc-400'}`}>{c.role} • {c.courseCode}</p>
                     </div>
                   </div>
-                  {unreadCount > 0 && (
+                  {unreadCount > 0 ? (
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full select-none shrink-0 ${
                       activeContactId === c.id ? 'bg-emerald-500 text-black' : 'bg-emerald-500 text-black'
                     }`}>
                       {unreadCount}
                     </span>
-                  )}
+                  ) : isLastMsgFromMeAndUnread ? (
+                    <div title="Delivered • Message not opened yet" className="shrink-0 flex items-center">
+                      <span className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-white shadow-2xs">
+                        <Check className="w-2.5 h-2.5 stroke-[3.5]" />
+                      </span>
+                    </div>
+                  ) : null}
                 </button>
               );
             })}
@@ -1623,7 +1706,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
 
   const renderChatArea = () => {
     return (
-      <div className="flex-1 flex flex-col h-full min-w-0 p-2.5 sm:p-3 bg-transparent">
+      <div className="flex-1 flex flex-col h-full min-w-0 bg-white dark:bg-zinc-950 relative overflow-hidden">
         
         {activeMeta ? (
           activeMeta.role === 'admin' && userProfile.role !== 'admin' ? (
@@ -1662,9 +1745,9 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
             </div>
           ) : (
             <>
-            {/* Compact Header user details */}
-            <div className="pb-2 border-b border-zinc-200/60 dark:border-zinc-850/60 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5 min-w-0">
+            {/* Messenger / Instagram Style Edge-to-Edge Sticky Header */}
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-zinc-150 dark:border-zinc-850/80 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md flex items-center justify-between shrink-0 sticky top-0 z-20">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 {(isMobile || mobileShowChat) && (
                   <button
                     type="button"
@@ -1672,10 +1755,10 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       setMobileShowChat(false);
                       speakText("Back to chat list", accessibility.readAloud);
                     }}
-                    className="lg:hidden p-1.5 rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 mr-1 shrink-0 animate-fade-in"
+                    className="lg:hidden w-10 h-10 rounded-full text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-850 transition-all cursor-pointer active:scale-95 shrink-0 flex items-center justify-center -ml-1 touch-manipulation"
                     title="Go back to list"
                   >
-                    <ArrowLeft className="w-4 h-4 text-emerald-500" />
+                    <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
                   </button>
                 )}
                 {!(activeMeta as any).isChannel ? (
@@ -1684,64 +1767,65 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                       <img 
                         src={(activeMeta as any).avatar} 
                         alt={activeMeta.name} 
-                        className="w-8 h-8 rounded-full object-cover border border-emerald-500/20"
+                        className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover ring-2 ring-emerald-500/30 shadow-xs"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-indigo-650 text-white font-extrabold text-xs flex items-center justify-center uppercase border border-emerald-500/20 shadow-2xs">
+                      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-extrabold text-sm flex items-center justify-center uppercase shadow-xs">
                         {activeMeta.name ? activeMeta.name[0] : '?'}
                       </div>
                     )}
                     {isUserOffline(activeMeta) ? (
                       <span 
                         title="Offline"
-                        className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500/30 dark:bg-emerald-500/25 border-2 border-white dark:border-zinc-950 opacity-60" 
+                        className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-zinc-400 border-2 border-white dark:border-zinc-950 opacity-70" 
                       />
                     ) : (
                       <span 
-                        title="Online"
-                        className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-xs ring-1 ring-emerald-500/40" 
+                        title="Active now"
+                        className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-950 shadow-xs ring-1 ring-emerald-500/40" 
                       />
                     )}
                   </div>
                 ) : (
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-black text-sm shrink-0">
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-black text-lg shrink-0">
                     #
                   </div>
                 )}
                 <div className="text-left min-w-0">
-                  <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
+                  <h3 className="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
                     <span className="truncate">{activeMeta.name}</span>
                     {activeMeta && !(activeMeta as any).isChannel && (
                       activeMeta.id === myId ||
                       ((activeMeta as any).email && userProfile.email && (activeMeta as any).email.toLowerCase() === userProfile.email.toLowerCase()) ||
                       (activeMeta.name && userProfile.name && activeMeta.name.toLowerCase() === userProfile.name.toLowerCase())
                     ) && (
-                      <span className="text-[8px] font-black px-1 py-0.2 rounded uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-                        (You)
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shrink-0">
+                        You
                       </span>
                     )}
                   </h3>
-                  <p className="text-[9px] font-semibold truncate flex items-center gap-1.5">
+                  <p className="text-xs font-medium truncate flex items-center gap-1.5">
                     {!(activeMeta as any).isChannel ? (
                       isUserOffline(activeMeta) ? (
                         <span className="text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/35 border border-emerald-500/40" />
-                          Offline • Direct Chat
+                          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                          Offline • Tap to leave message
                         </span>
                       ) : (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-xs ring-1 ring-emerald-500/50" />
-                          Online • Active
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          Active now
                         </span>
                       )
                     ) : (
-                      <span className="text-zinc-400 dark:text-zinc-500">Class Room Channel</span>
+                      <span className="text-zinc-500 dark:text-zinc-400 font-medium">{channels.find(c => c.id === activeMeta.id)?.code || 'Group'} Discussion Room</span>
                     )}
                   </p>
                 </div>
               </div>
-                         {/* Header Action Panel status indicator */}
+              
+              {/* Header Action Panel status indicator */}
               <div className="flex items-center gap-2">
                 {activeMeta && !(activeMeta as any).isChannel && (activeMeta.role === 'faculty' || (activeMeta as any).facultyId || (activeMeta as any).dept?.toLowerCase().includes('faculty') || (activeMeta as any).dept?.toLowerCase().includes('college')) && userProfile.role === 'student' && (
                   <button
@@ -1754,15 +1838,15 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         setScreen('consultations');
                       }
                     }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-black dark:text-emerald-400 dark:hover:text-black border border-emerald-500/25 transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-black dark:text-emerald-400 dark:hover:text-black transition-all cursor-pointer shadow-2xs active:scale-95 shrink-0"
                     title={`Book 1-on-1 academic consultation with ${activeMeta.name}`}
                   >
-                    <CalendarClock className="w-3.5 h-3.5" />
+                    <CalendarClock className="w-4 h-4" />
                     <span className="hidden sm:inline">Book Consultation</span>
                   </button>
                 )}
-                <div className={`hidden sm:flex items-center gap-1.5 font-mono text-[9px] uppercase font-bold px-2.5 py-1 rounded-xl ${
-                  isGoogleChatActive ? 'text-sky-500 bg-sky-500/10' : 'text-zinc-400 dark:text-zinc-500 bg-zinc-100 dark:bg-zinc-910'
+                <div className={`hidden sm:flex items-center gap-1.5 font-mono text-[9px] uppercase font-bold px-2.5 py-1 rounded-full ${
+                  isGoogleChatActive ? 'text-sky-500 bg-sky-500/10' : 'text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isGoogleChatActive ? 'bg-sky-500' : 'bg-emerald-500'}`} />
                   {isGoogleChatActive ? 'Workspace Live' : 'Live Sync'}
@@ -1797,96 +1881,162 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                         </div>
 
                         {/* Interactive Message Bubble */}
-                        <div className={`p-3.5 rounded-2xl text-[12px] max-w-[85%] text-left space-y-2.5 transition-all outline-none ${
-                          isMe
-                            ? 'bg-[#03213D] dark:bg-zinc-900 border border-[#03213D]/40 dark:border-zinc-800 text-white rounded-tr-none'
-                            : 'bg-emerald-600 border border-emerald-500 text-white rounded-tl-none font-bold shadow-xs'
-                        }`}>
-                          
-                          {/* Inner standard text if available */}
-                          {m.message && (
-                            <p className="leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-white font-medium">{m.message}</p>
-                          )}
-
-                          {/* Image Attachment wrapper */}
-                          {m.attachmentImg && (
-                            <div 
-                              onClick={() => setImagePreviewData({
-                                url: m.attachmentImg!,
-                                title: `Image Attachment`,
-                                subtitle: `From ${m.senderName || 'Sender'} • ${m.timestamp || 'Chat'}`,
-                                fileName: `chat_image_${m.id || Date.now()}.png`
-                              })}
-                              className="relative rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 max-w-xs bg-zinc-100 dark:bg-zinc-900 group cursor-pointer shadow-sm hover:ring-2 hover:ring-emerald-500/50 transition-all"
-                            >
-                              <img 
-                                src={m.attachmentImg} 
-                                alt="Attachment" 
-                                className="object-cover w-full max-h-48 transition-transform duration-300 group-hover:scale-105"
-                                referrerPolicy="no-referrer"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-2 backdrop-blur-[2px]">
-                                <span className="px-2.5 py-1.5 rounded-lg bg-zinc-900/90 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg border border-zinc-700">
-                                  <Download className="w-3.5 h-3.5 text-emerald-400" /> View & Save
-                                </span>
-                              </div>
+                        {m.attachmentImg && (!m.message || m.message === "Shared an image" || m.message === "Shared a photo" || !m.message.trim()) ? (
+                          /* Pure Image Attachment Card (Clean without outer colored bubble) */
+                          <div 
+                            onClick={() => setImagePreviewData({
+                              url: m.attachmentImg!,
+                              title: `Image Attachment`,
+                              subtitle: `From ${m.senderName || 'Sender'} • ${m.timestamp || 'Chat'}`,
+                              fileName: `chat_image_${m.id || Date.now()}.png`
+                            })}
+                            className="relative rounded-2xl overflow-hidden border border-zinc-200/80 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 group cursor-pointer shadow-md hover:ring-2 hover:ring-emerald-500/50 transition-all max-w-[280px] sm:max-w-xs"
+                          >
+                            <img 
+                              src={m.attachmentImg} 
+                              alt="Attachment" 
+                              className="object-cover w-full max-h-72 transition-transform duration-300 group-hover:scale-105"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-2 backdrop-blur-[2px]">
+                              <span className="px-3 py-1.5 rounded-xl bg-zinc-900/90 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg border border-zinc-700">
+                                <Download className="w-4 h-4 text-emerald-400" /> View Photo
+                              </span>
                             </div>
-                          )}
+                          </div>
+                        ) : (
+                          /* Standard Message Bubble with text / files / custom caption */
+                          <div className={`px-4 py-2.5 rounded-[20px] text-sm sm:text-[15px] leading-relaxed max-w-[85%] sm:max-w-md md:max-w-lg lg:max-w-xl text-left space-y-2 transition-all outline-none shadow-xs ${
+                            isMe
+                              ? 'bg-emerald-600 dark:bg-emerald-500 text-white dark:text-zinc-950 rounded-br-xs font-medium'
+                              : 'bg-zinc-100 dark:bg-zinc-850 text-zinc-900 dark:text-zinc-100 rounded-bl-xs font-normal'
+                          }`}>
+                            
+                            {/* Inner standard text if available */}
+                            {m.message && m.message !== "Shared an image" && m.message !== "Shared a photo" && (
+                              <p className="leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{m.message}</p>
+                            )}
 
-                          {/* Link Rich Bookmark block */}
-                          {m.attachmentLink && (
-                            <div className="p-3.5 rounded-xl border border-zinc-200/80 dark:border-zinc-850/80 bg-zinc-50/80 dark:bg-zinc-950/40 space-y-1.5 max-w-xs">
-                              <div className="flex items-start justify-between gap-2">
-                                <span className="text-[10px] font-bold text-emerald-555 flex items-center gap-1 uppercase tracking-wider">
-                                  <LinkIcon className="w-3 h-3 text-emerald-500" /> Web Resource
-                                </span>
-                                <a href={m.attachmentLink.url} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-emerald-500">
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              </div>
-                              <h5 className="font-bold text-xs truncate text-zinc-900 dark:text-zinc-100">{m.attachmentLink.title}</h5>
-                              <p className="text-[10px] text-zinc-400 line-clamp-2 leading-relaxed">{m.attachmentLink.desc}</p>
-                              <p className="text-[9px] text-zinc-500 dark:text-zinc-650 truncate font-mono">{m.attachmentLink.url}</p>
-                            </div>
-                          )}
-
-                          {/* PDF/File Attachment download box */}
-                          {m.attachmentFile && (
-                            <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-850/80 bg-zinc-50 dark:bg-zinc-950/40 flex items-center justify-between gap-4 max-w-xs transition-colors hover:bg-zinc-100/50">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
-                                  <FileText className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-bold text-xs truncate text-zinc-805 dark:text-zinc-200">{m.attachmentFile.name}</p>
-                                  <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-mono">Size: {m.attachmentFile.size}</p>
-                                </div>
-                              </div>
-                              <button 
-                                onClick={() => {
-                                  const fileName = m.attachmentFile?.name || 'resource.txt';
-                                  const blob = new Blob([`ClassPulse Academic Resource: ${fileName}\nExported: ${new Date().toLocaleString()}`], { type: 'text/plain' });
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement('a');
-                                  a.href = url;
-                                  a.download = fileName;
-                                  document.body.appendChild(a);
-                                  a.click();
-                                  document.body.removeChild(a);
-                                  URL.revokeObjectURL(url);
-                                  if (typeof window !== 'undefined' && (window as any).showToast) {
-                                    (window as any).showToast(`Downloaded resource: ${fileName}`, "success");
-                                  }
-                                  speakText(`Beginning download for class resource ${fileName}`, accessibility.readAloud);
-                                }}
-                                className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-emerald-500/10 hover:text-emerald-500 cursor-pointer"
+                            {/* Image Attachment inside captioned bubble */}
+                            {m.attachmentImg && (
+                              <div 
+                                onClick={() => setImagePreviewData({
+                                  url: m.attachmentImg!,
+                                  title: `Image Attachment`,
+                                  subtitle: `From ${m.senderName || 'Sender'} • ${m.timestamp || 'Chat'}`,
+                                  fileName: `chat_image_${m.id || Date.now()}.png`
+                                })}
+                                className="relative rounded-xl overflow-hidden border border-zinc-200/80 dark:border-zinc-700/80 bg-zinc-100 dark:bg-zinc-900 group cursor-pointer shadow-xs hover:ring-2 hover:ring-emerald-500/50 transition-all"
                               >
-                                <Download className="w-3.5 h-3.5 text-zinc-500" />
-                              </button>
-                            </div>
-                          )}
+                                <img 
+                                  src={m.attachmentImg} 
+                                  alt="Attachment" 
+                                  className="object-cover w-full max-h-56 transition-transform duration-300 group-hover:scale-105"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-2 backdrop-blur-[2px]">
+                                  <span className="px-2.5 py-1.5 rounded-lg bg-zinc-900/90 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg border border-zinc-700">
+                                    <Download className="w-3.5 h-3.5 text-emerald-400" /> View Photo
+                                  </span>
+                                </div>
+                              </div>
+                            )}
 
-                        </div>
+                            {/* Link Rich Bookmark block */}
+                            {m.attachmentLink && (
+                              <div className="p-3.5 rounded-xl border border-zinc-200/80 dark:border-zinc-850/80 bg-zinc-50/80 dark:bg-zinc-950/40 space-y-1.5 max-w-xs">
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-[10px] font-bold text-emerald-555 flex items-center gap-1 uppercase tracking-wider">
+                                    <LinkIcon className="w-3 h-3 text-emerald-500" /> Web Resource
+                                  </span>
+                                  <a href={m.attachmentLink.url} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-emerald-500">
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                </div>
+                                <h5 className="font-bold text-xs truncate text-zinc-900 dark:text-zinc-100">{m.attachmentLink.title}</h5>
+                                <p className="text-[10px] text-zinc-400 line-clamp-2 leading-relaxed">{m.attachmentLink.desc}</p>
+                                <p className="text-[9px] text-zinc-500 dark:text-zinc-650 truncate font-mono">{m.attachmentLink.url}</p>
+                              </div>
+                            )}
+
+                            {/* PDF/File Attachment download box */}
+                            {m.attachmentFile && (
+                              <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-850/80 bg-zinc-50 dark:bg-zinc-950/40 flex items-center justify-between gap-4 max-w-xs transition-colors hover:bg-zinc-100/50">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+                                    <FileText className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-xs truncate text-zinc-805 dark:text-zinc-200">{m.attachmentFile.name}</p>
+                                    <p className="text-[9px] text-zinc-400 dark:text-zinc-500 font-mono">Size: {m.attachmentFile.size}</p>
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => {
+                                    const fileName = m.attachmentFile?.name || 'resource.txt';
+                                    const blob = new Blob([`ClassPulse Academic Resource: ${fileName}\nExported: ${new Date().toLocaleString()}`], { type: 'text/plain' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = fileName;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    if (typeof window !== 'undefined' && (window as any).showToast) {
+                                      (window as any).showToast(`Downloaded resource: ${fileName}`, "success");
+                                    }
+                                    speakText(`Beginning download for class resource ${fileName}`, accessibility.readAloud);
+                                  }}
+                                  className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-emerald-500/10 hover:text-emerald-500 cursor-pointer"
+                                >
+                                  <Download className="w-3.5 h-3.5 text-zinc-500" />
+                                </button>
+                              </div>
+                            )}
+
+                          </div>
+                        )}
+
+                        {/* Facebook Messenger Delivery & Read Status Badge */}
+                        {isMe && (
+                          <div className="flex items-center gap-1 px-1 justify-end select-none">
+                            {!m.read ? (
+                              <div 
+                                title="Delivered • Not opened yet" 
+                                className="flex items-center gap-1 group cursor-default"
+                              >
+                                <span className="text-[9px] font-mono text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  Delivered
+                                </span>
+                                <span className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-white shadow-2xs transition-transform duration-200 hover:scale-110">
+                                  <Check className="w-2.5 h-2.5 stroke-[3.5]" />
+                                </span>
+                              </div>
+                            ) : (
+                              <div 
+                                title={`Seen by ${activeMeta?.name || 'recipient'}`}
+                                className="flex items-center gap-1 group cursor-default"
+                              >
+                                <span className="text-[9px] font-mono text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  Seen
+                                </span>
+                                {activeMeta?.avatar ? (
+                                  <img
+                                    src={activeMeta.avatar}
+                                    alt={activeMeta.name || "Seen"}
+                                    className="w-3.5 h-3.5 rounded-full object-cover ring-1 ring-emerald-500/80 shadow-2xs"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center text-black font-black text-[8px] shadow-2xs">
+                                    {activeMeta?.name ? activeMeta.name[0].toUpperCase() : '✓'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </motion.div>
                     );
                   })}
@@ -1914,7 +2064,7 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                   {pendingImg && (
                     <>
                       <ImageIcon className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <p className="text-xs font-bold truncate text-zinc-800 dark:text-zinc-200">Attached image preview coordinate loaded</p>
+                      <p className="text-xs font-bold truncate text-zinc-800 dark:text-zinc-200">Photo attached (ready to send)</p>
                     </>
                   )}
                   {pendingLink && (
@@ -2095,34 +2245,101 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
                 </div>
               )}
 
-              {/* Compact Input Form */}
-              <form onSubmit={handleSendMessage} className="pt-1.5 border-t border-zinc-200/60 dark:border-zinc-850/60 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                  className={`h-9 w-9 shrink-0 rounded-lg border border-zinc-200 dark:border-zinc-800 flex items-center justify-center transition-all cursor-pointer ${
-                    showAttachmentMenu ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
-                  }`}
-                  title="Attach file or photo"
+              {/* Messenger / Instagram 2026 Quick Replies & Adaptive Expanding Input Bar */}
+              <div className="pt-2 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.5rem))] px-2.5 sm:px-4 border-t border-zinc-150 dark:border-zinc-850 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md">
+                
+                {/* Quick Reaction Suggestion Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pb-2 text-xs">
+                  {["👍", "❤️", "Sounds good!", "Thank you!", "See you in class 👍"].map(quick => (
+                    <button
+                      key={quick}
+                      type="button"
+                      onClick={() => {
+                        setInputText(quick);
+                        if (textareaRef.current) {
+                          textareaRef.current.focus();
+                        }
+                      }}
+                      className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer active:scale-95 shrink-0"
+                    >
+                      {quick}
+                    </button>
+                  ))}
+                </div>
+
+                <form 
+                  onSubmit={handleSendMessage} 
+                  className="flex items-end gap-2"
                 >
-                  <Paperclip className="w-3.5 h-3.5" />
-                </button>
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={e => setInputText(e.target.value)}
-                  placeholder={`Message ${activeMeta.name}...`}
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans font-medium"
-                />
-                <button
-                  type="submit"
-                  disabled={!inputText.trim() && !pendingImg && !pendingLink && !pendingFile}
-                  className="h-9 w-9 shrink-0 font-bold text-black bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                  title="Send message"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              </form>
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                    className={`w-11 h-11 shrink-0 rounded-full flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-90 ${
+                      showAttachmentMenu 
+                        ? 'bg-emerald-500 text-black shadow-md' 
+                        : 'text-zinc-500 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                    }`}
+                    title="Attach file or photo"
+                  >
+                    <Paperclip className="w-5 h-5 stroke-[2.2]" />
+                  </button>
+
+                  {/* Expanding Textarea Capsule (100% available width, auto-grows, no scroll horizontal) */}
+                  <div className="flex-1 min-h-[46px] max-h-32 bg-zinc-100 dark:bg-zinc-900 rounded-[24px] px-4 py-2.5 flex items-end focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:bg-zinc-50 dark:focus-within:bg-zinc-900 transition-all border border-transparent focus-within:border-emerald-500/30">
+                    <textarea
+                      ref={textareaRef}
+                      rows={1}
+                      value={inputText}
+                      onChange={e => setInputText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSendMessage(e);
+                        }
+                      }}
+                      placeholder={`Message ${activeMeta.name}...`}
+                      className="w-full bg-transparent resize-none border-0 outline-none text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-normal leading-relaxed max-h-28"
+                    />
+                  </div>
+
+                  {inputText.trim() || pendingImg || pendingLink || pendingFile ? (
+                    <button
+                      type="submit"
+                      className="w-11 h-11 shrink-0 font-bold text-black bg-emerald-500 hover:bg-emerald-400 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md active:scale-90 touch-manipulation"
+                      title="Send message"
+                    >
+                      <Send className="w-5 h-5 stroke-[2.2] ml-0.5" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const newMsg: EnrichedChatMessage = {
+                          id: 'msg-' + Date.now(),
+                          senderId: myId,
+                          senderName: userProfile.name,
+                          senderRole: userProfile.role,
+                          receiverId: activeContactId,
+                          receiverName: activeMeta?.name || 'Academic Group',
+                          message: "👍",
+                          timestamp: nowStr,
+                          read: false
+                        };
+                        setMessages(prev => [...prev, newMsg]);
+                        const isOffline = localStorage.getItem('cp_offline') === 'true';
+                        saveMessageToFirestore(isOffline, newMsg).catch(err => console.error("Firestore thumbs up error:", err));
+                        setTimeout(() => scrollToBottom(true), 50);
+                        speakText("Sent thumbs up", accessibility.readAloud);
+                      }}
+                      className="w-11 h-11 shrink-0 rounded-full text-emerald-500 hover:bg-emerald-500/10 flex items-center justify-center transition-all cursor-pointer active:scale-90 touch-manipulation text-2xl"
+                      title="Send thumbs up"
+                    >
+                      👍
+                    </button>
+                  )}
+                </form>
+              </div>
             </div>
           </>
           )
@@ -2412,21 +2629,31 @@ export default function Messages({ userProfile, classes, enrollments, accessibil
         </div>
 
         {/* Input area for Admin message reply */}
-        <div className="pt-2.5 border-t border-zinc-200/60 dark:border-zinc-850/60 shrink-0 pb-1 sm:pb-0 bg-white dark:bg-zinc-950 sticky bottom-0 z-20">
-          <form onSubmit={handleSendAdminTicketReply} className="flex gap-2">
-            <input
-              type="text"
-              value={inputText}
-              onChange={e => setInputText(e.target.value)}
-              placeholder={`Type a reply to ${selectedTicket.userName}...`}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-205 dark:border-zinc-850 bg-zinc-50 dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans shadow-inner font-bold"
-            />
+        <div className="pt-2 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.5rem))] px-2.5 sm:px-4 border-t border-zinc-150 dark:border-zinc-850 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-md shrink-0 sticky bottom-0 z-20">
+          <form onSubmit={handleSendAdminTicketReply} className="flex items-end gap-2">
+            <div className="flex-1 min-h-[46px] max-h-32 bg-zinc-100 dark:bg-zinc-900 rounded-[24px] px-4 py-2.5 flex items-end focus-within:ring-2 focus-within:ring-emerald-500/40 focus-within:bg-zinc-50 dark:focus-within:bg-zinc-900 transition-all border border-transparent focus-within:border-emerald-500/30">
+              <textarea
+                ref={adminTextareaRef}
+                rows={1}
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendAdminTicketReply(e);
+                  }
+                }}
+                placeholder={`Type official reply to ${selectedTicket.userName}...`}
+                className="w-full bg-transparent resize-none border-0 outline-none text-base text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 font-normal leading-relaxed max-h-28"
+              />
+            </div>
             <button
               type="submit"
               disabled={!inputText.trim()}
-              className="h-10 px-5 font-bold text-black bg-emerald-500 hover:bg-emerald-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-sm text-xs uppercase tracking-wider"
+              className="w-11 h-11 shrink-0 font-bold text-black bg-emerald-500 hover:bg-emerald-400 disabled:opacity-35 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md active:scale-90 touch-manipulation"
+              title="Send reply"
             >
-              <span>Reply</span>
+              <Send className="w-5 h-5 stroke-[2.2] ml-0.5" />
             </button>
           </form>
         </div>

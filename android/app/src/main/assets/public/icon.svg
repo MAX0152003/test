@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Canvas -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
+  <rect width="504" height="504" x="4" y="4" rx="111" fill="none" stroke="#10b981" stroke-width="6" stroke-opacity="0.3" />
+
+  <!-- Center Radar / Pulse Rings -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="#10b981" stroke-width="4" stroke-opacity="0.15" />
+  <circle cx="256" cy="256" r="120" fill="none" stroke="#10b981" stroke-width="6" stroke-opacity="0.25" stroke-dasharray="16 10" />
+
+  <!-- Pulse Waveform Polyline -->
+  <path d="M 100 256 L 180 256 L 210 160 L 256 352 L 300 200 L 330 256 L 412 256" 
+        fill="none" 
+        stroke="url(#pulseGrad)" 
+        stroke-width="26" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        filter="url(#glow)" />
+
+  <!-- Center Target Dot -->
+  <circle cx="256" cy="256" r="14" fill="#34d399" />
+
+  <!-- MSU Badge Accent -->
+  <text x="256" y="425" text-anchor="middle" fill="#a7f3d0" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" letter-spacing="4">
+    CLASSPULSE • MSU
+  </text>
+</svg>

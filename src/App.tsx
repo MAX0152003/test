@@ -86,6 +86,8 @@ import { nativeAlarmBridge } from './lib/nativeAlarmBridge';
 import { AlarmCenterModal } from './components/AlarmCenterModal';
 import { ActiveAlarmBanner } from './components/ActiveAlarmBanner';
 import { autoPermissions } from './lib/autoPermissions';
+import { useBodyScrollLock } from './hooks/useBodyScrollLock';
+import { NativeBridgeManager } from './lib/nativeBridge';
 import { 
   Wifi, 
   WifiOff, 
@@ -267,6 +269,11 @@ export default function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     };
   }, [isInstalledApp]);
+
+  // Native Mobile Bridge Initialization (Capacitor Android & iOS Hardware Integration)
+  React.useEffect(() => {
+    NativeBridgeManager.init();
+  }, []);
 
   const [activeScreen, setActiveScreen] = React.useState<string>(() => {
     return safeStorage.getItem('cp_screen') || 'dashboard';
@@ -693,6 +700,11 @@ export default function App() {
     };
   });
 
+  // Sync Native Status Bar with application theme
+  React.useEffect(() => {
+    NativeBridgeManager.updateStatusBarTheme(accessibility.theme === 'dark');
+  }, [accessibility.theme]);
+
   const [viewDensity, setViewDensity] = React.useState<ViewDensity>(() => {
     const cached = safeStorage.getItem('cp_pref_view_density');
     if (cached === 'compact' || cached === 'comfortable' || cached === 'spacious') return cached as ViewDensity;
@@ -844,6 +856,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [isAccountLinkModalOpen, setIsAccountLinkModalOpen] = React.useState(false);
   const [isDownloadAppModalOpen, setIsDownloadAppModalOpen] = React.useState(false);
+
+  // Lock body scroll whenever full-screen modal or center overlay is open
+  useBodyScrollLock(isAlarmModalOpen || isDownloadAppModalOpen || isAccountLinkModalOpen || isAccPanelOpen);
 
   // Global listener to trigger Download APK / Mobile / Container modal from anywhere
   React.useEffect(() => {
@@ -2597,7 +2612,7 @@ export default function App() {
         )
       ) : (
         /* ================= FULL PAGE SERVICE GRID ================= */
-        <div className="flex flex-col md:flex-row h-screen overflow-hidden">
+        <div className="flex flex-col md:flex-row h-[100dvh] max-h-[100dvh] overflow-hidden">
           
           {/* Responsive Sidebar */}
           <Sidebar
@@ -2649,7 +2664,7 @@ export default function App() {
             )}
 
             {/* Top Operational bar - Clean solid background, no blur bleeding over the top */}
-            <header className={`flex px-2 sm:px-6 ${isOffline ? 'pt-2' : 'pt-[max(0.5rem,env(safe-area-inset-top,0rem))]'} pb-2 sm:pb-2.5 items-center justify-between gap-1.5 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative ${
+            <header className={`flex px-2 sm:px-6 ${isOffline ? 'pt-2' : 'pt-[max(0.625rem,env(safe-area-inset-top,0.625rem))]'} pb-2 sm:pb-2.5 items-center justify-between gap-1.5 sm:gap-4 shrink-0 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative ${
               isSearchOpen ? 'z-[100]' : 'z-30'
             }`}>
               
@@ -2657,8 +2672,19 @@ export default function App() {
               <div className={`items-center gap-1.5 sm:gap-2.5 text-left shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10 shrink-0">
-                  <Activity className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                {/* Mobile Drawer Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'))}
+                  className="md:hidden min-w-[40px] min-h-[40px] p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-700 dark:text-zinc-300 touch-manipulation cursor-pointer shrink-0 flex items-center justify-center active:scale-95 shadow-2xs"
+                  aria-label="Open Navigation Menu"
+                  title="Menu"
+                >
+                  <Menu className="w-5 h-5 text-emerald-500" />
+                </button>
+
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500 text-black flex items-center justify-center font-bold shadow-md shadow-emerald-500/10 shrink-0">
+                  <Activity className="w-5 h-5" />
                 </div>
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-zinc-900 dark:text-zinc-100 hidden md:inline">ClassPulse</span>
                 <span className={`text-[10px] sm:text-xs font-bold tracking-wide px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full border shadow-2xs shrink-0 capitalize ${
@@ -2685,48 +2711,26 @@ export default function App() {
                 setIsSearchOpen={setIsSearchOpen}
               />
 
-              {/* Right controllers: Messages Shortcut, Notification Bell & Profile Circle Avatar */}
-              <div className={`items-center gap-1 sm:gap-2 shrink-0 transition-all duration-300 ${
+              {/* Right controllers: Notification Bell & Profile Circle Avatar */}
+              <div className={`items-center gap-1.5 sm:gap-2 shrink-0 transition-all duration-300 ${
                 isSearchOpen ? 'hidden sm:flex' : 'flex'
               }`}>
-                {/* Messages Shortcut Button with Live Unread Badge */}
-                <button
-                  onClick={() => {
-                    handleSetScreen('messages');
-                    speakText("Navigating to messages", accessibility.readAloud);
-                  }}
-                  type="button"
-                  className={`p-1.5 sm:p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 shrink-0 ${
-                    activeScreen === 'messages'
-                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-bold shadow-2xs'
-                      : 'text-zinc-600 dark:text-zinc-400'
-                  }`}
-                  title="Messages"
-                >
-                  <MessageSquare className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-                  {unreadMessagesCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 bg-emerald-500 text-black rounded-full flex items-center justify-center text-[9px] font-black leading-none font-mono ring-1 ring-white dark:ring-zinc-950 shadow-xs animate-pulse">
-                      {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
-                    </span>
-                  )}
-                </button>
-
                 <button
                   onClick={() => {
                     setActiveScreen('notifications');
                     speakText("Navigating to notification center", accessibility.readAloud);
                   }}
                   type="button"
-                  className={`p-1.5 sm:p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 shrink-0 ${
+                  className={`min-w-[40px] min-h-[40px] p-2 rounded-xl border flex items-center justify-center cursor-pointer transition-all relative border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900 shrink-0 active:scale-95 ${
                     activeScreen === 'notifications'
                       ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 font-bold shadow-2xs'
                       : 'text-zinc-600 dark:text-zinc-400'
                   }`}
                   title="Notifications"
                 >
-                  <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                  <Bell className="w-5 h-5" />
                   {filteredNotificationsForMe.filter(n => !n.read).length > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-1 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-bold leading-none font-mono">
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold leading-none font-mono">
                       {filteredNotificationsForMe.filter(n => !n.read).length}
                     </span>
                   )}
@@ -2749,7 +2753,7 @@ export default function App() {
                   <img
                     src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150"}
                     alt={user.name}
-                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover"
                     referrerPolicy="no-referrer"
                   />
                   <span 
@@ -2780,10 +2784,10 @@ export default function App() {
             )}
 
             {/* Primary content grid layout block */}
-            <main ref={mainScrollRef} className={`px-2 sm:px-3.5 md:px-5 pt-1.5 md:pt-2 max-w-7xl w-full mx-auto flex-1 ${
+            <main ref={mainScrollRef} className={`w-full mx-auto flex-1 ${
               activeScreen === 'messages' || activeScreen === 'tickets' 
-                ? 'flex flex-col min-h-0 overflow-hidden pb-0' 
-                : 'overflow-y-auto pb-36 sm:pb-32 md:pb-10 space-y-2.5 sm:space-y-4'
+                ? 'flex flex-col min-h-0 overflow-hidden pb-0 px-0 sm:px-4 md:px-6 pt-0 sm:pt-2 md:pt-4 max-w-7xl' 
+                : 'overflow-y-auto pb-36 sm:pb-32 md:pb-10 space-y-2.5 sm:space-y-4 px-2.5 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-5 max-w-7xl'
             }`}>
               
               {/* Accessibility options expansion widget */}

@@ -30,6 +30,7 @@ import {
 import { triggerNativeChime } from './AlarmClock';
 import { triggerHapticFeedback } from '../lib/soundUtils';
 import { speakText } from './AccessibilitySettings';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface AlarmCenterModalProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ export const AlarmCenterModal: React.FC<AlarmCenterModalProps> = ({
   enrollments = [],
   readAloud = false
 }) => {
+  useBodyScrollLock(isOpen);
+
   const [activeTab, setActiveTab] = useState<'schedule' | 'timer' | 'settings'>('schedule');
   const [permissionStatus, setPermissionStatus] = useState<string>(() => getNotificationPermissionStatus());
   const [isTestArming, setIsTestArming] = useState(false);
@@ -233,12 +236,12 @@ export const AlarmCenterModal: React.FC<AlarmCenterModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-left">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in text-left touch-none overscroll-contain">
       <motion.div 
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
-        className="w-full max-w-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] overscroll-contain"
       >
         {/* Header Bar */}
         <div className="px-4 sm:px-6 py-3.5 border-b border-zinc-200 dark:border-zinc-850 flex items-center justify-between bg-zinc-50/70 dark:bg-zinc-900/40">
@@ -313,7 +316,7 @@ export const AlarmCenterModal: React.FC<AlarmCenterModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 modal-scrollable-content overscroll-contain touch-pan-y" data-scrollable="true">
           
           {/* Permission Status Alert Banner */}
           {permissionStatus !== 'granted' && (

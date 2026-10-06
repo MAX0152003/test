@@ -2,13 +2,7 @@ import React from 'react';
 import { 
   X, 
   Download, 
-  ZoomIn, 
-  ZoomOut, 
-  RotateCw, 
-  Maximize2, 
-  Check, 
-  FileImage,
-  ExternalLink 
+  Check
 } from 'lucide-react';
 
 export interface ImagePreviewModalProps {
@@ -21,25 +15,25 @@ export interface ImagePreviewModalProps {
   readAloudEnabled?: boolean;
 }
 
+/**
+ * Standard, modern, clean photo viewer (just like Facebook Messenger, WhatsApp, and Google Photos)
+ * Displays the photo centered without heavy toolbar frames or coordinate diagnostic panels.
+ */
 export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   isOpen,
   onClose,
   imageUrl,
-  title = 'Image Attachment Preview',
+  title = 'Photo',
   subtitle,
-  fileName = 'classpulse_attachment.png',
+  fileName = 'photo.png',
   readAloudEnabled = false
 }) => {
-  const [scale, setScale] = React.useState<number>(1);
-  const [rotation, setRotation] = React.useState<number>(0);
   const [isSaved, setIsSaved] = React.useState<boolean>(false);
   const [isSaving, setIsSaving] = React.useState<boolean>(false);
 
-  // Reset transform state when modal opens with new image
+  // Reset state when modal opens
   React.useEffect(() => {
     if (isOpen) {
-      setScale(1);
-      setRotation(0);
       setIsSaved(false);
       setIsSaving(false);
     }
@@ -51,10 +45,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
       if (!isOpen) return;
       if (e.key === 'Escape') {
         onClose();
-      } else if (e.key === '+' || e.key === '=') {
-        setScale(s => Math.min(s + 0.25, 3));
-      } else if (e.key === '-') {
-        setScale(s => Math.max(s - 0.25, 0.5));
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -63,15 +53,14 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
   if (!isOpen || !imageUrl) return null;
 
-  const handleDownload = async () => {
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsSaving(true);
     try {
-      // Determine clean filename
       const cleanFileName = fileName.endsWith('.png') || fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || fileName.endsWith('.webp')
         ? fileName
         : `${fileName}.png`;
 
-      // If it's a data URL (base64)
       if (imageUrl.startsWith('data:')) {
         const link = document.createElement('a');
         link.href = imageUrl;
@@ -80,7 +69,6 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         link.click();
         document.body.removeChild(link);
       } else {
-        // Fetch as blob or fallback to canvas conversion to bypass CORS download limits
         try {
           const response = await fetch(imageUrl, { mode: 'cors' });
           if (response.ok) {
@@ -96,54 +84,31 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
           } else {
             throw new Error('Direct fetch failed');
           }
-        } catch (fetchErr) {
-          // Fallback via Image drawing on Canvas
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth || img.width;
-            canvas.height = img.naturalHeight || img.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(img, 0, 0);
-              const dataUrl = canvas.toDataURL('image/png');
-              const link = document.createElement('a');
-              link.href = dataUrl;
-              link.download = cleanFileName;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }
-          };
-          img.onerror = () => {
-            // Direct window / anchor fallback
-            const link = document.createElement('a');
-            link.href = imageUrl;
-            link.target = '_blank';
-            link.download = cleanFileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          };
-          img.src = imageUrl;
+        } catch {
+          const link = document.createElement('a');
+          link.href = imageUrl;
+          link.target = '_blank';
+          link.download = cleanFileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
         }
       }
 
       setIsSaved(true);
       if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast(`Image saved successfully: ${cleanFileName}`, 'success');
+        (window as any).showToast('Photo saved to downloads', 'success');
       }
       if (readAloudEnabled && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        const u = new SpeechSynthesisUtterance("Image saved to your downloads folder successfully.");
+        const u = new SpeechSynthesisUtterance("Photo saved to your downloads folder.");
         u.rate = 1.0;
         window.speechSynthesis.speak(u);
       }
-      setTimeout(() => setIsSaved(false), 3000);
+      setTimeout(() => setIsSaved(false), 2500);
     } catch (err) {
       console.error('Error saving image:', err);
       if (typeof window !== 'undefined' && (window as any).showToast) {
-        (window as any).showToast('Failed to save image. Try right clicking to save.', 'error');
+        (window as any).showToast('Failed to save photo. Try saving directly.', 'error');
       }
     } finally {
       setIsSaving(false);
@@ -152,130 +117,77 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6 select-none animate-fade-in"
+      className="fixed inset-0 z-[99999] flex flex-col justify-between p-3 sm:p-6 bg-black/90 backdrop-blur-sm animate-fade-in select-none"
       onClick={onClose}
     >
-      {/* Header bar */}
+      {/* Floating Header */}
       <div 
-        className="w-full max-w-5xl flex items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-zinc-900 border border-zinc-750 text-white shadow-2xl z-10 mb-3"
+        className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 z-10"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 shrink-0">
-            <FileImage className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-black text-zinc-100 truncate tracking-tight">
+        <div className="min-w-0 pr-2">
+          {title && (
+            <h3 className="text-sm font-semibold text-white/95 truncate">
               {title}
             </h3>
-            {subtitle && (
-              <p className="text-[11px] text-zinc-400 truncate">
-                {subtitle}
-              </p>
-            )}
-          </div>
+          )}
+          {subtitle && (
+            <p className="text-xs text-white/60 truncate">
+              {subtitle}
+            </p>
+          )}
         </div>
 
-        {/* Action Controls */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Zoom controls */}
-          <div className="hidden sm:flex items-center gap-1 bg-zinc-800 p-1 rounded-xl border border-zinc-700">
-            <button
-              type="button"
-              onClick={() => setScale(s => Math.max(s - 0.25, 0.5))}
-              title="Zoom Out (-)"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <span className="text-[10px] font-mono px-1.5 font-bold text-zinc-300 min-w-[42px] text-center">
-              {Math.round(scale * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => setScale(s => Math.min(s + 0.25, 3))}
-              title="Zoom In (+)"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setRotation(r => (r + 90) % 360)}
-              title="Rotate 90°"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => { setScale(1); setRotation(0); }}
-              title="Reset View"
-              className="p-1.5 rounded-lg text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* SAVE / DOWNLOAD BUTTON */}
           <button
             type="button"
             onClick={handleDownload}
             disabled={isSaving}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md active:scale-95 ${
-              isSaved
-                ? 'bg-emerald-500 text-black shadow-emerald-500/20'
-                : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
-            }`}
+            title="Save photo to device"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/25 text-white text-xs font-semibold backdrop-blur-md border border-white/15 transition-all cursor-pointer shadow-sm"
           >
             {isSaved ? (
               <>
-                <Check className="w-4 h-4 text-black stroke-[3]" />
-                <span className="hidden xs:inline">Saved!</span>
+                <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                <span className="hidden xs:inline text-emerald-400">Saved</span>
               </>
             ) : (
               <>
-                <Download className="w-4 h-4 stroke-[2.5]" />
-                <span className="hidden xs:inline">Save Image</span>
+                <Download className="w-4 h-4" />
+                <span className="hidden xs:inline">Save</span>
               </>
             )}
           </button>
 
-          {/* Close button */}
           <button
             type="button"
             onClick={onClose}
-            title="Close (Esc)"
-            className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer border border-zinc-700"
+            title="Close"
+            className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/25 text-white/90 hover:text-white backdrop-blur-md border border-white/15 transition-all cursor-pointer shadow-sm"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Main Image Stage */}
+      {/* Main Photo Centerpiece */}
       <div 
-        className="w-full max-w-5xl flex-1 flex items-center justify-center overflow-auto p-2 sm:p-4 rounded-3xl bg-zinc-950 border border-zinc-850 shadow-2xl relative"
-        onClick={(e) => e.stopPropagation()}
+        className="flex-1 w-full max-w-5xl mx-auto flex items-center justify-center min-h-0 py-2 sm:py-4"
+        onClick={onClose}
       >
-        <div 
-          className="transition-transform duration-200 flex items-center justify-center max-w-full max-h-full"
-          style={{
-            transform: `scale(${scale}) rotate(${rotation}deg)`
-          }}
-        >
-          <img
-            src={imageUrl}
-            alt={title || 'Attachment Preview'}
-            className="max-h-[72vh] max-w-[85vw] object-contain rounded-xl shadow-2xl border border-zinc-800/80"
-            referrerPolicy="no-referrer"
-          />
-        </div>
+        <img
+          src={imageUrl}
+          alt={title || 'Photo'}
+          onClick={(e) => e.stopPropagation()}
+          className="max-h-[82vh] max-w-[94vw] sm:max-w-[85vw] object-contain rounded-2xl shadow-2xl transition-all cursor-default"
+          referrerPolicy="no-referrer"
+        />
       </div>
 
-      {/* Footer hint */}
-      <div className="mt-2 text-center text-[10px] text-zinc-500 font-mono">
-        Press <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">Esc</kbd> to close • Click "Save Image" to download to your device
+      {/* Bottom Hint */}
+      <div className="w-full text-center text-[11px] text-white/40 font-sans py-1">
+        Tap anywhere or press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/70">Esc</kbd> to exit
       </div>
     </div>
   );

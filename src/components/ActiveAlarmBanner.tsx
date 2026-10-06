@@ -22,7 +22,7 @@ export const ActiveAlarmBanner: React.FC<ActiveAlarmBannerProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed top-3 sm:top-5 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-md z-[120] pointer-events-auto">
+      <div className="fixed top-[max(3.25rem,calc(env(safe-area-inset-top,0px)+0.75rem))] sm:top-5 left-3 right-3 sm:left-auto sm:right-6 sm:max-w-md z-[120] pointer-events-auto">
         <motion.div
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}

@@ -4,6 +4,7 @@ import { ClassSession, Enrollment, AttendanceRecord, FacultyStatus } from '../ty
 import AttendanceGraph from './AttendanceGraph';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import { X, Calendar, Clock, MapPin, User, Users, CheckCircle, Activity, Download, Search, Lock, Unlock, Trash2 } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface SubjectDetailModalProps {
   isOpen: boolean;
@@ -40,6 +41,8 @@ export default function SubjectDetailModal({
   onToggleCloseSubject,
   onDeleteClass
 }: SubjectDetailModalProps) {
+  useBodyScrollLock(isOpen && !!cls);
+
   if (!isOpen || !cls) return null;
 
   const [rosterSearch, setRosterSearch] = React.useState('');
@@ -137,7 +140,7 @@ export default function SubjectDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 touch-none overscroll-contain">
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
@@ -145,7 +148,7 @@ export default function SubjectDetailModal({
       />
 
       {/* Modal / Bottom Sheet Box */}
-      <div className="relative w-full max-w-2xl rounded-t-3xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-5 sm:p-6 shadow-2xl transition-all max-h-[92vh] overflow-y-auto z-10 text-left">
+      <div className="relative w-full max-w-2xl rounded-t-3xl sm:rounded-3xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 p-5 sm:p-6 shadow-2xl transition-all max-h-[92vh] overflow-y-auto z-10 text-left overscroll-contain modal-scrollable-content touch-pan-y" data-scrollable="true">
         {/* Mobile Grab Handle */}
         <div className="w-10 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700 mx-auto mb-3 sm:hidden" />
         

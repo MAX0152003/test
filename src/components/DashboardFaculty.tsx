@@ -744,6 +744,45 @@ export default function DashboardFaculty({
 
   // Compute analytics data for active monitoring class
   const monClassRecords = attendanceRecords.filter(r => r.classId === selectedMonitoringClassId);
+  const totalMonRecords = monClassRecords.length;
+  const monClassPresents = monClassRecords.filter(r => r.status === 'present').length;
+  const monClassLates = monClassRecords.filter(r => r.status === 'late').length;
+  const monClassAbsents = monClassRecords.filter(r => r.status === 'absent').length;
+
+  const uniqueMonDates = Array.from(new Set(monClassRecords.map(r => r.date)));
+  const monSessionCount = uniqueMonDates.length;
+  // If no sessions logged yet, expected capacity is 0 (0% attendance baseline)
+  const expectedClassCapacity = monSessionCount > 0 
+    ? Math.max(totalMonRecords, (monEnrollments.length || 1) * monSessionCount)
+    : 0;
+
+  // Real 0 to 100% attendance rate scaling
+  const monClassPresentsRate = expectedClassCapacity > 0 
+    ? Math.round((monClassPresents / expectedClassCapacity) * 100) 
+    : 0;
+  const monClassLatesRate = expectedClassCapacity > 0 
+    ? Math.round((monClassLates / expectedClassCapacity) * 100) 
+    : 0;
+  const unrecordedAbsents = expectedClassCapacity > (monClassPresents + monClassLates + monClassAbsents)
+    ? expectedClassCapacity - (monClassPresents + monClassLates + monClassAbsents)
+    : 0;
+  const totalMonAbsentsCount = monClassAbsents + unrecordedAbsents;
+  const monClassAbsentsRate = expectedClassCapacity > 0 
+    ? Math.round((totalMonAbsentsCount / expectedClassCapacity) * 100) 
+    : 0;
+
+  // Roster at risk (under 85% attendance rate)
+  const monClassAtRisk = monEnrollments.filter(student => {
+    const studentRecords = attendanceRecords.filter(
+      r => r.classId === selectedMonitoringClassId && 
+      (r.studentId === student.studentId || r.studentName === student.studentName)
+    );
+    const presentCount = studentRecords.filter(r => r.status === 'present').length;
+    const lateCount = studentRecords.filter(r => r.status === 'late').length;
+    const rate = studentRecords.length > 0 ? Math.round(((presentCount + lateCount) / studentRecords.length) * 100) : 0;
+    return totalMonRecords > 0 && rate < 85;
+  }).length;
+  const monClassAtRiskRate = monEnrollments.length > 0 ? (monClassAtRisk / monEnrollments.length) * 100 : 0;
 
   const handleExportSelectedClassAttendance = () => {
     if (!activeMonClass) {
@@ -850,28 +889,6 @@ export default function DashboardFaculty({
       : "";
     speakText(`Successfully exported all assigned classes attendance records to CSV${filterDesc}`, accessibility.readAloud);
   };
-
-  const totalMonRecords = monClassRecords.length;
-  const monClassPresents = monClassRecords.filter(r => r.status === 'present').length;
-  const monClassLates = monClassRecords.filter(r => r.status === 'late').length;
-  const monClassAbsents = monClassRecords.filter(r => r.status === 'absent').length;
-  
-  // Roster at risk (under 85% attendance rate)
-  const monClassAtRisk = monEnrollments.filter(student => {
-    const studentRecords = attendanceRecords.filter(
-      r => r.classId === selectedMonitoringClassId && 
-      (r.studentId === student.studentId || r.studentName === student.studentName)
-    );
-    const presentCount = studentRecords.filter(r => r.status === 'present').length;
-    const lateCount = studentRecords.filter(r => r.status === 'late').length;
-    const rate = studentRecords.length > 0 ? Math.round(((presentCount + lateCount) / studentRecords.length) * 100) : 0;
-    return totalMonRecords > 0 && rate < 85;
-  }).length;
-
-  const monClassPresentsRate = totalMonRecords > 0 ? (monClassPresents / totalMonRecords) * 100 : 0;
-  const monClassLatesRate = totalMonRecords > 0 ? (monClassLates / totalMonRecords) * 100 : 0;
-  const monClassAbsentsRate = totalMonRecords > 0 ? (monClassAbsents / totalMonRecords) * 100 : 0;
-  const monClassAtRiskRate = monEnrollments.length > 0 ? (monClassAtRisk / monEnrollments.length) * 100 : 0;
 
   const handleCommitFacultyAlarmUpdate = (status: 'attend' | 'cancel' | 'late') => {
     const matchedClass = classes.find(c => c.id === selectedAlarmClassId);
@@ -3823,7 +3840,7 @@ export default function DashboardFaculty({
             </div>
 
               {/* Subject Filter tab Selection Option Dropdown */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans w-full p-2.5 sm:p-3 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-sm shadow-zinc-950/5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans w-full p-2.5 sm:p-3 bg-white dark:bg-zinc-950 border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-sm shadow-zinc-950/5">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full max-w-md">
                   <label htmlFor="faculty-class-monitor-select" className="text-xs font-extrabold text-zinc-450 dark:text-zinc-400 uppercase tracking-widest shrink-0 flex items-center gap-1.5">
                     <Filter className="w-3.5 h-3.5 text-emerald-500" />

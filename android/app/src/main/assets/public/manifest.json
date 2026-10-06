@@ -1,0 +1,20 @@
+{
+  "name": "ClassPulse 2.0 - Mindanao State University",
+  "short_name": "ClassPulse",
+  "description": "Smart Attendance & Class Schedule Tracker for Mindanao State University",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#09090b",
+  "theme_color": "#10b981",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
