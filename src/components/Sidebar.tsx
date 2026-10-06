@@ -273,14 +273,14 @@ export default function Sidebar({
       <div
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`max-md:fixed max-md:top-0 max-md:bottom-0 max-md:left-0 z-50 h-[100dvh] max-h-[100dvh] flex flex-col justify-between transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${
+        className={`max-md:fixed max-md:inset-y-0 max-md:left-0 z-50 h-screen flex flex-col justify-between transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] transform ${
           isOpen ? 'translate-x-0 shadow-2xl' : 'max-md:-translate-x-full'
         } ${
-          isEffectiveCollapsed ? 'w-72 md:w-20' : 'w-72 sm:w-80 md:w-60'
-        } bg-white dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-850 text-zinc-900 dark:text-zinc-100 md:relative md:h-screen md:max-h-screen md:translate-x-0 md:shadow-lg`}
+          isEffectiveCollapsed ? 'w-64 md:w-20' : 'w-64 md:w-60'
+        } bg-white dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-850 text-zinc-900 dark:text-zinc-100 md:relative md:translate-x-0 md:shadow-lg`}
       >
         {/* Top Area - Brand Logo & Integrated Header Collapse Button */}
-        <div className="relative shrink-0 border-b border-zinc-200/80 dark:border-zinc-850 p-4 pt-[max(0.875rem,env(safe-area-inset-top,0.875rem))]">
+        <div className="relative shrink-0 border-b border-zinc-100 dark:border-zinc-900/60 p-3.5 pt-[max(0.875rem,env(safe-area-inset-top,0.875rem))]">
           <div className="flex items-center justify-between">
             <div 
               onClick={isEffectiveCollapsed ? toggleCollapse : undefined}
@@ -293,17 +293,17 @@ export default function Sidebar({
                 animate={{ opacity: 1, scale: 1 }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-black shrink-0 cursor-pointer shadow-sm"
+                className="relative w-9 h-9 rounded-xl bg-emerald-500 text-black flex items-center justify-center font-black shrink-0 cursor-pointer shadow-sm"
               >
-                <Activity className="w-6 h-6 stroke-[2.5]" />
+                <Activity className="w-5 h-5 stroke-[2.5]" />
               </motion.div>
 
               {!isEffectiveCollapsed && (
                 <div className="text-left flex flex-col justify-center min-w-0">
-                  <h1 className="text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase truncate">
+                  <h1 className="text-base font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 uppercase truncate">
                     Class<span className="text-emerald-500">Pulse</span>
                   </h1>
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 tracking-wide capitalize truncate">{role} Portal</span>
+                  <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 tracking-wide capitalize truncate">{role} Portal</span>
                 </div>
               )}
             </div>
@@ -315,28 +315,28 @@ export default function Sidebar({
               className="hidden md:flex p-2 rounded-xl text-zinc-400 hover:text-emerald-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-all cursor-pointer"
               title={isEffectiveCollapsed ? "Expand Sidebar Menu" : "Collapse Sidebar Menu"}
             >
-              <ChevronLeft className={`w-5 h-5 transition-transform duration-300 ${isEffectiveCollapsed ? 'rotate-180 text-emerald-500' : ''}`} />
+              <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isEffectiveCollapsed ? 'rotate-180 text-emerald-500' : ''}`} />
             </button>
 
-            {/* Mobile Drawer Close (Large 48x48px Touch Target) */}
+            {/* Mobile Drawer Close (Complies with 44x44px Touch Target Rule) */}
             <button
               onClick={() => setIsOpen(false)}
               type="button"
               aria-label="Close Navigation Menu"
-              className="md:hidden min-w-[48px] min-h-[48px] flex items-center justify-center rounded-2xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 cursor-pointer touch-manipulation"
+              className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-900 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 cursor-pointer touch-manipulation"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
         {/* Scrollable Middle Cabinet Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-3">
-          <nav className="px-3 sm:px-3.5 space-y-4 text-left">
+        <div className="flex-1 min-h-0 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-3">
+          <nav className="px-3 space-y-4 text-left">
             {navSections.map((section, idx) => (
-              <div key={section.title} className="space-y-1.5">
+              <div key={section.title} className="space-y-1">
                 {!isEffectiveCollapsed ? (
-                  <div className="px-3.5 pt-2 pb-1 text-xs font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  <div className="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                     {section.title}
                   </div>
                 ) : (
@@ -351,26 +351,26 @@ export default function Sidebar({
                       onClick={() => handleNavClick(item.id, item.label)}
                       type="button"
                       title={isEffectiveCollapsed ? item.label : undefined}
-                      className={`w-full min-h-[50px] sm:min-h-[52px] touch-manipulation flex items-center justify-between px-4 py-3 rounded-2xl transition-all text-sm sm:text-base font-bold cursor-pointer active:scale-98 group relative isolate ${
+                      className={`w-full min-h-[44px] touch-manipulation flex items-center justify-between px-3 py-2 rounded-xl transition-all text-xs sm:text-sm font-semibold cursor-pointer active:scale-95 group relative isolate ${
                         isActive 
                           ? `${roleNav.bgClass} ${roleNav.activeClass}` 
-                          : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100/90 dark:hover:bg-zinc-900/90 hover:text-zinc-950 dark:hover:text-white'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100/70 dark:hover:bg-zinc-900/70 hover:text-zinc-900 dark:hover:text-zinc-100'
                       } ${isEffectiveCollapsed ? 'justify-center px-1' : ''}`}
                     >
-                      <div className="flex items-center gap-3.5 relative z-10 min-w-0">
-                        <Icon className={`w-6 h-6 shrink-0 stroke-[2.2] transition-transform duration-200 group-hover:scale-110 ${
+                      <div className="flex items-center gap-3 relative z-10 min-w-0">
+                        <Icon className={`w-4.5 h-4.5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
                           isActive ? 'text-emerald-500' : ''
                         }`} />
                         {!isEffectiveCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
 
                       {!isEffectiveCollapsed && item.badge !== undefined && item.badge > 0 && (
-                        <span className={`text-xs font-black px-2.5 py-0.5 rounded-full shrink-0 font-mono shadow-2xs ${roleNav.badgeClass}`}>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 font-mono shadow-2xs ${roleNav.badgeClass}`}>
                           {item.badge}
                         </span>
                       )}
                       {isEffectiveCollapsed && item.badge !== undefined && item.badge > 0 && (
-                        <div className="absolute right-2 top-2 w-2.5 h-2.5 rounded-full bg-emerald-500 z-10" />
+                        <div className="absolute right-2 top-2 w-2 h-2 rounded-full bg-emerald-500 z-10" />
                       )}
                     </button>
                   );
@@ -380,27 +380,27 @@ export default function Sidebar({
           </nav>
         </div>
 
-        {/* Footer Area - Completely borderless, always within reach, zero red background, large touch targets */}
-        <div className="p-3 sm:p-4 pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] shrink-0 bg-white dark:bg-zinc-950 space-y-2.5">
+        {/* Footer Area - Sleek User Card & Logout Button with Safe Area Inset Support */}
+        <div className="p-3 pb-[max(1rem,env(safe-area-inset-bottom,1rem))] border-t border-zinc-100 dark:border-zinc-900 shrink-0 bg-white dark:bg-zinc-950 space-y-2">
           {!isEffectiveCollapsed && (
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/70">
+            <div className="flex items-center gap-2.5 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200/60 dark:border-zinc-800/60">
               <div className="relative shrink-0">
                 <img 
                   src={userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150'} 
                   alt={userName}
-                  className="w-11 h-11 rounded-full object-cover shrink-0 ring-2 ring-emerald-500/40"
+                  className="w-8 h-8 rounded-full object-cover shrink-0 border border-emerald-500/30"
                   referrerPolicy="no-referrer"
                 />
                 <span 
-                  className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-zinc-950 ${
-                    isOffline ? 'bg-amber-500 shadow-xs' : 'bg-emerald-500 shadow-xs animate-pulse'
+                  className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-950 ${
+                    isOffline ? 'bg-amber-500 shadow-xs shadow-amber-500/50' : 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse'
                   }`}
                   title={isOffline ? "Offline Mode (Local Storage)" : "Cloud Synced (Firestore)"}
                 />
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-100 truncate">{userName}</p>
-                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 truncate capitalize">{role}</p>
+                <p className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">{userName}</p>
+                <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 truncate capitalize">{role}</p>
               </div>
             </div>
           )}
@@ -412,11 +412,11 @@ export default function Sidebar({
             }}
             type="button"
             title={isEffectiveCollapsed ? "Log Out" : undefined}
-            className={`w-full min-h-[50px] touch-manipulation flex items-center gap-3 px-4 py-3 rounded-2xl text-sm sm:text-base font-bold transition-all cursor-pointer text-zinc-700 dark:text-zinc-200 bg-zinc-100/80 dark:bg-zinc-900/80 hover:bg-zinc-200/90 dark:hover:bg-zinc-800 hover:text-zinc-950 dark:hover:text-white shadow-2xs active:scale-98 group ${
-              isEffectiveCollapsed ? 'justify-center px-1' : 'justify-center'
+            className={`w-full min-h-[44px] touch-manipulation flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 active:scale-95 ${
+              isEffectiveCollapsed ? 'justify-center px-1' : ''
             }`}
           >
-            <LogOut className="w-5.5 h-5.5 shrink-0 stroke-[2.2] text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors" />
+            <LogOut className="w-4 h-4 shrink-0 opacity-80" />
             {!isEffectiveCollapsed && <span>Log Out</span>}
           </button>
         </div>

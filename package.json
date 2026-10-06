@@ -5,10 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "start": "node server.js",
+    "build": "python3 scripts/build_packages.py && vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "cap:sync": "npm run build && npx cap sync",
     "cap:build:android": "npm run build && npx cap sync android",
